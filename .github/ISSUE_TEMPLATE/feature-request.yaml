@@ -1,0 +1,30 @@
+name: Feature request
+description: Propose a user-facing outcome for Bachata S4 or its public portal.
+title: "[FEATURE] Short description"
+labels: ["type:feature", "triage:new"]
+body:
+  - type: markdown
+    attributes:
+      value: Search existing issues first. Implementation-source requests for the public ARM64 core belong in zenithblue-oss/shadps4-arm64.
+  - type: textarea
+    id: problem
+    attributes: { label: Problem, description: Describe the user problem without prescribing implementation details. }
+    validations: { required: true }
+  - type: textarea
+    id: proposed_outcome
+    attributes: { label: Proposed outcome, description: Describe what success looks like for users. }
+    validations: { required: true }
+  - type: dropdown
+    id: affected_area
+    attributes:
+      label: Affected area
+      options: [Android app, Compatibility metadata, Compatibility website, Documentation]
+    validations: { required: true }
+  - type: textarea
+    id: user_value
+    attributes: { label: User value, description: Explain who benefits and why this matters. }
+    validations: { required: true }
+  - type: textarea
+    id: alternatives
+    attributes: { label: Alternatives considered, description: Describe workarounds or other outcomes you considered. }
+    validations: { required: true }

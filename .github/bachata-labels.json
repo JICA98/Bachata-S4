@@ -1,0 +1,37 @@
+[
+  { "name": "type:compatibility", "color": "1d76db", "description": "Canonical game compatibility report", "group": "type" },
+  { "name": "type:game-bug", "color": "d73a4a", "description": "Game-specific defect linked to a compatibility report", "group": "type" },
+  { "name": "type:app-bug", "color": "b60205", "description": "Bachata Android application defect", "group": "type" },
+  { "name": "type:feature", "color": "a2eeef", "description": "Feature or user-experience request", "group": "type" },
+  { "name": "type:documentation", "color": "0075ca", "description": "Documentation change", "group": "type" },
+  { "name": "type:site", "color": "5319e7", "description": "Compatibility website change", "group": "type" },
+
+  { "name": "area:library", "color": "c5def5", "description": "Game library and discovery", "group": "area" },
+  { "name": "area:storage", "color": "c5def5", "description": "Storage, imports, or file management", "group": "area" },
+  { "name": "area:input", "color": "c5def5", "description": "Controller or input handling", "group": "area" },
+  { "name": "area:runtime", "color": "c5def5", "description": "Managed runtime behavior", "group": "area" },
+  { "name": "area:graphics", "color": "c5def5", "description": "Rendering or graphics behavior", "group": "area" },
+  { "name": "area:driver", "color": "c5def5", "description": "GPU driver selection or compatibility", "group": "area" },
+  { "name": "area:updates", "color": "c5def5", "description": "Application or data updates", "group": "area" },
+  { "name": "area:compatibility-site", "color": "c5def5", "description": "bachatas4.games compatibility portal", "group": "area" },
+  { "name": "area:metadata", "color": "c5def5", "description": "Public compatibility metadata", "group": "area" },
+
+  { "name": "triage:new", "color": "ededed", "description": "Awaiting initial maintainer review", "group": "triage" },
+  { "name": "triage:needs-info", "color": "fbca04", "description": "More reporter information is required", "group": "triage" },
+  { "name": "triage:confirmed", "color": "0e8a16", "description": "Reproduced or confirmed by a maintainer", "group": "triage" },
+  { "name": "triage:duplicate", "color": "cfd3d7", "description": "Duplicates an existing canonical report", "group": "triage" },
+  { "name": "triage:blocked", "color": "000000", "description": "Blocked by an external dependency or missing access", "group": "triage" },
+
+  { "name": "severity:crash", "color": "d93f0b", "description": "Causes a crash or immediate stop", "group": "severity" },
+  { "name": "severity:data-loss", "color": "b60205", "description": "May corrupt or lose user data", "group": "severity" },
+  { "name": "severity:regression", "color": "e99695", "description": "Previously working behavior has regressed", "group": "severity" },
+
+  { "name": "status:testing", "color": "ededed", "description": "Compatibility has not been conclusively classified", "group": "status" },
+  { "name": "status:playable", "color": "0e8a16", "description": "Playable through normal gameplay", "group": "status" },
+  { "name": "status:ingame", "color": "7cc317", "description": "Reaches gameplay with significant issues", "group": "status" },
+  { "name": "status:menus", "color": "fbca04", "description": "Reaches menus but not gameplay", "group": "status" },
+  { "name": "status:boots", "color": "f9d0c4", "description": "Boots but does not reach functional menus", "group": "status" },
+  { "name": "status:nothing", "color": "b60205", "description": "Does not produce usable output", "group": "status" },
+
+  { "name": "migration:recreated", "color": "6f42c1", "description": "Recreated from the archived public repository", "group": "migration" }
+]

@@ -1,0 +1,72 @@
+name: Game compatibility discussion
+description: Create the canonical compatibility report for one legally owned game.
+title: "[CUSAxxxxx] Exact Game Title"
+labels: ["type:compatibility", "triage:new", "status:testing"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Search this repository and https://bachatas4.games for the CUSA before submitting. One canonical issue is maintained per CUSA.
+        Remove personal information from screenshots and logs. Do not upload games, keys, firmware, or copyrighted game data.
+  - type: checkboxes
+    id: duplicate_search
+    attributes:
+      label: Duplicate search
+      options:
+        - label: I searched open and closed issues for this CUSA and found no canonical report.
+          required: true
+  - type: input
+    id: cusa
+    attributes: { label: CUSA ID, description: "Use exactly five digits and update the issue title to match.", placeholder: CUSA12345 }
+    validations: { required: true }
+  - type: input
+    id: game_title
+    attributes: { label: Exact game title }
+    validations: { required: true }
+  - type: input
+    id: region
+    attributes: { label: Region, placeholder: "US, Europe, or Japan" }
+    validations: { required: true }
+  - type: input
+    id: release
+    attributes: { label: Bachata S4 release, placeholder: v0.1.9 }
+    validations: { required: true }
+  - type: input
+    id: device
+    attributes: { label: Android device, placeholder: Manufacturer and exact model }
+    validations: { required: true }
+  - type: input
+    id: soc_gpu
+    attributes: { label: SoC and GPU, placeholder: Snapdragon 8 Gen 3 / Adreno 750 }
+    validations: { required: true }
+  - type: dropdown
+    id: driver_type
+    attributes: { label: Driver type, options: [System, Turnip, Other] }
+    validations: { required: true }
+  - type: input
+    id: driver_version
+    attributes: { label: Exact driver version }
+    validations: { required: true }
+  - type: input
+    id: game_version
+    attributes: { label: Game version }
+    validations: { required: true }
+  - type: dropdown
+    id: observed_status
+    attributes: { label: Observed compatibility status, options: [Playable, Ingame, Menus, Boots, Nothing] }
+    validations: { required: true }
+  - type: textarea
+    id: summary
+    attributes: { label: Test summary, description: "Describe boot, menus, gameplay, performance, graphics, audio, input, and stopping behavior." }
+    validations: { required: true }
+  - type: textarea
+    id: evidence
+    attributes: { label: Privacy-safe evidence, description: "Attach screenshots or relevant log excerpts after removing usernames, paths, tokens, and game data." }
+    validations: { required: false }
+  - type: checkboxes
+    id: legal_ownership
+    attributes:
+      label: Legal ownership
+      options:
+        - label: I legally own this game and created this report from my own dump.
+          required: true

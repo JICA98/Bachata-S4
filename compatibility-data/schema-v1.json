@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://bachatas4.games/schema/compatibility-v1.json",
+  "title": "Bachata S4 compatibility report",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "gameId",
+    "release",
+    "device",
+    "driver",
+    "status",
+    "testedAt"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": 1
+    },
+    "gameId": {
+      "type": "string",
+      "pattern": "^CUSA[0-9]{5}$"
+    },
+    "release": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tag"],
+      "properties": {
+        "tag": {
+          "type": "string",
+          "pattern": "^v[0-9]+\\.[0-9]+(?:\\.[0-9]+)?$"
+        },
+        "commit": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        }
+      }
+    },
+    "device": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "androidVersion"],
+      "properties": {
+        "label": { "type": "string", "minLength": 1, "maxLength": 120 },
+        "androidVersion": { "type": "string", "minLength": 1, "maxLength": 32 },
+        "soc": { "type": "string", "maxLength": 120 },
+        "gpu": { "type": "string", "maxLength": 120 },
+        "ramGb": { "type": "number", "exclusiveMinimum": 0 }
+      }
+    },
+    "driver": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "name", "version"],
+      "properties": {
+        "kind": { "enum": ["system", "turnip", "custom"] },
+        "name": { "type": "string", "minLength": 1, "maxLength": 160 },
+        "version": { "type": "string", "minLength": 1, "maxLength": 80 },
+        "build": { "type": "string", "maxLength": 160 },
+        "source": { "type": "string", "format": "uri", "pattern": "^https://" }
+      }
+    },
+    "status": {
+      "enum": ["playable", "ingame", "menus", "boots", "nothing"]
+    },
+    "testedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "notes": {
+      "type": "string",
+      "maxLength": 4000
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "report": { "type": "string", "format": "uri", "pattern": "^https://" },
+        "screenshots": {
+          "type": "array",
+          "items": { "type": "string", "format": "uri", "pattern": "^https://" },
+          "maxItems": 3
+        }
+      }
+    }
+  }
+}

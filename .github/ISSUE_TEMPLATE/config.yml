@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Bachata S4 compatibility portal
+    url: https://bachatas4.games
+    about: Search existing game reports and browse current compatibility data.
+  - name: Public ARM64 emulator core
+    url: https://github.com/zenithblue-oss/shadps4-arm64
+    about: Report or contribute changes to the open-source ARM64 core in its source repository.
+  - name: Private security report
+    url: https://github.com/JICA98/Bachata-S4/security/policy
+    about: Report security vulnerabilities privately; do not disclose them in a public issue.

@@ -1,0 +1,46 @@
+name: Android app bug
+description: Report a reproducible problem in the Bachata S4 Android application.
+title: "[APP BUG] Short description"
+labels: ["type:app-bug", "triage:new"]
+body:
+  - type: markdown
+    attributes:
+      value: Remove usernames, local paths, account data, tokens, and copyrighted game data from all evidence.
+  - type: input
+    id: release
+    attributes: { label: Bachata S4 release, placeholder: v0.1.9 }
+    validations: { required: true }
+  - type: input
+    id: android_version
+    attributes: { label: Android version, placeholder: Android 15 }
+    validations: { required: true }
+  - type: input
+    id: device
+    attributes: { label: Device, placeholder: Manufacturer and exact model }
+    validations: { required: true }
+  - type: input
+    id: soc_gpu
+    attributes: { label: SoC and GPU, placeholder: Snapdragon 8 Gen 3 / Adreno 750 }
+    validations: { required: true }
+  - type: dropdown
+    id: app_area
+    attributes:
+      label: Affected app area
+      options: [Library, Storage and imports, Input, Runtime launch, Graphics and drivers, Updates, Settings, Other]
+    validations: { required: true }
+  - type: textarea
+    id: reproduction
+    attributes: { label: Reproduction steps, description: Provide numbered steps from a clean app launch. }
+    validations: { required: true }
+  - type: textarea
+    id: expected
+    attributes: { label: Expected behavior }
+    validations: { required: true }
+  - type: textarea
+    id: actual
+    attributes: { label: Actual behavior }
+    validations: { required: true }
+  - type: textarea
+    id: evidence
+    attributes: { label: Privacy-safe logs and screenshots, description: Include only the smallest relevant excerpt. }
+    validations: { required: false }

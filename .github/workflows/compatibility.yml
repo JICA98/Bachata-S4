@@ -1,0 +1,272 @@
+name: Validate compatibility data
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out public data
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Validate reports, provenance, and file inventory
+        shell: python
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          import json
+          import os
+          import re
+          import subprocess
+          from datetime import datetime
+          from pathlib import Path
+          from urllib.parse import urlsplit
+          from urllib.request import Request, urlopen
+
+          ROOT = Path(".")
+          DATA = ROOT / "compatibility-data"
+          SCHEMA_PATH = DATA / "schema-v1.json"
+          SOURCE_PATH = ROOT / "release-metadata" / "source-links.json"
+          HTTPS_HOSTS = {"github.com", "bachatas4.games"}
+          ARTIFACT_REPO = "https://github.com/JICA98/Bachata-S4"
+          SOURCE_REPOSITORIES = {
+              "https://github.com/JICA98/Bachata-S4",
+              "https://github.com/JICA98/shadps4-arm64",
+          }
+          HEX40 = re.compile(r"^[0-9a-f]{40}$")
+          SHA256 = re.compile(r"^[0-9a-f]{64}$")
+
+          def github_json(path):
+              headers = {
+                  "Accept": "application/vnd.github+json",
+                  "X-GitHub-Api-Version": "2022-11-28",
+                  "User-Agent": "Bachata-S4-compatibility-validator",
+              }
+              token = os.environ.get("GITHUB_TOKEN")
+              if token: headers["Authorization"] = "Bearer " + token
+              request = Request("https://api.github.com/repos/" + path, headers=headers)
+              with urlopen(request, timeout=30) as response:
+                  return json.load(response)
+
+          def stop(message):
+              raise SystemExit(message)
+
+          def object_at(value, path, required, optional=()):
+              if not isinstance(value, dict):
+                  stop(f"{path}: expected object")
+              allowed = set(required) | set(optional)
+              unknown = set(value) - allowed
+              missing = set(required) - set(value)
+              if unknown:
+                  stop(f"{path}: unexpected fields {sorted(unknown)}")
+              if missing:
+                  stop(f"{path}: missing fields {sorted(missing)}")
+              return value
+
+          def string_at(value, path, minimum=0, maximum=None):
+              if not isinstance(value, str) or len(value) < minimum:
+                  stop(f"{path}: expected non-empty string")
+              if maximum is not None and len(value) > maximum:
+                  stop(f"{path}: string is too long")
+              return value
+
+          def https_at(value, path, host=None):
+              string_at(value, path, 1)
+              parsed = urlsplit(value)
+              if parsed.scheme != "https" or parsed.username or parsed.password:
+                  stop(f"{path}: must be a credential-free HTTPS URL")
+              if parsed.port is not None or not parsed.hostname:
+                  stop(f"{path}: must have a canonical host")
+              if parsed.query or parsed.fragment:
+                  stop(f"{path}: query and fragment are not allowed")
+              if host is not None and parsed.hostname != host:
+                  stop(f"{path}: unexpected host")
+              return parsed
+
+          def validate_report(report, path="report"):
+              report = object_at(report, path,
+                  ["schemaVersion", "gameId", "release", "device", "driver", "status", "testedAt"],
+                  ["notes", "evidence"])
+              if report["schemaVersion"] != 1 or isinstance(report["schemaVersion"], bool):
+                  stop(f"{path}.schemaVersion: expected integer 1")
+              if not re.fullmatch(r"CUSA[0-9]{5}", report["gameId"]):
+                  stop(f"{path}.gameId: invalid CUSA identifier")
+
+              release = object_at(report["release"], f"{path}.release", ["tag"], ["commit"])
+              if not re.fullmatch(r"^v[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[0-9A-Za-z.-]+)?$", string_at(release["tag"], f"{path}.release.tag", 1)):
+                  stop(f"{path}.release.tag: invalid release tag")
+              if "commit" in release and not HEX40.fullmatch(string_at(release["commit"], f"{path}.release.commit")):
+                  stop(f"{path}.release.commit: expected lowercase 40-hex revision")
+
+              device = object_at(report["device"], f"{path}.device", ["label", "androidVersion"], ["soc", "gpu", "ramGb"])
+              string_at(device["label"], f"{path}.device.label", 1, 120)
+              string_at(device["androidVersion"], f"{path}.device.androidVersion", 1, 32)
+              for key in ("soc", "gpu"):
+                  if key in device: string_at(device[key], f"{path}.device.{key}", 0, 120)
+              if "ramGb" in device and (isinstance(device["ramGb"], bool) or not isinstance(device["ramGb"], (int, float)) or device["ramGb"] <= 0):
+                  stop(f"{path}.device.ramGb: expected positive number")
+
+              driver = object_at(report["driver"], f"{path}.driver", ["kind", "name", "version"], ["build", "source"])
+              if driver["kind"] not in {"system", "turnip", "custom"}:
+                  stop(f"{path}.driver.kind: invalid driver kind")
+              string_at(driver["name"], f"{path}.driver.name", 1, 160)
+              string_at(driver["version"], f"{path}.driver.version", 1, 80)
+              if "build" in driver: string_at(driver["build"], f"{path}.driver.build", 0, 160)
+              if "source" in driver: https_at(driver["source"], f"{path}.driver.source")
+
+              if report["status"] not in {"playable", "ingame", "menus", "boots", "nothing"}:
+                  stop(f"{path}.status: invalid status")
+              tested = string_at(report["testedAt"], f"{path}.testedAt", 1)
+              if not re.fullmatch(r"[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}(?:\.[0-9]+)?(?:Z|[+-][0-9]{2}:[0-9]{2})", tested):
+                  stop(f"{path}.testedAt: expected full RFC3339 date-time")
+              try: datetime.fromisoformat(tested.replace("Z", "+00:00"))
+              except ValueError: stop(f"{path}.testedAt: invalid date-time")
+              if "notes" in report: string_at(report["notes"], f"{path}.notes", 0, 4000)
+              if "evidence" in report:
+                  evidence = object_at(report["evidence"], f"{path}.evidence", [], ["report", "screenshots"])
+                  if "report" in evidence: https_at(evidence["report"], f"{path}.evidence.report")
+                  if "screenshots" in evidence:
+                      shots = evidence["screenshots"]
+                      if not isinstance(shots, list) or len(shots) > 3:
+                          stop(f"{path}.evidence.screenshots: expected at most three URLs")
+                      for index, shot in enumerate(shots): https_at(shot, f"{path}.evidence.screenshots[{index}]")
+              if "serial" in json.dumps(report, sort_keys=True).lower():
+                  stop(f"{path}: device serials are not publishable")
+
+          def validate_source_links(links):
+              links = object_at(links, "source-links", ["schemaVersion", "sourceRepositories", "releaseArtifacts"])
+              if links["schemaVersion"] != 1 or isinstance(links["schemaVersion"], bool): stop("source-links.schemaVersion: expected integer 1")
+              repos = links["sourceRepositories"]
+              artifacts = links["releaseArtifacts"]
+              if not isinstance(repos, list) or not repos: stop("source-links.sourceRepositories: expected non-empty array")
+              if not isinstance(artifacts, list) or not artifacts: stop("source-links.releaseArtifacts: expected non-empty array")
+              revisions = set()
+              tags = {}
+              for index, entry in enumerate(repos):
+                  p = f"source-links.sourceRepositories[{index}]"
+                  entry = object_at(entry, p, ["name", "repository", "revision", "tag", "url"])
+                  string_at(entry["name"], p+".name", 1, 120)
+                  if entry["repository"] not in SOURCE_REPOSITORIES: stop(p+".repository: unexpected source repository")
+                  https_at(entry["repository"], p+".repository", "github.com")
+                  if not HEX40.fullmatch(string_at(entry["revision"], p+".revision")): stop(p+".revision: expected lowercase 40-hex revision")
+                  revisions.add(entry["revision"])
+                  if not re.fullmatch(r"^v[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[0-9A-Za-z.-]+)?$", string_at(entry["tag"], p+".tag", 1)): stop(p+".tag: invalid release tag")
+                  expected = entry["repository"] + "/tree/" + entry["revision"]
+                  if entry["url"] != expected: stop(p+".url: must be the exact immutable tree URL")
+                  https_at(entry["url"], p+".url", "github.com")
+                  if entry["tag"] in tags: stop(p+".tag: duplicate source tag")
+                  tags[entry["tag"]] = entry["revision"]
+                  repo_path = entry["repository"].split("https://github.com/", 1)[1]
+                  ref = github_json(repo_path + "/git/ref/tags/" + entry["tag"])
+                  target = ref.get("object", {})
+                  if target.get("type") == "tag":
+                      target = github_json(repo_path + "/git/tags/" + target.get("sha", "")).get("object", {})
+                  if target.get("type") != "commit" or target.get("sha") != entry["revision"]:
+                      stop(p+".revision: does not resolve from the remote tag")
+              release_cache = {}
+              for index, entry in enumerate(artifacts):
+                  p = f"source-links.releaseArtifacts[{index}]"
+                  entry = object_at(entry, p, ["name", "repository", "tag", "revision", "url", "sha256", "size"])
+                  string_at(entry["name"], p+".name", 1, 200)
+                  if entry["repository"] != ARTIFACT_REPO: stop(p+".repository: unexpected artifact repository")
+                  https_at(entry["repository"], p+".repository", "github.com")
+                  if not re.fullmatch(r"^v[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[0-9A-Za-z.-]+)?$", string_at(entry["tag"], p+".tag", 1)): stop(p+".tag: invalid release tag")
+                  if not HEX40.fullmatch(string_at(entry["revision"], p+".revision")) or entry["revision"] not in revisions or tags.get(entry["tag"]) != entry["revision"]: stop(p+".revision: not tied to the tagged declared source")
+                  if not SHA256.fullmatch(string_at(entry["sha256"], p+".sha256")): stop(p+".sha256: expected lowercase SHA-256")
+                  if isinstance(entry["size"], bool) or not isinstance(entry["size"], int) or entry["size"] <= 0: stop(p+".size: expected positive integer")
+                  expected = ARTIFACT_REPO + "/releases/download/" + entry["tag"] + "/" + entry["name"]
+                  if entry["url"] != expected: stop(p+".url: must be the exact release asset URL")
+                  https_at(entry["url"], p+".url", "github.com")
+                  # Query release metadata only. Public CI must never download
+                  # APK bytes because they may contain private runtime pieces.
+                  if entry["tag"] not in release_cache:
+                      release_cache[entry["tag"]] = github_json(
+                          ARTIFACT_REPO.split("https://github.com/", 1)[1] + "/releases/tags/" + entry["tag"],
+                      )
+                  release = release_cache[entry["tag"]]
+                  if release.get("tag_name") != entry["tag"] or release.get("draft"):
+                      stop(p+".tag: release metadata does not match declared tag")
+                  matches = [asset for asset in release.get("assets", []) if asset.get("name") == entry["name"]]
+                  if len(matches) != 1:
+                      stop(p+".name: release metadata must contain exactly one matching asset")
+                  asset = matches[0]
+                  if asset.get("browser_download_url") != entry["url"]:
+                      stop(p+".url: release metadata URL does not match")
+                  if asset.get("size") != entry["size"] or asset.get("digest") != "sha256:" + entry["sha256"]:
+                      stop(p+".url: release metadata digest/size does not match")
+              published = [
+                  release for release in github_json(
+                      ARTIFACT_REPO.split("https://github.com/", 1)[1] + "/releases?per_page=100",
+                  ) if not release.get("draft")
+              ]
+              remote_tags = {release.get("tag_name") for release in published}
+              if remote_tags != set(tags):
+                  stop("source-links: manifest tags do not cover the complete published release inventory")
+              declared_assets = {(entry["tag"], entry["name"]) for entry in artifacts}
+              remote_assets = {
+                  (release.get("tag_name"), asset.get("name"))
+                  for release in published
+                  for asset in release.get("assets", [])
+                  if str(asset.get("name", "")).lower().endswith(".apk")
+              }
+              if declared_assets != remote_assets:
+                  stop("source-links: manifest APK inventory does not match published release assets")
+
+          schema = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
+          if schema.get("$schema") != "https://json-schema.org/draft/2020-12/schema" or not schema.get("$id", "").startswith("https://"):
+              stop("schema-v1.json must use the reviewed HTTPS Draft 2020-12 contract")
+
+          # Reject every tracked file outside the exact portal inventory.
+          # Reports are top-level CUSA JSON only; nested/non-JSON files and
+          # accidental root/private files never silently ship.
+          allowed = {
+              "README.md", "LICENSE", ".github/workflows/compatibility.yml",
+              "compatibility-data/README.md", "compatibility-data/schema-v1.json",
+              "release-metadata/source-links.json",
+          }
+          tracked = subprocess.check_output(["git", "ls-files", "-s", "-z"], text=True)
+          for record in tracked.split("\0"):
+              if not record: continue
+              mode, _oid, _stage, rel = record.split(maxsplit=3)
+              if rel not in allowed and not re.fullmatch(r"compatibility-data/CUSA[0-9]{5}\.json", rel):
+                  stop(f"unexpected tracked portal path: {rel}")
+              if mode != "100644":
+                  stop(f"unsupported tracked portal mode: {mode} {rel}")
+
+          # Repeat the directory walk to catch files that are present in the
+          # checkout but omitted from the index during local validation.
+          for path in sorted(DATA.rglob("*")):
+              if path.is_dir(): continue
+              rel = path.relative_to(DATA).as_posix()
+              if rel not in {"README.md", "schema-v1.json"} and not re.fullmatch(r"CUSA[0-9]{5}\.json", rel):
+                  stop(f"unexpected compatibility-data path: {rel}")
+
+          reports = sorted(path for path in DATA.glob("CUSA[0-9][0-9][0-9][0-9][0-9].json"))
+          for path in reports: validate_report(json.loads(path.read_text(encoding="utf-8")), str(path))
+
+          if not SOURCE_PATH.exists(): stop("missing release-metadata/source-links.json")
+          for path in sorted((ROOT / "release-metadata").rglob("*")):
+              if path.is_file() and path != SOURCE_PATH: stop(f"unexpected release-metadata path: {path}")
+          validate_source_links(json.loads(SOURCE_PATH.read_text(encoding="utf-8")))
+
+          # Negative fixtures protect the validator itself from accidental
+          # weakening of nested types, additionalProperties, or date formats.
+          base = {"schemaVersion": 1, "gameId": "CUSA00001", "release": {"tag": "v1.0.0"}, "device": {"label": "test", "androidVersion": "16"}, "driver": {"kind": "system", "name": "system", "version": "1"}, "status": "boots", "testedAt": "2026-08-28T00:00:00Z"}
+          for bad in [
+              {**base, "release": "v1.0.0"},
+              {**base, "device": {"label": "test", "androidVersion": "16", "extra": True}},
+              {**base, "testedAt": "2026-08-28"},
+              {**base, "driver": {"kind": "system", "name": "x", "version": "1", "source": "http://example.invalid"}},
+          ]:
+              try: validate_report(bad, "negative-fixture")
+              except SystemExit: pass
+              else: stop("negative compatibility fixture was accepted")
+
+          print(f"Validated {len(reports)} compatibility report(s), exact portal inventory, and immutable release provenance")

@@ -1,0 +1,121 @@
+name: Public contribution policy
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  public-contribution-policy:
+    name: Public contribution policy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out full pull-request history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Enforce public paths and scan content
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, re, subprocess, sys
+
+          base = os.environ["BASE_SHA"]
+          head = os.environ["HEAD_SHA"]
+          changed = subprocess.check_output(
+              ["git", "diff", "--name-only", "-z", base, head]
+          ).decode().split("\0")
+          exact = {"README.md", "LICENSE", "CONTRIBUTING.md", "SECURITY.md"}
+          prefixes = (".github/", "compatibility-data/", "compatibility-site/", "docs/public/")
+          archive = re.compile(r"\.(7z|aab|apk|appimage|bz2|class|deb|dex|dll|dmg|dylib|exe|gz|jar|o|obj|rar|rpm|so|tar|tgz|xz|zip|zst)$", re.I)
+          prohibited = re.compile(r"\.(bin|elf|iso|jks|key|keystore|lic|license|p12|pem|pkg|prx|pup|rap|rif|self|sprx)$", re.I)
+          credential = re.compile(r"gh[pousr]_[A-Za-z0-9]{20,}|github[_-]?token\s*[:=]|(api|access|secret)[_-]?key\s*[:=]|BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY", re.I)
+          serial = re.compile(r"(adb\s+serial|ro\.serialno)\s*[:=]\s*[A-Za-z0-9._:-]+", re.I)
+          private = re.compile(r"BACHATA_INTERNAL_ONLY|BACHATA_PRIVATE|PUBLIC_HARDENING_PRIVATE|private/public-hardening|runtime/evidence", re.I)
+          errors = []
+
+          for path in filter(None, changed):
+              if path not in exact and not path.startswith(prefixes):
+                  errors.append(f"private implementation path is not accepted: {path}")
+              tree = subprocess.check_output(["git", "ls-tree", head, "--", path]).decode().strip()
+              if not tree:
+                  continue
+              mode = tree.split()[0]
+              if mode == "120000": errors.append(f"symbolic link is not accepted: {path}")
+              if mode == "160000": errors.append(f"gitlink is not accepted: {path}")
+              if archive.search(path): errors.append(f"binary or archive is not accepted: {path}")
+              if prohibited.search(path): errors.append(f"game, firmware, key, or license material is not accepted: {path}")
+              if mode == "160000":
+                  continue
+              data = subprocess.check_output(["git", "show", f"{head}:{path}"])
+              if len(data) > 5 * 1024 * 1024: errors.append(f"oversized contribution file: {path}")
+              if b"\0" in data or data.startswith((b"PK\x03\x04", b"\x7fELF")):
+                  errors.append(f"binary or archive payload is not accepted: {path}")
+              text = data.decode("utf-8", errors="replace")
+              if credential.search(text): errors.append(f"credential pattern found: {path}")
+              if serial.search(text): errors.append(f"ADB serial found: {path}")
+              if private.search(text): errors.append(f"private marker found: {path}")
+
+          if errors:
+              print("\n".join(errors), file=sys.stderr)
+              raise SystemExit(1)
+          PY
+
+      - name: Validate changed compatibility JSON
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          python3 - <<'PY'
+          import json, os, pathlib, re, subprocess
+          changed = subprocess.check_output(
+              ["git", "diff", "--name-only", os.environ["BASE_SHA"], os.environ["HEAD_SHA"]],
+              text=True,
+          ).splitlines()
+          for value in changed:
+              path = pathlib.Path(value)
+              if not re.fullmatch(r"compatibility-data/CUSA\d{5}\.json", value) or not path.exists():
+                  continue
+              report = json.loads(path.read_text(encoding="utf-8"))
+              expected = path.stem
+              if report.get("cusa") != expected:
+                  raise SystemExit(f"{value}: cusa must equal {expected}")
+          PY
+
+      - name: Validate changed website scripts and local links
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          while IFS= read -r path; do
+            if [[ -f "$path" && "$path" == compatibility-site/*.js ]]; then
+              node --check "$path"
+            fi
+          done < <(git diff --name-only "$BASE_SHA" "$HEAD_SHA")
+          python3 - <<'PY'
+          import os, pathlib, re, subprocess, urllib.parse
+          changed = subprocess.check_output(
+              ["git", "diff", "--name-only", os.environ["BASE_SHA"], os.environ["HEAD_SHA"]],
+              text=True,
+          ).splitlines()
+          for value in changed:
+              path = pathlib.Path(value)
+              if not value.startswith("compatibility-site/") or path.suffix != ".html" or not path.exists():
+                  continue
+              text = path.read_text(encoding="utf-8")
+              for raw in re.findall(r'(?:href|src)=["\']([^"\']+)', text, re.I):
+                  parsed = urllib.parse.urlsplit(raw)
+                  if parsed.scheme or raw.startswith(("#", "//")):
+                      continue
+                  target = (path.parent / urllib.parse.unquote(parsed.path)).resolve()
+                  root = pathlib.Path("compatibility-site").resolve()
+                  if target != root and root not in target.parents:
+                      raise SystemExit(f"{value}: local link escapes site root: {raw}")
+                  if parsed.path and not target.exists():
+                      raise SystemExit(f"{value}: missing local link target: {raw}")
+          PY

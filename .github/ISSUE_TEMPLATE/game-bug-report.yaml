@@ -1,0 +1,65 @@
+name: Game bug
+description: Report a reproducible defect for a game with a canonical compatibility issue.
+title: "[GAME BUG][CUSAxxxxx] Short description"
+labels: ["type:game-bug", "triage:new"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Link the canonical CUSA compatibility issue. Test a clean, legally owned dump without mods, patches, or cheats.
+        Remove personal information from evidence. Never upload games, keys, firmware, or copyrighted game data.
+  - type: input
+    id: cusa
+    attributes: { label: CUSA ID, placeholder: CUSA12345 }
+    validations: { required: true }
+  - type: input
+    id: canonical_issue
+    attributes: { label: Canonical compatibility issue, placeholder: "#123" }
+    validations: { required: true }
+  - type: input
+    id: release
+    attributes: { label: Bachata S4 release, placeholder: v0.1.9 }
+    validations: { required: true }
+  - type: input
+    id: device
+    attributes: { label: Android device, placeholder: Manufacturer and exact model }
+    validations: { required: true }
+  - type: dropdown
+    id: driver_type
+    attributes: { label: Driver type, options: [System, Turnip, Other] }
+    validations: { required: true }
+  - type: input
+    id: driver_version
+    attributes: { label: Exact driver version }
+    validations: { required: true }
+  - type: textarea
+    id: reproduction
+    attributes: { label: Reproduction steps, description: Provide numbered steps from a clean launch. }
+    validations: { required: true }
+  - type: textarea
+    id: expected
+    attributes: { label: Expected behavior }
+    validations: { required: true }
+  - type: textarea
+    id: actual
+    attributes: { label: Actual behavior }
+    validations: { required: true }
+  - type: dropdown
+    id: frequency
+    attributes: { label: Frequency, options: [Every time, Often, Sometimes, Once] }
+    validations: { required: true }
+  - type: dropdown
+    id: regression
+    attributes: { label: Regression state, options: [Not a regression, Regression, Unknown] }
+    validations: { required: true }
+  - type: textarea
+    id: evidence
+    attributes: { label: Privacy-safe logs and screenshots, description: "Remove usernames, paths, tokens, and game data." }
+    validations: { required: false }
+  - type: checkboxes
+    id: legal_ownership
+    attributes:
+      label: Legal ownership
+      options:
+        - label: I legally own this game and reproduced the bug using my own clean dump.
+          required: true
