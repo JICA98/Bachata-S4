@@ -1,0 +1,519 @@
+{
+  "schemaVersion": 1,
+  "capturedAt": "2026-08-29T05:45:56.703Z",
+  "source": {
+    "repository": "JICA98/Bachata-S4",
+    "repositoryId": 1275160139,
+    "forkParent": "shadps4-emu/shadPS4",
+    "heads": {
+      "gh-pages": "4582f01e32a624c8f0340053ae1c2e1030eb0135",
+      "main": "f92eedf644c18e8834e23cd705c3f55386da3988"
+    },
+    "apiVersion": "2022-11-28"
+  },
+  "counts": {
+    "openIssues": 17,
+    "comments": 23,
+    "attachments": 3
+  },
+  "retainedReleases": [
+    {
+      "id": 375830520,
+      "tag": "v0.1.9",
+      "target": "main",
+      "publishedAt": "2026-08-24T16:12:06Z",
+      "sourceUrl": "https://github.com/JICA98/Bachata-S4/releases/tag/v0.1.9",
+      "assets": [
+        {
+          "id": 527995001,
+          "name": "bachatas4-0.1.9-release.apk",
+          "sourceUrl": "https://github.com/JICA98/Bachata-S4/releases/download/v0.1.9/bachatas4-0.1.9-release.apk",
+          "contentType": "application/vnd.android.package-archive",
+          "downloadCount": 3319,
+          "size": 173641755,
+          "sha256": "ee6514f4148e3c6aa88ca0ef0ae1d41eaad464ca2d6cd1057d1c425504aa2ef2"
+        }
+      ]
+    },
+    {
+      "id": 372043706,
+      "tag": "v0.1.8",
+      "target": "main",
+      "publishedAt": "2026-08-18T01:52:17Z",
+      "sourceUrl": "https://github.com/JICA98/Bachata-S4/releases/tag/v0.1.8",
+      "assets": [
+        {
+          "id": 518771113,
+          "name": "bachatas4-0.1.8-release.apk",
+          "sourceUrl": "https://github.com/JICA98/Bachata-S4/releases/download/v0.1.8/bachatas4-0.1.8-release.apk",
+          "contentType": "application/vnd.android.package-archive",
+          "downloadCount": 1941,
+          "size": 230437472,
+          "sha256": "7cd83fb8b1526d19bee3508ac984a454ce5e7cf71bbfc08ee29a5eb02d827587"
+        }
+      ]
+    }
+  ],
+  "files": [
+    {
+      "path": "issues/attachments/2/01-410ed159-8331-43ac-a619-e43d6abefbcb",
+      "size": 40338,
+      "sha256": "a18217ff4075926fa8fce4c4bf110412bb2d7596daba3489c4d1684a62851728"
+    },
+    {
+      "path": "issues/attachments/26/01-29e179cd-0c71-4a78-9196-457fac7991eb",
+      "size": 10430108,
+      "sha256": "bd580f85a2e8495cff28d1f62ac077dbcea353ed999ee3b817c54a1e9b568135"
+    },
+    {
+      "path": "issues/attachments/8/01-138202f8-3989-44ce-866e-287586d2a1e7",
+      "size": 369504,
+      "sha256": "119e6ea93c4fa47fa1facf6e978a688263223700922b28673103655e9e6fa390"
+    },
+    {
+      "path": "issues/index.json",
+      "size": 7604,
+      "sha256": "ba5e49a69e6129f04df662c8beee548bafa5a090c6935512a57bff85d942ae9d"
+    },
+    {
+      "path": "issues/markdown/10.md",
+      "size": 3543,
+      "sha256": "9a74a278b1def384863527933aec893aa8d01b22f8c53ba464513237cc500945"
+    },
+    {
+      "path": "issues/markdown/11.md",
+      "size": 1807,
+      "sha256": "81795942e9103818a8a402b748e3edde44a80324f2819802dc3d759dd0c13758"
+    },
+    {
+      "path": "issues/markdown/12.md",
+      "size": 1968,
+      "sha256": "4b1fdd70e6d7ea761407ecd74a94bb48a7c43ff834b54925e58e4dfdb4489073"
+    },
+    {
+      "path": "issues/markdown/13.md",
+      "size": 1815,
+      "sha256": "00c82eca2f2f047f682fbab330e76aabb113531a17ed661f15ebc2ecdd10c370"
+    },
+    {
+      "path": "issues/markdown/15.md",
+      "size": 442,
+      "sha256": "b6405210d393149b856f5103c5ec46c2b77f66042d28701bb625d367126b1fe2"
+    },
+    {
+      "path": "issues/markdown/16.md",
+      "size": 918,
+      "sha256": "bd6a57a7001c92b72788dea03eef4ece77a2ed9157a6ea440f4674af4917ae8d"
+    },
+    {
+      "path": "issues/markdown/2.md",
+      "size": 1327,
+      "sha256": "42d42514c09115da09468b28393d71840c7de6ae721f8e3a90d3a091efa9dee3"
+    },
+    {
+      "path": "issues/markdown/22.md",
+      "size": 3574,
+      "sha256": "0f6ba2c072617888e689d7be18fff251267d4fc083c9904018749f64400722ba"
+    },
+    {
+      "path": "issues/markdown/23.md",
+      "size": 1550,
+      "sha256": "de7ded91dbdfcddb3ae76191c3c712fe14064b309786224a3f05427058a60ed0"
+    },
+    {
+      "path": "issues/markdown/26.md",
+      "size": 1472,
+      "sha256": "2d373cb070477caeb2fa5b516283e742d3b318a46d74c41b547bfe636f23fa01"
+    },
+    {
+      "path": "issues/markdown/3.md",
+      "size": 816,
+      "sha256": "93e1b95254de95c069734908ae1c46a39a88c760d8ec1545443e37762d713c59"
+    },
+    {
+      "path": "issues/markdown/4.md",
+      "size": 1915,
+      "sha256": "970cbdf80f46569d22b99b6c70bc67544c2541ca9e4133d24d1e79b2a3275863"
+    },
+    {
+      "path": "issues/markdown/5.md",
+      "size": 1966,
+      "sha256": "861e71f8eee8f48db3c42ae2eb24539f911a952a05d3e32de2dce6062c1cab3b"
+    },
+    {
+      "path": "issues/markdown/6.md",
+      "size": 2212,
+      "sha256": "08be9081b7625dffa15a50c3b9266f6b7edba7a32c931191f53372350864f443"
+    },
+    {
+      "path": "issues/markdown/7.md",
+      "size": 1661,
+      "sha256": "d2e78e3718ebc7941c71f2db8368269d7c7fe630cdc00ed7fbff531e51815661"
+    },
+    {
+      "path": "issues/markdown/8.md",
+      "size": 1626,
+      "sha256": "e9c4d7043d4032b7751704db285fccbfc69fdf017c9c45f5ae07ace463765053"
+    },
+    {
+      "path": "issues/markdown/9.md",
+      "size": 1824,
+      "sha256": "88a8b42c6ddb024b16031e691d1200f3eb5a2a29ee12a13eb70133a9904a3ead"
+    },
+    {
+      "path": "issues/raw/10.json",
+      "size": 9596,
+      "sha256": "f796afcfc1eb67f7cf4bb4d7f9a981168f6fc11583b5e96d989cef4d08bfa312"
+    },
+    {
+      "path": "issues/raw/11.json",
+      "size": 18214,
+      "sha256": "b231e9b520dd5981a24c676fb188854b4555bf280b14b895c6329ccaf1262e45"
+    },
+    {
+      "path": "issues/raw/12.json",
+      "size": 18375,
+      "sha256": "f8162c768a89f0381e23b718b1600f7c9cd29a59909d15c295ba3580c78731bb"
+    },
+    {
+      "path": "issues/raw/13.json",
+      "size": 18217,
+      "sha256": "8b7f61d7f3ad24814f060fdb23961ff28fb3836afd33475d827d8f61ea5be3be"
+    },
+    {
+      "path": "issues/raw/15.json",
+      "size": 10578,
+      "sha256": "cbe32dc8222b6809574c1c82896122ce5dac9d07a6b4456c72fabba5743377ce"
+    },
+    {
+      "path": "issues/raw/16.json",
+      "size": 3575,
+      "sha256": "7bd993633ce00c204c02e124ec2675485f92715488057169e7192b78135f1930"
+    },
+    {
+      "path": "issues/raw/2.json",
+      "size": 27530,
+      "sha256": "2633fb7e52ccbf5ec5476e150b31ceb80889418ccbbd4db2c11176fa2b7d027d"
+    },
+    {
+      "path": "issues/raw/22.json",
+      "size": 21683,
+      "sha256": "178a6f84286a7feb977f7e1da47031a8f71e184264103da4cf0ffa40c281c869"
+    },
+    {
+      "path": "issues/raw/23.json",
+      "size": 6073,
+      "sha256": "d6d22836294ef1f03699a173ab9fe5d25a09517f47f32a88ee4b0e86617b7029"
+    },
+    {
+      "path": "issues/raw/26.json",
+      "size": 4094,
+      "sha256": "aea0605a787edd0487a8fd1f9d0d297162fa55624b75212bd7b77b9c0834ed34"
+    },
+    {
+      "path": "issues/raw/3.json",
+      "size": 21347,
+      "sha256": "1f61cc5558325b0748d0d9126287931db9f198b68ab176be9d43b2e48effd877"
+    },
+    {
+      "path": "issues/raw/4.json",
+      "size": 27662,
+      "sha256": "a8d99d4e47512b8e9de519384fa09bd290f4f138cb53aa5e8d0a4663f1d61b15"
+    },
+    {
+      "path": "issues/raw/5.json",
+      "size": 18366,
+      "sha256": "415990e9b8752d629a6d54e0900f7eba64487b892eec73334eb6c9f64800aace"
+    },
+    {
+      "path": "issues/raw/6.json",
+      "size": 18609,
+      "sha256": "a69aa96e1eef4f93c2c038593b7a6032c14d6408d0732dacd72813d571a19e6b"
+    },
+    {
+      "path": "issues/raw/7.json",
+      "size": 18056,
+      "sha256": "e72f5560ce979dadaca507181ccac7a8f0db080168c11eb63d1c1445988e1596"
+    },
+    {
+      "path": "issues/raw/8.json",
+      "size": 20257,
+      "sha256": "8772b52b2ba0e60d6e69dde944a5687f0836b0a75072bd0338ffba8274d388ea"
+    },
+    {
+      "path": "issues/raw/9.json",
+      "size": 10119,
+      "sha256": "6a4f9a21f6c99e3618ac00597fad1c2f0fb326c4a70e7b9f860c6a2384d04832"
+    },
+    {
+      "path": "releases/index.json",
+      "size": 1413,
+      "sha256": "9baef7171d6027736d3404c647063b378f7714fced9205fa95374190fa9611ad"
+    },
+    {
+      "path": "releases/v0.1.8/bachatas4-0.1.8-release.apk",
+      "size": 230437472,
+      "sha256": "7cd83fb8b1526d19bee3508ac984a454ce5e7cf71bbfc08ee29a5eb02d827587"
+    },
+    {
+      "path": "releases/v0.1.8/release.json",
+      "size": 6840,
+      "sha256": "e8f466ea21c558fa04e9feec51958d7bbeb40b13e5eafac37a5d26e2428ee65f"
+    },
+    {
+      "path": "releases/v0.1.8/SHA256SUMS.txt",
+      "size": 94,
+      "sha256": "cd6f90281373a5a44d6e817e17d95da4a16ecacb78ec7b4a4a39f1c2aa37fbfc"
+    },
+    {
+      "path": "releases/v0.1.9/bachatas4-0.1.9-release.apk",
+      "size": 173641755,
+      "sha256": "ee6514f4148e3c6aa88ca0ef0ae1d41eaad464ca2d6cd1057d1c425504aa2ef2"
+    },
+    {
+      "path": "releases/v0.1.9/release.json",
+      "size": 5833,
+      "sha256": "cff727a089c6e79b20903688760646f488c86c08db65e3d27dad679cb652a797"
+    },
+    {
+      "path": "releases/v0.1.9/SHA256SUMS.txt",
+      "size": 94,
+      "sha256": "470d58ae439fe6b1f34475d979dcc01b5dfefaf6259426eb3fca2bb9da3719d5"
+    },
+    {
+      "path": "repository.bundle",
+      "size": 154001802,
+      "sha256": "724829d3c5aa0ed0e6f76b0094707b9b3ee0f48dc53c3a644f380f9c840ed0f3"
+    },
+    {
+      "path": "repository.git/config",
+      "size": 191,
+      "sha256": "de90dea9b633cbd05e04bdd46b56cea08c7cb3b6c4d10c50c447fd9b73148f8e"
+    },
+    {
+      "path": "repository.git/description",
+      "size": 73,
+      "sha256": "85ab6c163d43a17ea9cf7788308bca1466f1b0a8d1cc92e26e9bf63da4062aee"
+    },
+    {
+      "path": "repository.git/HEAD",
+      "size": 21,
+      "sha256": "28d25bf82af4c0e2b72f50959b2beb859e3e60b9630a5e8c603dad4ddb2b6e80"
+    },
+    {
+      "path": "repository.git/hooks/applypatch-msg.sample",
+      "size": 478,
+      "sha256": "0223497a0b8b033aa58a3a521b8629869386cf7ab0e2f101963d328aa62193f7"
+    },
+    {
+      "path": "repository.git/hooks/commit-msg.sample",
+      "size": 896,
+      "sha256": "1f74d5e9292979b573ebd59741d46cb93ff391acdd083d340b94370753d92437"
+    },
+    {
+      "path": "repository.git/hooks/fsmonitor-watchman.sample",
+      "size": 4726,
+      "sha256": "e0549964e93897b519bd8e333c037e51fff0f88ba13e086a331592bf801fa1d0"
+    },
+    {
+      "path": "repository.git/hooks/post-update.sample",
+      "size": 189,
+      "sha256": "81765af2daef323061dcbc5e61fc16481cb74b3bac9ad8a174b186523586f6c5"
+    },
+    {
+      "path": "repository.git/hooks/pre-applypatch.sample",
+      "size": 424,
+      "sha256": "e15c5b469ea3e0a695bea6f2c82bcf8e62821074939ddd85b77e0007ff165475"
+    },
+    {
+      "path": "repository.git/hooks/pre-commit.sample",
+      "size": 1649,
+      "sha256": "57185b7b9f05239d7ab52db045f5b89eb31348d7b2177eab214f5eb872e1971b"
+    },
+    {
+      "path": "repository.git/hooks/pre-merge-commit.sample",
+      "size": 416,
+      "sha256": "d3825a70337940ebbd0a5c072984e13245920cdf8898bd225c8d27a6dfc9cb53"
+    },
+    {
+      "path": "repository.git/hooks/pre-push.sample",
+      "size": 1374,
+      "sha256": "ecce9c7e04d3f5dd9d8ada81753dd1d549a9634b26770042b58dda00217d086a"
+    },
+    {
+      "path": "repository.git/hooks/pre-rebase.sample",
+      "size": 4898,
+      "sha256": "4febce867790052338076f4e66cc47efb14879d18097d1d61c8261859eaaa7b3"
+    },
+    {
+      "path": "repository.git/hooks/pre-receive.sample",
+      "size": 544,
+      "sha256": "a4c3d2b9c7bb3fd8d1441c31bd4ee71a595d66b44fcf49ddb310252320169989"
+    },
+    {
+      "path": "repository.git/hooks/prepare-commit-msg.sample",
+      "size": 1492,
+      "sha256": "e9ddcaa4189fddd25ed97fc8c789eca7b6ca16390b2392ae3276f0c8e1aa4619"
+    },
+    {
+      "path": "repository.git/hooks/push-to-checkout.sample",
+      "size": 2783,
+      "sha256": "a53d0741798b287c6dd7afa64aee473f305e65d3f49463bb9d7408ec3b12bf5f"
+    },
+    {
+      "path": "repository.git/hooks/sendemail-validate.sample",
+      "size": 2308,
+      "sha256": "44ebfc923dc5466bc009602f0ecf067b9c65459abfe8868ddc49b78e6ced7a92"
+    },
+    {
+      "path": "repository.git/hooks/update.sample",
+      "size": 3650,
+      "sha256": "8d5f2fa83e103cf08b57eaa67521df9194f45cbdbcb37da52ad586097a14d106"
+    },
+    {
+      "path": "repository.git/info/exclude",
+      "size": 240,
+      "sha256": "6671fe83b7a07c8932ee89164d1f2793b2318058eb8b98dc5c06ee0a5a3b0ec1"
+    },
+    {
+      "path": "repository.git/objects/pack/pack-90781b50aa8c114fd12563dd84621a056da1028c.idx",
+      "size": 1383992,
+      "sha256": "653187dfea84bf2e87e5df81dcda1473bff23e6cdc56fc4d8257ea7f4e9929f7"
+    },
+    {
+      "path": "repository.git/objects/pack/pack-90781b50aa8c114fd12563dd84621a056da1028c.pack",
+      "size": 154009848,
+      "sha256": "36dba7ca117c0d8bd43724f90ebba112aa10aa1131fc37cfcc75f08bbcd23bb7"
+    },
+    {
+      "path": "repository.git/objects/pack/pack-90781b50aa8c114fd12563dd84621a056da1028c.rev",
+      "size": 197612,
+      "sha256": "af0667f819cf5e0c6eca0c1db9ddde046bd373f4fbf59e3ceeaad115fd6e1ad8"
+    },
+    {
+      "path": "repository.git/packed-refs",
+      "size": 1813,
+      "sha256": "3ff7d8e6a2aa9f1af87174e564f66b5161b57e773ef18a3715acc9e6c3cc5721"
+    },
+    {
+      "path": "settings/actions-runs.json",
+      "size": 1498630,
+      "sha256": "a0380d17e3fa5c1d15acad73ec562965311ac448c83786fd0071f1c89d3b58dd"
+    },
+    {
+      "path": "settings/actions-secrets.json",
+      "size": 40,
+      "sha256": "92471c73f46340faf89cee89b506bcce30f82acb0a6dd5df525856ecfdae0682"
+    },
+    {
+      "path": "settings/actions-variables.json",
+      "size": 42,
+      "sha256": "2424b97bb87bf7617d4c3f616f6c7e646523565e7be344ca361ef89019f23865"
+    },
+    {
+      "path": "settings/actions-workflows.json",
+      "size": 1859,
+      "sha256": "6deb505bb4036ed8b747369865ae259e15cbb5d068bc13aa9760b705c9a4e530"
+    },
+    {
+      "path": "settings/branch-protections.json",
+      "size": 835,
+      "sha256": "6c702b386de30a3513106ff7d1ab825e300c6910217bbdc9b8756d95cd747cd1"
+    },
+    {
+      "path": "settings/branches.json",
+      "size": 2206,
+      "sha256": "fa328e8fd40854c0e808b7949b44ed6b58433d1812940a5e9fe64c28500f2e45"
+    },
+    {
+      "path": "settings/collaborators.json",
+      "size": 1193,
+      "sha256": "7410dd95dca7a453f56b9d1010f50d0091d03988e49ce4551cba89203f125688"
+    },
+    {
+      "path": "settings/deploy-keys.json",
+      "size": 3,
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    {
+      "path": "settings/discussions.json",
+      "size": 3,
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    {
+      "path": "settings/environments.json",
+      "size": 1262,
+      "sha256": "b46673ead7374da1b7dfcb64d89b639155fb3f58e6ddeb3caa43d9b0f7b9e073"
+    },
+    {
+      "path": "settings/hooks.json",
+      "size": 3,
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    {
+      "path": "settings/index.json",
+      "size": 395,
+      "sha256": "5e6858070ec099ebc5e68aa641f5a66c063ed7c50f18ef55634e3c024b8caad8"
+    },
+    {
+      "path": "settings/labels.json",
+      "size": 8249,
+      "sha256": "f82ac12c2809ad9042ec5ade82c8907a957db94d5dec9e83dc1db8b98be3344b"
+    },
+    {
+      "path": "settings/lfs.json",
+      "size": 46,
+      "sha256": "cb7cc129267994964657664e195cedc25526b93ea9aa27ed2b830e282abb8017"
+    },
+    {
+      "path": "settings/milestones.json",
+      "size": 3,
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    {
+      "path": "settings/packages.json",
+      "size": 3,
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    {
+      "path": "settings/pages.json",
+      "size": 610,
+      "sha256": "42c18ecce600862cfa96345b7bb510da630d2e3355a7b0542e877553c3ae09b0"
+    },
+    {
+      "path": "settings/projects.json",
+      "size": 3,
+      "sha256": "37517e5f3dc66819f61f5a7bb8ace1921282415f10551d2defa5c3eb0985b570"
+    },
+    {
+      "path": "settings/pull-request-details.json",
+      "size": 194164,
+      "sha256": "bbd347289a52730a852477f09dde627769717725227dc65ea24ea70422dbb0e2"
+    },
+    {
+      "path": "settings/pull-requests.json",
+      "size": 103417,
+      "sha256": "ed5c3c9e28fa2ac72103011272cc61edb406f7ec304b2f82687a8b25510513e1"
+    },
+    {
+      "path": "settings/refs.json",
+      "size": 9029,
+      "sha256": "40f729832f497375d5e80bf13fe4396c6f152e94f20600322b5e8e3b1b5984ed"
+    },
+    {
+      "path": "settings/repository.json",
+      "size": 18937,
+      "sha256": "f83648527a76c4c5d917543a9f0865ffa8530e9ebbebae64da9bb45ea6124aa6"
+    },
+    {
+      "path": "settings/rulesets.json",
+      "size": 581,
+      "sha256": "ef53f5b7be98a7eea6d7d0685c894c09de8f4b36fa12791e07bc4f4dd385df9c"
+    },
+    {
+      "path": "settings/wiki.json",
+      "size": 41,
+      "sha256": "32ea3f564b5d313b6f6305e29b639cbb2ecd24abacba1cfabb2325717507d12d"
+    }
+  ]
+}

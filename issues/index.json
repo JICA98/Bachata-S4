@@ -1,0 +1,239 @@
+{
+  "repository": "JICA98/Bachata-S4",
+  "openIssueCount": 17,
+  "commentCount": 23,
+  "attachmentCount": 3,
+  "issues": [
+    {
+      "number": 2,
+      "sourceId": 5040717087,
+      "sourceUrl": "https://github.com/JICA98/Bachata-S4/issues/2",
+      "author": "JICA98",
+      "createdAt": "2026-08-01T16:30:30Z",
+      "updatedAt": "2026-08-18T03:38:08Z",
+      "title": "[CUSA00900] Bloodborne",
+      "commentCount": 2,
+      "attachmentCount": 1
+    },
+    {
+      "number": 3,
+      "sourceId": 5040725901,
+      "sourceUrl": "https://github.com/JICA98/Bachata-S4/issues/3",
+      "author": "JICA98",
+      "createdAt": "2026-08-02T04:35:53Z",
+      "updatedAt": "2026-08-02T04:45:16Z",
+      "title": "[CUSA08692] Dark Souls: Remastered",
+      "commentCount": 1,
+      "attachmentCount": 0
+    },
+    {
+      "number": 4,
+      "sourceId": 5041726236,
+      "sourceUrl": "https://github.com/JICA98/Bachata-S4/issues/4",
+      "author": "JICA98",
+      "createdAt": "2026-08-02T09:27:27Z",
+      "updatedAt": "2026-08-02T09:45:30Z",
+      "title": "[CUSA07023] Sonic Mania",
+      "commentCount": 1,
+      "attachmentCount": 0
+    },
+    {
+      "number": 5,
+      "sourceId": 5041831378,
+      "sourceUrl": "https://github.com/JICA98/Bachata-S4/issues/5",
+      "author": "JICA98",
+      "createdAt": "2026-08-02T09:57:19Z",
+      "updatedAt": "2026-08-02T10:11:19Z",
+      "title": "[CUSA13801] Sekiro: Shadows Die Twice",
+      "commentCount": 1,
+      "attachmentCount": 0
+    },
+    {
+      "number": 6,
+      "sourceId": 5041901873,
+      "sourceUrl": "https://github.com/JICA98/Bachata-S4/issues/6",
+      "author": "JICA98",
+      "createdAt": "2026-08-02T10:16:53Z",
+      "updatedAt": "2026-08-02T11:14:34Z",
+      "title": "[CUSA07399] Crash Bandicoot N. Sane Trilogy",
+      "commentCount": 1,
+      "attachmentCount": 0
+    },
+    {
+      "number": 7,
+      "sourceId": 5042197523,
+      "sourceUrl": "https://github.com/JICA98/Bachata-S4/issues/7",
+      "author": "JICA98",
+      "createdAt": "2026-08-02T11:38:48Z",
+      "updatedAt": "2026-08-02T11:52:36Z",
+      "title": "[CUSA03146] Galak-Z",
+      "commentCount": 1,
+      "attachmentCount": 0
+    },
+    {
+      "number": 8,
+      "sourceId": 5099315967,
+      "sourceUrl": "https://github.com/JICA98/Bachata-S4/issues/8",
+      "author": "logistica26cyv-cell",
+      "createdAt": "2026-08-08T20:27:30Z",
+      "updatedAt": "2026-08-25T01:11:59Z",
+      "title": "[Feature Request]:",
+      "commentCount": 5,
+      "attachmentCount": 1
+    },
+    {
+      "number": 9,
+      "sourceId": 5102689602,
+      "sourceUrl": "https://github.com/JICA98/Bachata-S4/issues/9",
+      "author": "jacobmalek4-lang",
+      "createdAt": "2026-08-09T13:08:59Z",
+      "updatedAt": "2026-08-10T01:13:50Z",
+      "title": "[APP BUG]: D-Pad issue and general controller issues",
+      "commentCount": 1,
+      "attachmentCount": 0
+    },
+    {
+      "number": 10,
+      "sourceId": 5132013567,
+      "sourceUrl": "https://github.com/JICA98/Bachata-S4/issues/10",
+      "author": "CVN32",
+      "createdAt": "2026-08-12T14:31:47Z",
+      "updatedAt": "2026-08-14T13:03:13Z",
+      "title": "(CUSA17425) SnowRunner: libSceNpToolkit2.prx init issue",
+      "commentCount": 1,
+      "attachmentCount": 0
+    },
+    {
+      "number": 11,
+      "sourceId": 5150658510,
+      "sourceUrl": "https://github.com/JICA98/Bachata-S4/issues/11",
+      "author": "JICA98",
+      "createdAt": "2026-08-14T10:21:03Z",
+      "updatedAt": "2026-08-14T10:30:45Z",
+      "title": "[CUSA10454] Dragon's Crown Pro",
+      "commentCount": 1,
+      "attachmentCount": 0
+    },
+    {
+      "number": 12,
+      "sourceId": 5150758068,
+      "sourceUrl": "https://github.com/JICA98/Bachata-S4/issues/12",
+      "author": "JICA98",
+      "createdAt": "2026-08-14T10:34:57Z",
+      "updatedAt": "2026-08-14T10:42:06Z",
+      "title": "[CUSA01843] Teenage Mutant Ninja Turtles: Mutants in Manhattan",
+      "commentCount": 1,
+      "attachmentCount": 0
+    },
+    {
+      "number": 13,
+      "sourceId": 5150832604,
+      "sourceUrl": "https://github.com/JICA98/Bachata-S4/issues/13",
+      "author": "JICA98",
+      "createdAt": "2026-08-14T10:45:33Z",
+      "updatedAt": "2026-08-14T11:08:49Z",
+      "title": "[CUSA17425] SnowRunner",
+      "commentCount": 1,
+      "attachmentCount": 0
+    },
+    {
+      "number": 15,
+      "sourceId": 5177278611,
+      "sourceUrl": "https://github.com/JICA98/Bachata-S4/issues/15",
+      "author": "JICA98",
+      "createdAt": "2026-08-18T02:11:06Z",
+      "updatedAt": "2026-08-18T02:11:06Z",
+      "title": "[CUSA00093] DriveClub",
+      "commentCount": 0,
+      "attachmentCount": 0
+    },
+    {
+      "number": 16,
+      "sourceId": 5178403858,
+      "sourceUrl": "https://github.com/JICA98/Bachata-S4/issues/16",
+      "author": "Shalaykin1",
+      "createdAt": "2026-08-18T05:23:43Z",
+      "updatedAt": "2026-08-18T05:23:43Z",
+      "title": "[APP BUG]: Add permission to access files",
+      "commentCount": 0,
+      "attachmentCount": 0
+    },
+    {
+      "number": 22,
+      "sourceId": 5245937698,
+      "sourceUrl": "https://github.com/JICA98/Bachata-S4/issues/22",
+      "author": "hyperbolecubed",
+      "createdAt": "2026-08-25T12:40:33Z",
+      "updatedAt": "2026-08-27T14:56:16Z",
+      "title": "[APP BUG]: Importing game folder results in installing to internal drive no internal space. tried to change install dir to SD card but doesn't work.",
+      "commentCount": 5,
+      "attachmentCount": 0
+    },
+    {
+      "number": 23,
+      "sourceId": 5248034983,
+      "sourceUrl": "https://github.com/JICA98/Bachata-S4/issues/23",
+      "author": "xhlao5383-ux",
+      "createdAt": "2026-08-25T16:11:42Z",
+      "updatedAt": "2026-08-25T17:23:38Z",
+      "title": "[GAME BUG]:",
+      "commentCount": 1,
+      "attachmentCount": 0
+    },
+    {
+      "number": 26,
+      "sourceId": 5281511515,
+      "sourceUrl": "https://github.com/JICA98/Bachata-S4/issues/26",
+      "author": "guranu",
+      "createdAt": "2026-08-28T19:17:42Z",
+      "updatedAt": "2026-08-28T19:17:42Z",
+      "title": "[GAME BUG]: inFamous Second Son crashes the entire OS",
+      "commentCount": 0,
+      "attachmentCount": 1
+    }
+  ],
+  "attachments": [
+    {
+      "issueNumber": 2,
+      "path": "issues/attachments/2/01-410ed159-8331-43ac-a619-e43d6abefbcb",
+      "sources": [
+        {
+          "type": "comment",
+          "sourceId": 5323285394
+        }
+      ],
+      "url": "https://github.com/user-attachments/assets/410ed159-8331-43ac-a619-e43d6abefbcb",
+      "sha256": "a18217ff4075926fa8fce4c4bf110412bb2d7596daba3489c4d1684a62851728",
+      "size": 40338,
+      "contentType": "image/jpeg"
+    },
+    {
+      "issueNumber": 8,
+      "path": "issues/attachments/8/01-138202f8-3989-44ce-866e-287586d2a1e7",
+      "sources": [
+        {
+          "type": "comment",
+          "sourceId": 5234902486
+        }
+      ],
+      "url": "https://github.com/user-attachments/assets/138202f8-3989-44ce-866e-287586d2a1e7",
+      "sha256": "119e6ea93c4fa47fa1facf6e978a688263223700922b28673103655e9e6fa390",
+      "size": 369504,
+      "contentType": "image/jpeg"
+    },
+    {
+      "issueNumber": 26,
+      "path": "issues/attachments/26/01-29e179cd-0c71-4a78-9196-457fac7991eb",
+      "sources": [
+        {
+          "type": "issue",
+          "sourceId": 5281511515
+        }
+      ],
+      "url": "https://github.com/user-attachments/assets/29e179cd-0c71-4a78-9196-457fac7991eb",
+      "sha256": "bd580f85a2e8495cff28d1f62ac077dbcea353ed999ee3b817c54a1e9b568135",
+      "size": 10430108,
+      "contentType": "video/mp4"
+    }
+  ]
+}
