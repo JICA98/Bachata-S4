@@ -1,0 +1,408 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Bachata S4 is an experimental PlayStation 4 emulator for ARM64 Android devices. Explore the public compatibility database and the open-source ARM64 emulator core.">
+  <meta name="theme-color" content="#0a0d16">
+  <meta name="bachata-deployment" content="bachata-public-standalone:v1">
+  <meta name="google-adsense-account" content="ca-pub-8704776489115590">
+  <link rel="canonical" href="https://bachatas4.games/">
+  <meta property="og:title" content="Bachata S4 — PS4 Emulation on Android">
+  <meta property="og:description" content="Experimental PlayStation 4 emulation for ARM64 Android. Search public compatibility reports and find the open-source ARM64 emulator core.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://bachatas4.games/">
+  <meta property="og:image" content="https://bachatas4.games/assets/bachata-s4-logo.png">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Bachata S4 — PS4 Emulation on Android">
+  <meta name="twitter:description" content="Experimental PS4 emulation for ARM64 Android. Explore public compatibility reports and the open-source ARM64 emulator core.">
+  <meta name="twitter:image" content="https://bachatas4.games/assets/bachata-s4-logo.png">
+  <title>Bachata S4 — PS4 Emulation on Android</title>
+  <link rel="icon" href="assets/bachata-s4-logo.png">
+  <link rel="stylesheet" href="assets/css/styles.css">
+  <script>
+    (function () {
+      var params = new URLSearchParams(location.search);
+      var game = params.get('game');
+      if (game && /^CUSA\d{4,6}$/i.test(game)) {
+        var target = new URL('compatibility.html', location.href);
+        target.search = params.toString();
+        location.replace(target.href);
+      }
+    })();
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": "https://bachatas4.games/#website",
+        "url": "https://bachatas4.games/",
+        "name": "Bachata S4",
+        "description": "Experimental PlayStation 4 emulation for ARM64 Android devices, with a public community-maintained game compatibility database.",
+        "publisher": {
+          "@type": "Organization",
+          "name": "Bachata S4 project",
+          "url": "https://github.com/JICA98/Bachata-S4"
+        }
+      },
+      {
+        "@type": "SoftwareApplication",
+        "@id": "https://bachatas4.games/#software",
+        "name": "Bachata S4",
+        "url": "https://bachatas4.games/",
+        "applicationCategory": "GameApplication",
+        "operatingSystem": "Android 12 and newer (ARM64)",
+        "description": "Experimental PlayStation 4 emulator for ARM64 Android devices, based on the shadPS4 emulator core.",
+        "author": {
+          "@type": "Organization",
+          "name": "Bachata S4 project",
+          "url": "https://github.com/JICA98/Bachata-S4"
+        }
+      }
+    ]
+  }
+  </script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="./" aria-label="Bachata S4 home">
+        <img src="assets/bachata-s4-logo.png" alt="" width="48" height="48">
+        <span>
+          <strong>Bachata S4</strong>
+          <small>PS4 emulation on Android</small>
+        </span>
+      </a>
+      <nav class="site-nav" id="site-nav" aria-label="Primary">
+        <a class="nav-link" href="index.html" aria-current="page">Home</a>
+        <a class="nav-link" href="compatibility.html">Compatibility</a>
+        <a class="nav-link" href="updates.html">Updates</a>
+        <a class="nav-link" href="methodology.html">How Testing Works</a>
+        <a class="nav-link" href="about.html">About</a>
+        <a class="nav-link" href="contact.html">Contact</a>
+        <a class="nav-link nav-external" href="https://github.com/JICA98/Bachata-S4" target="_blank" rel="noreferrer">GitHub</a>
+      </nav>
+      <div class="header-actions">
+        <button class="icon-button" id="theme-toggle" type="button" aria-label="Switch color theme" title="Switch color theme">
+          <span aria-hidden="true">◐</span>
+        </button>
+        <button class="icon-button nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu" title="Menu">
+          <span class="nav-toggle-bars" aria-hidden="true"></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main id="main">
+    <section class="hero home-hero">
+      <div class="container hero-grid">
+        <div class="hero-copy">
+          <span class="eyebrow">Experimental ARM64 emulation</span>
+          <h1>PlayStation 4 emulation on <span>Android</span>.</h1>
+          <p>Bachata S4 is an experimental PlayStation 4 emulator for ARM64 Android devices, built on the shadPS4 emulator core. Every compatibility result on this site comes with the exact release, phone, graphics driver, screenshots, and logs behind it.</p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="compatibility.html">Explore compatibility</a>
+            <a class="button button-secondary" href="https://github.com/JICA98/Bachata-S4" target="_blank" rel="noreferrer">View on GitHub</a>
+            <a class="button button-secondary" href="https://play.google.com/store/apps/details?id=com.bachatas4.android" target="_blank" rel="noreferrer">Get Bachata S4</a>
+          </div>
+        </div>
+        <div class="status-legend" aria-label="Compatibility status definitions">
+          <article><span class="status-dot playable"></span><div><strong>Playable</strong><small>Completable without major issues</small></div></article>
+          <article><span class="status-dot ingame"></span><div><strong>Ingame</strong><small>Gameplay works with major issues</small></div></article>
+          <article><span class="status-dot menus"></span><div><strong>Menus</strong><small>Reaches menus, not gameplay</small></div></article>
+          <article><span class="status-dot boots"></span><div><strong>Boots</strong><small>Visual or audio output before menus</small></div></article>
+          <article><span class="status-dot nothing"></span><div><strong>Nothing</strong><small>Crash, hang, or black screen</small></div></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="about-section" aria-label="What is Bachata S4">
+      <div class="container">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">The project</span>
+            <h2>What is Bachata S4?</h2>
+          </div>
+        </div>
+        <div class="about-grid">
+          <article>
+            <h3>A PS4 emulator that runs on your phone</h3>
+            <p>Bachata S4 adapts the <a href="https://github.com/shadps4-emu/shadPS4" target="_blank" rel="noreferrer">shadPS4</a> emulator core to modern ARM64 Android hardware. PlayStation 4 software is built for x86-64 processors, so Bachata S4 runs PS4 game code through <strong>FEX</strong>, an open-source x86-64 emulator for ARM devices, inside a managed Linux (glibc) runtime packaged with the app. Graphics are rendered with <strong>Vulkan</strong>, using either the system's Vulkan driver or an explicitly selected driver such as <strong>Mesa Turnip</strong>.</p>
+          </article>
+          <article>
+            <h3>Why it is experimental</h3>
+            <p>PS4 emulation on Android is demanding: the emulator must translate game code, keep a full Linux environment alive, and drive a modern GPU in real time — all on mobile-class silicon and power budgets. Games that run on one phone may not run on another, and results can change with every release, driver, and thermal state. Treat compatibility reports as evidence for a specific configuration, not as promises.</p>
+          </article>
+          <article>
+            <h3>Public source and evidence</h3>
+            <p>The <a href="https://github.com/zenithblue-oss/shadps4-arm64" target="_blank" rel="noreferrer">ARM64 emulator client and core</a> remain open source. This release and community repository publishes the compatibility database, issue discussions, release notes, and downloads. Anyone can inspect report evidence or contribute a test of a game they legally own.</p>
+          </article>
+          <article>
+            <h3>This website</h3>
+            <p>This site publishes the compatibility database: one canonical entry per game serial (CUSA ID), with every report tied to an exact emulator release, device, SoC, GPU, Android version, and graphics driver — plus screenshots, logs, and measured performance.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="browser-section cards-section" aria-label="What you can find here">
+      <div class="container">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Explore</span>
+            <h2>What you can find here</h2>
+          </div>
+        </div>
+        <div class="cards-grid">
+          <article class="find-card">
+            <span class="find-icon" aria-hidden="true">▦</span>
+            <h3>Compatibility Database</h3>
+            <p>Compare actual game test reports — one entry per CUSA serial, with search and filters for release, status, device, driver, and GPU.</p>
+            <a class="button button-secondary" href="compatibility.html">Browse the database</a>
+          </article>
+          <article class="find-card">
+            <span class="find-icon" aria-hidden="true">▤</span>
+            <h3>Devices &amp; Drivers</h3>
+            <p>See the exact phone, SoC, GPU, Android version, and Turnip or system driver used for each test before comparing with your own setup.</p>
+            <a class="button button-secondary" href="compatibility.html#games">See test configurations</a>
+          </article>
+          <article class="find-card">
+            <span class="find-icon" aria-hidden="true">▣</span>
+            <h3>Evidence</h3>
+            <p>Open the screenshots, compressed session logs, and measured performance behind every report. Evidence is public by design.</p>
+            <a class="button button-secondary" href="methodology.html">How evidence is collected</a>
+          </article>
+          <article class="find-card">
+            <span class="find-icon" aria-hidden="true">◎</span>
+            <h3>Community Discussions</h3>
+            <p>Jump directly to the canonical GitHub issue for each title, or browse all game reports in the issue tracker.</p>
+            <a class="button button-secondary" href="https://github.com/JICA98/Bachata-S4/issues?q=is%3Aissue%20label%3Agame-report" target="_blank" rel="noreferrer">Open discussions</a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="stats-section" aria-label="Live project numbers">
+      <div class="container">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Generated from real reports</span>
+            <h2>Live project numbers</h2>
+          </div>
+          <p id="stats-meta" aria-live="polite"></p>
+        </div>
+        <div class="stats-grid">
+          <article class="stat-card"><span id="stat-games">—</span><small>Tested games</small></article>
+          <article class="stat-card"><span id="stat-reports">—</span><small>Total reports</small></article>
+          <article class="stat-card"><span id="stat-devices">—</span><small>Devices represented</small></article>
+          <article class="stat-card"><span id="stat-playable">—</span><small>Playable</small></article>
+          <article class="stat-card"><span id="stat-ingame">—</span><small>Ingame</small></article>
+        </div>
+      </div>
+    </section>
+
+    <section class="browser-section latest-section" id="latest" aria-label="Latest compatibility reports">
+      <div class="container">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Fresh from testers</span>
+            <h2>Latest compatibility reports</h2>
+          </div>
+          <p>Most recent test results, from the generated site data.</p>
+        </div>
+        <div class="latest-list" id="latest-list" aria-live="polite" aria-busy="true">
+          <div class="dialog-loading"><strong>Loading latest reports…</strong></div>
+        </div>
+        <div class="load-more-wrap">
+          <a class="button button-secondary" href="compatibility.html">Browse all compatibility reports</a>
+          <a class="button button-secondary" href="updates.html">Full updates feed</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="about-section" aria-label="Why results differ">
+      <div class="container">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Reading reports correctly</span>
+            <h2>Why results differ</h2>
+          </div>
+        </div>
+        <div class="about-grid">
+          <article>
+            <h3>Every report is a snapshot</h3>
+            <p>A compatibility result describes one emulator release on one device on one day. The same game can behave differently depending on the <strong>Bachata S4 release</strong>, the <strong>SoC or CPU architecture generation</strong>, the <strong>GPU</strong>, the <strong>Android version</strong>, and the <strong>graphics driver</strong> — including the exact <strong>Turnip version</strong> when a custom driver is used.</p>
+          </article>
+          <article>
+            <h3>Beyond the hardware</h3>
+            <p>Results also vary with <strong>thermals</strong> (long sessions throttle mobile chips), the <strong>game update or version</strong> tested, and <strong>emulator settings</strong> such as resolution scale. Two phones with the same chip can still give different results because of cooling, firmware, and driver builds.</p>
+          </article>
+          <article>
+            <h3>Check before you compare</h3>
+            <p>Before trusting a report, match its release, device, driver, and game version against your own setup. If your result differs, that is normal — and the project would like to hear about it: new reports are how compatibility gets better.</p>
+          </article>
+          <article>
+            <h3>Results can regress</h3>
+            <p>Emulator development is not a straight line. A release that improves one game can change rendering or audio for another. That is why multiple reports per game are preserved instead of overwritten — history stays visible.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="browser-section how-section" id="how" aria-label="How testing works">
+      <div class="container">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Evidence-first</span>
+            <h2>How testing works</h2>
+          </div>
+          <p><a class="release-link" href="methodology.html">Full methodology →</a></p>
+        </div>
+        <ol class="steps-grid">
+          <li class="step-card">
+            <span class="step-number" aria-hidden="true">1</span>
+            <h3>Pick an official release</h3>
+            <p>Testers select a published Bachata S4 release — never a local or dirty build.</p>
+          </li>
+          <li class="step-card">
+            <span class="step-number" aria-hidden="true">2</span>
+            <h3>Record the environment</h3>
+            <p>Exact device, SoC, GPU, Android version, and graphics driver (including Turnip version) are recorded up front.</p>
+          </li>
+          <li class="step-card">
+            <span class="step-number" aria-hidden="true">3</span>
+            <h3>Test legally owned software</h3>
+            <p>Only software the tester legally owns is launched — games, or open-source homebrew.</p>
+          </li>
+          <li class="step-card">
+            <span class="step-number" aria-hidden="true">4</span>
+            <h3>Publish evidence</h3>
+            <p>Screenshots, compressed logs, and measured performance are submitted for review before the report is merged.</p>
+          </li>
+        </ol>
+      </div>
+    </section>
+
+    <section class="about-section" aria-label="Compatibility status definitions">
+      <div class="container">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Status meanings</span>
+            <h2>Status definitions</h2>
+          </div>
+        </div>
+        <div class="status-defs">
+          <article class="status-def">
+            <span class="status-dot playable"></span>
+            <div><strong>Playable</strong><p>Suitable for normal play in the tested configuration, with no major blocker found.</p></div>
+          </article>
+          <article class="status-def">
+            <span class="status-dot ingame"></span>
+            <div><strong>Ingame</strong><p>Reaches controllable gameplay, but completion and full stability are not verified. Ingame is not the same as playable.</p></div>
+          </article>
+          <article class="status-def">
+            <span class="status-dot menus"></span>
+            <div><strong>Menus</strong><p>Reaches menus or title screens, but not controllable gameplay.</p></div>
+          </article>
+          <article class="status-def">
+            <span class="status-dot boots"></span>
+            <div><strong>Boots</strong><p>Starts and produces meaningful visual or audio output before an early blocker.</p></div>
+          </article>
+          <article class="status-def">
+            <span class="status-dot nothing"></span>
+            <div><strong>Nothing</strong><p>Crashes, hangs, or fails to produce useful output in the tested configuration.</p></div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="browser-section how-section" id="community" aria-label="Open source and community">
+      <div class="container">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Open source</span>
+            <h2>Development happens publicly</h2>
+          </div>
+        </div>
+        <div class="cards-grid">
+          <article class="find-card">
+            <span class="find-icon" aria-hidden="true">⌥</span>
+            <h3>Source code</h3>
+            <p>The emulator, Android frontend, and runtime build recipes are on GitHub under an open-source license.</p>
+            <a class="button button-secondary" href="https://github.com/JICA98/Bachata-S4" target="_blank" rel="noreferrer">JICA98/Bachata-S4</a>
+          </article>
+          <article class="find-card">
+            <span class="find-icon" aria-hidden="true">◫</span>
+            <h3>Game discussions</h3>
+            <p>One canonical issue per game, labelled <code>game-report</code>, with the best confirmed status kept up to date.</p>
+            <a class="button button-secondary" href="https://github.com/JICA98/Bachata-S4/issues?q=is%3Aissue%20label%3Agame-report" target="_blank" rel="noreferrer">Browse game issues</a>
+          </article>
+          <article class="find-card">
+            <span class="find-icon" aria-hidden="true">▦</span>
+            <h3>Compatibility data</h3>
+            <p>Structured reports, screenshots, and compressed logs live in a separate repository with validation on every change.</p>
+            <a class="button button-secondary" href="https://github.com/JICA98/Bachata-S4-Compatibility" target="_blank" rel="noreferrer">Bachata-S4-Compatibility</a>
+          </article>
+          <article class="find-card">
+            <span class="find-icon" aria-hidden="true">▣</span>
+            <h3>Test something</h3>
+            <p>Have a game not listed yet? The contribution skill walks through the full evidence workflow.</p>
+            <a class="button button-secondary" href="https://github.com/JICA98/Bachata-S4/tree/main/.agents/skills/bachata-compatibility" target="_blank" rel="noreferrer">Contribution workflow</a>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="about-section legal-section" aria-label="Legal and trust">
+      <div class="container">
+        <div class="section-heading">
+          <div>
+            <span class="eyebrow">Clear and honest</span>
+            <h2>Legal &amp; trust</h2>
+          </div>
+        </div>
+        <div class="about-grid">
+          <article>
+            <h3>Independent project</h3>
+            <p>Bachata S4 is an independent open-source project and is <strong>not affiliated with, endorsed by, or sponsored by Sony Interactive Entertainment</strong>. “PlayStation” and related marks are trademarks of their respective owners.</p>
+          </article>
+          <article>
+            <h3>No distribution of protected content</h3>
+            <p>Bachata S4 <strong>does not distribute games, firmware, decryption keys, or licenses</strong>. Users are expected to run only software they legally own, such as their own dumps or open-source homebrew. Every compatibility report follows the same rule.</p>
+          </article>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <div class="brand footer-brand">
+        <img src="assets/bachata-s4-logo.png" alt="" width="38" height="38">
+        <span><strong>Bachata S4</strong><small>Frontend from Bachata S4 · reports from the compatibility repository</small></span>
+      </div>
+      <div class="footer-col">
+        <nav class="footer-nav" aria-label="Site">
+          <a href="index.html">Home</a>
+          <a href="compatibility.html">Compatibility</a>
+          <a href="updates.html">Updates</a>
+          <a href="methodology.html">How Testing Works</a>
+          <a href="about.html">About</a>
+          <a href="contact.html">Contact</a>
+          <a href="privacy.html">Privacy</a>
+          <a href="terms.html">Terms</a>
+          <a href="https://github.com/JICA98/Bachata-S4" target="_blank" rel="noreferrer">GitHub</a>
+        </nav>
+        <p>Bachata S4 is an independent project, not affiliated with Sony Interactive Entertainment. Only test games and firmware files you legally own. Reports describe emulator behavior and do not provide game content.</p>
+      </div>
+    </div>
+  </footer>
+
+  <script defer src="assets/js/site.js"></script>
+  <script defer src="assets/js/home.js"></script>
+</body>
+</html>
