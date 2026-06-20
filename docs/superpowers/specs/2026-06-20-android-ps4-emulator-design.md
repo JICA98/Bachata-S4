@@ -70,11 +70,11 @@ Feature modules depend on core interfaces. Core modules never depend on features
 
 ### Runtime bundle
 
-Runtime artifacts are reproducible, pinned, and described by a manifest containing component name, upstream revision, license, ABI, compressed size, installed size, and SHA-256 digest. MVP archives are generated before the Android build and packaged as APK assets, so APK signing authenticates the manifest and archive together. Large generated binaries remain ignored source-tree build outputs.
+Runtime artifacts are reproducible, pinned, and described by a manifest containing component name, upstream revision, license, ABI, compressed size, installed size, and SHA-256 digest. MVP archives are generated before the Android build and packaged as APK assets, so APK signing authenticates the manifest and archive together. Android forbids executing binaries extracted into writable app data: Box64 is therefore packaged as an ARM64 native-library artifact named `libbox64.so` and launched from the APK-managed `nativeLibraryDir`. The rootfs and x86-64 programs remain non-executable data interpreted by Box64. Large generated binaries remain ignored source-tree build outputs.
 
 Bundle contains:
 
-- ARM64 Box64 executable and required wrapper libraries.
+- ARM64 Box64 PIE executable packaged as `libbox64.so`, plus required wrapper libraries under `jniLibs/arm64-v8a`.
 - Minimal ARM64 glibc userspace needed by Box64 and native wrappers.
 - Pinned x86-64 glibc libraries needed by the shadPS4 executable.
 - ARM64 Android X server adapted from Winlator's LGPL-2.1 `winlator-app` X server at a pinned revision, with retained notices and source modifications.
@@ -89,7 +89,7 @@ Build scripts fetch only pinned upstream revisions, verify hashes, apply reposit
 
 `EmulationService` is a foreground service started only by explicit user action. `RuntimeSupervisor` owns one session at a time and moves it through `Idle`, `Preparing`, `Starting`, `Running`, `Stopping`, `Stopped`, or `Failed` states.
 
-The service starts the embedded X server and audio bridge, then launches Box64 with an explicit environment and the x86-64 shadPS4 executable. No shell command is constructed from user input. Arguments are passed as an array. Runtime files live under app-private storage and are not executable from shared storage.
+The service starts the embedded X server and audio bridge in app-owned native code, then launches `nativeLibraryDir/libbox64.so` with an explicit environment and the app-private x86-64 shadPS4 path. No shell command is constructed from user input. Arguments are passed as an array. Extracted runtime files are treated as data and never passed directly to Android's `execve`.
 
 Control and telemetry use a versioned local Unix-domain socket protocol. Messages use length-prefixed JSON for the MVP because traffic is low volume and logs remain human-readable. Protocol messages cover handshake, launch, stop, lifecycle, controller input, structured log events, frame statistics, fatal error, and clean exit. Unknown message versions fail closed with a reinstall-required error.
 
@@ -145,7 +145,7 @@ Qualification runs use fixed workloads and cold/warm trials. Recorded metrics in
 - App ships no Sony firmware, keys, games, or URLs intended to obtain them.
 - Imported content remains local and user-controlled.
 - Runtime archives and extracted files are hash-verified before execution.
-- Executable files are app-owned, non-world-writable, and never loaded from arbitrary shared paths.
+- Kernel-executed ARM64 code comes only from APK-managed `nativeLibraryDir`; writable app data contains interpreted x86-64 programs and rootfs data, never kernel-executed files.
 - Child process environment is allowlisted; user data never becomes shell syntax.
 - Local socket accepts only the app-owned session and validates protocol handshake.
 - GPL-2.0-or-later obligations from this fork apply to distributed derivative binaries and corresponding source/build scripts.
