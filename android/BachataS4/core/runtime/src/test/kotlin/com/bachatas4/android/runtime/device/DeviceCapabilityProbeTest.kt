@@ -20,6 +20,7 @@ class DeviceCapabilityProbeTest {
     @Test
     fun matchingIsCaseInsensitive() {
         assertTrue(classify("sm8650", "qualcomm ADRENO 750").supported)
+        assertTrue(classify("SM8650", "Qualcomm Adreno (TM) 750 GPU").supported)
         assertTrue(classify("sm8750", "adreno 830").supported)
     }
 
@@ -27,6 +28,15 @@ class DeviceCapabilityProbeTest {
     fun rejectsWrongSocGpuPairings() {
         assertFalse(classify("SM8650", "Adreno 830").supported)
         assertFalse(classify("SM8750", "Adreno 750").supported)
+    }
+
+    @Test
+    fun rejectsGpuNamesWithoutModelTokenBoundaries() {
+        assertFalse(classify("SM8650", "Adreno 7500").supported)
+        assertFalse(classify("SM8650", "FakeAdreno 750").supported)
+        assertFalse(classify("SM8650", "Adreno 750Pro").supported)
+        assertFalse(classify("SM8750", "Adreno 8300").supported)
+        assertFalse(classify("SM8750", "FakeAdreno 830").supported)
     }
 
     @Test

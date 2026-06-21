@@ -37,10 +37,19 @@ class DeviceCapabilityProbe(
 
 internal fun classify(soc: String, gpu: String): DeviceProfile = when {
     soc.equals("SM8650", ignoreCase = true) &&
-        gpu.contains("Adreno 750", ignoreCase = true) -> DeviceProfile(soc, gpu, true)
+        gpu.matchesAdrenoModel("750") -> DeviceProfile(soc, gpu, true)
     soc.equals("SM8750", ignoreCase = true) &&
-        gpu.contains("Adreno 830", ignoreCase = true) -> DeviceProfile(soc, gpu, true)
+        gpu.matchesAdrenoModel("830") -> DeviceProfile(soc, gpu, true)
     else -> DeviceProfile(soc, gpu, false)
+}
+
+private fun String.matchesAdrenoModel(model: String): Boolean {
+    val tokens = lowercase()
+        .split(NON_ALPHANUMERIC)
+        .filter { it.isNotEmpty() && it != "tm" }
+    return tokens.zipWithNext().any { (family, candidate) ->
+        family == "adreno" && candidate == model
+    }
 }
 
 private data object AndroidSocModelProvider : SocModelProvider {
@@ -48,3 +57,4 @@ private data object AndroidSocModelProvider : SocModelProvider {
 }
 
 private const val UNVERIFIED_GPU = "unverified"
+private val NON_ALPHANUMERIC = Regex("[^a-z0-9]+")
