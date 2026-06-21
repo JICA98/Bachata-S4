@@ -6,9 +6,9 @@ plugins {
 }
 
 android {
-    namespace = "com.bachatas4.android.feature.home"
+    namespace = "com.bachatas4.android.feature.library"
     compileSdk = 37
-    defaultConfig { minSdk = 24 }
+    defaultConfig { minSdk = 31 }
     buildFeatures { compose = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -17,14 +17,14 @@ android {
 }
 
 dependencies {
-    implementation(project(":core:designsystem"))
     implementation(project(":core:data"))
-
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(platform(libs.compose.bom))
-    implementation(libs.compose.ui)
+    implementation(project(":core:model"))
+    implementation(project(":core:designsystem"))
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
+    implementation(libs.androidx.navigation.compose)
+    implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
-    ksp("org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.0")
+    ksp(libs.kotlin.metadata.jvm)
 }

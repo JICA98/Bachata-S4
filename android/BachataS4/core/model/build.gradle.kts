@@ -1,13 +1,12 @@
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.compose.compiler)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
-    namespace = "com.bachatas4.android.designsystem"
+    namespace = "com.bachatas4.android.model"
     compileSdk = 37
     defaultConfig { minSdk = 31 }
-    buildFeatures { compose = true }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -15,7 +14,6 @@ android {
 }
 
 dependencies {
-    api(platform(libs.compose.bom))
-    api(libs.compose.material3)
-    api(libs.compose.ui)
+    implementation(libs.kotlinx.serialization.json)
+    testImplementation(libs.junit)
 }

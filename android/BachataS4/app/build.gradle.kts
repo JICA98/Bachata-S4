@@ -36,7 +36,10 @@ android {
 dependencies {
     implementation(project(":core:designsystem"))
     implementation(project(":core:data"))
-    implementation(project(":feature:home"))
+    implementation(project(":feature:setup"))
+    implementation(project(":feature:library"))
+    implementation(project(":feature:session"))
+    implementation(project(":feature:settings"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
@@ -45,5 +48,5 @@ dependencies {
     implementation(libs.compose.ui)
     implementation(libs.hilt.android)
     ksp(libs.hilt.compiler)
-    ksp("org.jetbrains.kotlin:kotlin-metadata-jvm:2.4.0")
+    ksp(libs.kotlin.metadata.jvm)
 }

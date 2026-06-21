@@ -1,11 +1,10 @@
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.hilt)
-    alias(libs.plugins.ksp)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
-    namespace = "com.bachatas4.android.data"
+    namespace = "com.bachatas4.android.runtime"
     compileSdk = 37
     defaultConfig { minSdk = 31 }
     compileOptions {
@@ -16,14 +15,9 @@ android {
 
 dependencies {
     implementation(project(":core:model"))
-    implementation(project(":core:database"))
-    implementation(project(":core:runtime"))
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.datastore.preferences)
     implementation(libs.kotlinx.coroutines.android)
-    implementation(libs.hilt.android)
-    ksp(libs.hilt.compiler)
-    ksp(libs.kotlin.metadata.jvm)
+    implementation(libs.kotlinx.serialization.json)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
     testImplementation(libs.turbine)
 }
