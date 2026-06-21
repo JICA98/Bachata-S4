@@ -432,5 +432,8 @@ result
 /android/BachataS4/.idea/
 /android/BachataS4/app/src/main/assets/runtime/
 /android/BachataS4/core/runtime/src/main/jniLibs/
+/android/BachataS4/keystore/
+/android/BachataS4/*.jks
+/android/BachataS4/*.keystore
 /runtime/build/
 /runtime/sources/

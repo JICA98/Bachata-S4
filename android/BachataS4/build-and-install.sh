@@ -48,6 +48,9 @@ if $BUNDLE_ONLY; then
     ARTIFACT_DIR="app/build/outputs/bundle/${VARIANT}"
     ARTIFACT_EXT="aab"
 else
+    if [[ "$VARIANT" != "debug" ]]; then
+        error "Only debug APKs can be installed directly. Release artifacts require external signing."
+    fi
     GRADLE_TASK="assemble${VARIANT_CAP}"
     ARTIFACT_DIR="app/build/outputs/apk/${VARIANT}"
     ARTIFACT_EXT="apk"
