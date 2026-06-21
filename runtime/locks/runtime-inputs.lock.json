@@ -4,7 +4,8 @@
     {"name":"glibc-2.43+r22+g8362e8ce10b2-2-x86_64.pkg.tar.zst","url":"https://archive.archlinux.org/packages/g/glibc/glibc-2.43%2Br22%2Bg8362e8ce10b2-2-x86_64.pkg.tar.zst","sha256":"2c20828b3a571b272697671c90b1e3a8c426d6a7e7fb99a242099373f2710fe1"},
     {"name":"libstdc++-16.1.1+r12+g301eb08fa2c5-1-x86_64.pkg.tar.zst","url":"https://archive.archlinux.org/packages/l/libstdc%2B%2B/libstdc%2B%2B-16.1.1%2Br12%2Bg301eb08fa2c5-1-x86_64.pkg.tar.zst","sha256":"5eb8ab787086682875805e7eaad8728e73bad687aba00c9460ecb261c3762aeb"},
     {"name":"ca-certificates-mozilla-3.125-1-x86_64.pkg.tar.zst","url":"https://archive.archlinux.org/packages/c/ca-certificates-mozilla/ca-certificates-mozilla-3.125-1-x86_64.pkg.tar.zst","sha256":"0fa76c249c0a6c28963f02ae366730a739121585aa1ffbb09b106b7a4fc8f358"},
-    {"name":"cacert-2025-02-25.pem","url":"https://curl.se/ca/cacert-2025-02-25.pem","sha256":"50a6277ec69113f00c5fd45f09e8b97a4b3e32daa35d3a95ab30137a55386cef"}
+    {"name":"cacert-2025-02-25.pem","url":"https://curl.se/ca/cacert-2025-02-25.pem","sha256":"50a6277ec69113f00c5fd45f09e8b97a4b3e32daa35d3a95ab30137a55386cef"},
+    {"name":"sdl2-2.30.11-1-x86_64.pkg.tar.zst","url":"https://archive.archlinux.org/packages/s/sdl2/sdl2-2.30.11-1-x86_64.pkg.tar.zst","sha256":"7f2b1abdd245c83585d2ccf69d86fc596b87c45c54d59984ab195c403d3ae41f"}
   ],
   "winlatorRevision": "fb66541b93a4eb3ee585a433b4c7b20544d58e40",
   "winlatorGlibcPatches": [

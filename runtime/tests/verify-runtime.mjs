@@ -17,6 +17,7 @@ const EXPECTED_INPUTS = [
   { name: "libstdc++-16.1.1+r12+g301eb08fa2c5-1-x86_64.pkg.tar.zst", url: "https://archive.archlinux.org/packages/l/libstdc%2B%2B/libstdc%2B%2B-16.1.1%2Br12%2Bg301eb08fa2c5-1-x86_64.pkg.tar.zst", sha256: "5eb8ab787086682875805e7eaad8728e73bad687aba00c9460ecb261c3762aeb" },
   { name: "ca-certificates-mozilla-3.125-1-x86_64.pkg.tar.zst", url: "https://archive.archlinux.org/packages/c/ca-certificates-mozilla/ca-certificates-mozilla-3.125-1-x86_64.pkg.tar.zst", sha256: "0fa76c249c0a6c28963f02ae366730a739121585aa1ffbb09b106b7a4fc8f358" },
   { name: "cacert-2025-02-25.pem", url: "https://curl.se/ca/cacert-2025-02-25.pem", sha256: "50a6277ec69113f00c5fd45f09e8b97a4b3e32daa35d3a95ab30137a55386cef" },
+  { name: "sdl2-2.30.11-1-x86_64.pkg.tar.zst", url: "https://archive.archlinux.org/packages/s/sdl2/sdl2-2.30.11-1-x86_64.pkg.tar.zst", sha256: "7f2b1abdd245c83585d2ccf69d86fc596b87c45c54d59984ab195c403d3ae41f" },
 ];
 const EXPECTED_WINLATOR_PATCHES = [
   { path: "sysdeps/unix/sysv/linux/android_sysvshm.c", sha256: "3698e8e9cc8e00790f60ec16fbf88c88a78da933740e003677a6c37e509c71c2" },
@@ -28,12 +29,14 @@ const EXPECTED_WINLATOR_PATCHES = [
 ];
 const REQUIRED_RUNTIME_PATHS = [
   "bin/hello",
+  "bin/sdl-window",
   "etc/ssl/certs/ca-certificates.crt",
   "lib/x86_64-linux-gnu/libc.so.6",
   "lib/x86_64-linux-gnu/libdl.so.2",
   "lib/x86_64-linux-gnu/libm.so.6",
   "lib/x86_64-linux-gnu/libpthread.so.0",
   "lib/x86_64-linux-gnu/libstdc++.so.6",
+  "lib/x86_64-linux-gnu/libSDL2-2.0.so.0",
   "lib64/ld-linux-x86-64.so.2",
   "usr/share/bachata/winlator-glibc-patches.sha256",
 ];
