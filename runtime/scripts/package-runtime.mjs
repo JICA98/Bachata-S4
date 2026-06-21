@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from "node:fs";
+import { execFileSync } from "node:child_process";
+import { chmodSync, copyFileSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -20,6 +21,16 @@ function crc32(bytes) {
 
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
+}
+
+function run(command, args) {
+  execFileSync(command, args, { stdio: "inherit" });
+}
+
+function copy(source, target, mode) {
+  mkdirSync(dirname(target), { recursive: true });
+  copyFileSync(source, target);
+  chmodSync(target, mode);
 }
 
 function collectFiles(root, directory = root, files = []) {
@@ -93,9 +104,55 @@ function makeZip(files) {
 
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(scriptDir, "../..");
-const rootfs = resolve(process.argv[2] ?? resolve(projectRoot, "runtime/build/rootfs"));
-const outputDir = resolve(process.argv[3] ?? resolve(projectRoot, "android/BachataS4/app/src/main/assets/runtime"));
-const runtimeVersion = process.argv[4] ?? "box64-50c8b90b09b4";
+if (process.argv.length > 3) fail("usage: package-runtime.mjs [output-directory]");
+const rootfs = resolve(projectRoot, "runtime/build/rootfs");
+const extractDir = resolve(projectRoot, "runtime/build/extract");
+const inputDir = resolve(projectRoot, "runtime/build/inputs");
+const outputDir = resolve(process.argv[2] ?? resolve(projectRoot, "android/BachataS4/app/src/main/assets/runtime"));
+const componentLock = JSON.parse(readFileSync(resolve(projectRoot, "runtime/locks/components.lock.json"), "utf8"));
+const inputLock = JSON.parse(readFileSync(resolve(projectRoot, "runtime/locks/runtime-inputs.lock.json"), "utf8"));
+const revisions = Object.fromEntries(componentLock.components.map(({ name, revision }) => [name, revision]));
+const runtimeVersion = `box64-${revisions.box64.slice(0, 12)}`;
+
+for (const input of inputLock.inputs) {
+  const bytes = readFileSync(join(inputDir, input.name));
+  if (sha256(bytes) !== input.sha256) fail(`Locked input hash mismatch: ${input.name}`);
+}
+for (const component of ["glibc-packages", "winlator-components"]) {
+  const sourceDir = resolve(projectRoot, `runtime/sources/${component}`);
+  const actual = execFileSync("git", ["-C", sourceDir, "rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+  if (actual !== revisions[component]) fail(`Source revision mismatch: ${component}`);
+}
+const patchRoot = resolve(projectRoot, "runtime/sources/winlator-components/glibc_patches");
+for (const patch of inputLock.winlatorGlibcPatches) {
+  if (sha256(readFileSync(join(patchRoot, patch.path))) !== patch.sha256) fail(`Winlator glibc patch mismatch: ${patch.path}`);
+}
+
+rmSync(rootfs, { recursive: true, force: true });
+rmSync(extractDir, { recursive: true, force: true });
+const glibcExtract = join(extractDir, "glibc");
+const libstdcppExtract = join(extractDir, "libstdcpp");
+const certificatesExtract = join(extractDir, "certificates");
+for (const directory of [rootfs, glibcExtract, libstdcppExtract, certificatesExtract]) mkdirSync(directory, { recursive: true });
+const inputByPrefix = (prefix) => join(inputDir, inputLock.inputs.find(({ name }) => name.startsWith(prefix)).name);
+run("tar", ["--zstd", "-xf", inputByPrefix("glibc-"), "-C", glibcExtract]);
+run("tar", ["--zstd", "-xf", inputByPrefix("libstdc++-"), "-C", libstdcppExtract]);
+run("tar", ["--zstd", "-xf", inputByPrefix("ca-certificates-mozilla-"), "-C", certificatesExtract]);
+const probe = join(rootfs, "bin/hello");
+mkdirSync(dirname(probe), { recursive: true });
+run("x86_64-linux-gnu-gcc", ["-O2", "-s", "-fno-ident", "-Wl,--build-id=none", resolve(projectRoot, "runtime/probes/hello.c"), "-o", probe]);
+copy(join(glibcExtract, "usr/lib/ld-linux-x86-64.so.2"), join(rootfs, "lib64/ld-linux-x86-64.so.2"), 0o755);
+for (const library of ["libc.so.6", "libdl.so.2", "libm.so.6", "libpthread.so.0"]) {
+  copy(join(glibcExtract, `usr/lib/${library}`), join(rootfs, `lib/x86_64-linux-gnu/${library}`), 0o755);
+}
+copy(join(libstdcppExtract, "usr/lib/libstdc++.so.6.0.35"), join(rootfs, "lib/x86_64-linux-gnu/libstdc++.so.6"), 0o755);
+copy(inputByPrefix("cacert-"), join(rootfs, "etc/ssl/certs/ca-certificates.crt"), 0o644);
+copy(join(certificatesExtract, "usr/share/ca-certificates/trust-source/mozilla.trust.p11-kit"), join(rootfs, "usr/share/ca-certificates/trust-source/mozilla.trust.p11-kit"), 0o644);
+const patchProvenance = inputLock.winlatorGlibcPatches.map(({ path, sha256: digest }) => `${digest}  ${path}`).join("\n") + "\n";
+const patchProvenancePath = join(rootfs, "usr/share/bachata/winlator-glibc-patches.sha256");
+mkdirSync(dirname(patchProvenancePath), { recursive: true });
+writeFileSync(patchProvenancePath, patchProvenance, { mode: 0o644 });
+
 const files = collectFiles(rootfs).sort((left, right) => left.path.localeCompare(right.path, "en"));
 if (files.length === 0) fail("Runtime rootfs is empty");
 if (new Set(files.map((file) => file.path)).size !== files.length) fail("Duplicate runtime paths");
@@ -105,6 +162,10 @@ const manifest = {
   schemaVersion: 1,
   runtimeVersion,
   protocolVersion: 1,
+  components: componentLock.components.map(({ name, revision }) => ({ name, revision })),
+  inputs: inputLock.inputs.map(({ name, sha256: digest }) => ({ name, sha256: digest })),
+  winlatorRevision: inputLock.winlatorRevision,
+  winlatorGlibcPatches: inputLock.winlatorGlibcPatches,
   files: files.map(({ path, bytes }) => ({ path, size: bytes.length, sha256: sha256(bytes) })),
 };
 mkdirSync(outputDir, { recursive: true });

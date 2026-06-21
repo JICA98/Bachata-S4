@@ -12,6 +12,20 @@ const EXPECTED_COMPONENTS = [
   { name: "glibc-packages", url: "https://github.com/termux-pacman/glibc-packages.git", revision: "26d89ba7a1f856b99f0d437bef54f558b2485075", license: "mixed" },
   { name: "mesa", url: "https://gitlab.freedesktop.org/mesa/mesa.git", revision: "6984e91b5fe1d1c204e54954a4282fcdc0c44b78", license: "MIT" },
 ];
+const EXPECTED_INPUTS = [
+  { name: "glibc-2.43+r22+g8362e8ce10b2-2-x86_64.pkg.tar.zst", url: "https://archive.archlinux.org/packages/g/glibc/glibc-2.43%2Br22%2Bg8362e8ce10b2-2-x86_64.pkg.tar.zst", sha256: "2c20828b3a571b272697671c90b1e3a8c426d6a7e7fb99a242099373f2710fe1" },
+  { name: "libstdc++-16.1.1+r12+g301eb08fa2c5-1-x86_64.pkg.tar.zst", url: "https://archive.archlinux.org/packages/l/libstdc%2B%2B/libstdc%2B%2B-16.1.1%2Br12%2Bg301eb08fa2c5-1-x86_64.pkg.tar.zst", sha256: "5eb8ab787086682875805e7eaad8728e73bad687aba00c9460ecb261c3762aeb" },
+  { name: "ca-certificates-mozilla-3.125-1-x86_64.pkg.tar.zst", url: "https://archive.archlinux.org/packages/c/ca-certificates-mozilla/ca-certificates-mozilla-3.125-1-x86_64.pkg.tar.zst", sha256: "0fa76c249c0a6c28963f02ae366730a739121585aa1ffbb09b106b7a4fc8f358" },
+  { name: "cacert-2025-02-25.pem", url: "https://curl.se/ca/cacert-2025-02-25.pem", sha256: "50a6277ec69113f00c5fd45f09e8b97a4b3e32daa35d3a95ab30137a55386cef" },
+];
+const EXPECTED_WINLATOR_PATCHES = [
+  { path: "sysdeps/unix/sysv/linux/android_sysvshm.c", sha256: "3698e8e9cc8e00790f60ec16fbf88c88a78da933740e003677a6c37e509c71c2" },
+  { path: "sysdeps/unix/sysv/linux/android_sysvshm.h", sha256: "031fa071ca44d1191dc22b4adbf351191bb292d718af0afd2caa9291aabf6550" },
+  { path: "sysdeps/unix/sysv/linux/shmat.c", sha256: "e6b80913003e80ef4f900322398b682a76c1806dbd2f2da2a8f58a0759897f66" },
+  { path: "sysdeps/unix/sysv/linux/shmctl.c", sha256: "fe72ee45e0c4cd6215f109c358bdbbfbeef22a6922ea0f91758226a671bc7d4b" },
+  { path: "sysdeps/unix/sysv/linux/shmdt.c", sha256: "4e4362296e2e572e36e48617dce286639b3d4c2998afc7b8737a201b1e91069e" },
+  { path: "sysdeps/unix/sysv/linux/shmget.c", sha256: "e59d1b5574e05cd6683202a6e0f61addea2eccca61ebad66682703a9cd477299" },
+];
 const REQUIRED_RUNTIME_PATHS = [
   "bin/hello",
   "etc/ssl/certs/ca-certificates.crt",
@@ -21,6 +35,7 @@ const REQUIRED_RUNTIME_PATHS = [
   "lib/x86_64-linux-gnu/libpthread.so.0",
   "lib/x86_64-linux-gnu/libstdc++.so.6",
   "lib64/ld-linux-x86-64.so.2",
+  "usr/share/bachata/winlator-glibc-patches.sha256",
 ];
 
 function fail(message) {
@@ -72,6 +87,7 @@ function parseStoredZip(bytes) {
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const projectRoot = resolve(scriptDir, "../..");
 const lockPath = resolve(process.argv[2] ?? resolve(projectRoot, "runtime/locks/components.lock.json"));
+const inputLockPath = resolve(projectRoot, "runtime/locks/runtime-inputs.lock.json");
 const zipPath = resolve(process.argv[3] ?? resolve(projectRoot, "android/BachataS4/app/src/main/assets/runtime/runtime.zip"));
 const manifestPath = resolve(process.argv[4] ?? resolve(projectRoot, "android/BachataS4/app/src/main/assets/runtime/manifest.json"));
 
@@ -83,10 +99,21 @@ for (const component of lock.components) {
   if (!/^https:\/\//.test(component.url)) fail(`Invalid URL: ${component.name}`);
   if (!component.license) fail(`Missing license: ${component.name}`);
 }
+const inputLock = JSON.parse(readFileSync(inputLockPath, "utf8"));
+if (inputLock.schemaVersion !== 1) fail("Input lock schemaVersion must be 1");
+if (JSON.stringify(inputLock.inputs) !== JSON.stringify(EXPECTED_INPUTS)) fail("Runtime inputs differ from approved artifacts");
+if (inputLock.winlatorRevision !== EXPECTED_COMPONENTS[2].revision) fail("Winlator patch revision mismatch");
+if (JSON.stringify(inputLock.winlatorGlibcPatches) !== JSON.stringify(EXPECTED_WINLATOR_PATCHES)) fail("Winlator patch hashes differ from approved revision");
 
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
 if (manifest.schemaVersion !== 1 || manifest.protocolVersion !== 1) fail("Invalid runtime manifest schema/protocol");
 if (!manifest.runtimeVersion) fail("Missing runtimeVersion");
+const componentProvenance = lock.components.map(({ name, revision }) => ({ name, revision }));
+const inputProvenance = inputLock.inputs.map(({ name, sha256: digest }) => ({ name, sha256: digest }));
+if (JSON.stringify(manifest.components) !== JSON.stringify(componentProvenance)) fail("Manifest component provenance mismatch");
+if (JSON.stringify(manifest.inputs) !== JSON.stringify(inputProvenance)) fail("Manifest input provenance mismatch");
+if (manifest.winlatorRevision !== inputLock.winlatorRevision) fail("Manifest Winlator revision mismatch");
+if (JSON.stringify(manifest.winlatorGlibcPatches) !== JSON.stringify(inputLock.winlatorGlibcPatches)) fail("Manifest Winlator patch provenance mismatch");
 const zipEntries = parseStoredZip(readFileSync(zipPath));
 const paths = zipEntries.map((entry) => entry.path);
 if (new Set(paths).size !== paths.length) fail("Duplicate ZIP paths");
@@ -102,6 +129,9 @@ for (let index = 0; index < zipEntries.length; index++) {
   if (declared.size !== entry.bytes.length) fail(`Manifest size mismatch: ${entry.path}`);
   if (declared.sha256 !== sha256(entry.bytes)) fail(`Manifest SHA-256 mismatch: ${entry.path}`);
 }
+const patchProvenance = zipEntries.find((entry) => entry.path === "usr/share/bachata/winlator-glibc-patches.sha256").bytes.toString("utf8");
+const expectedPatchProvenance = inputLock.winlatorGlibcPatches.map(({ path, sha256: digest }) => `${digest}  ${path}`).join("\n") + "\n";
+if (patchProvenance !== expectedPatchProvenance) fail("Archived Winlator patch provenance mismatch");
 const hello = zipEntries.find((entry) => entry.path === "bin/hello").bytes;
 if (hello.length < 20 || hello[0] !== 0x7f || hello.subarray(1, 4).toString() !== "ELF") fail("Probe is not ELF");
 if (hello.readUInt16LE(18) !== 62) fail("Probe is not x86_64 ELF");
