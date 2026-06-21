@@ -13,6 +13,10 @@ android {
     }
 }
 
+tasks.withType<JavaCompile>().configureEach {
+    exclude("com/winlator/**")
+}
+
 dependencies {
     api(project(":core:model"))
     api(libs.kotlinx.coroutines.core)
