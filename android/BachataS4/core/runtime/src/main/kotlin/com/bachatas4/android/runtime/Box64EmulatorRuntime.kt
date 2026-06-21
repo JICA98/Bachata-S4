@@ -12,6 +12,7 @@ import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
@@ -22,6 +23,7 @@ import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 
 fun interface RuntimeInstallationVerifier {
     suspend fun verify()
@@ -57,11 +59,16 @@ class Box64EmulatorRuntime(
     private val requestFactory: RuntimeProcessRequestFactory,
     private val controlChannel: RuntimeControlChannel,
     private val processWaiter: RuntimeProcessWaiter,
+    private val stopMessageTimeoutMillis: Long = STOP_MESSAGE_TIMEOUT_MILLIS,
     private val sessionIdProvider: SessionIdProvider = SessionIdProvider {
         UUID.randomUUID().toString()
     },
     private val timestampProvider: TimestampProvider = TimestampProvider(System::currentTimeMillis),
 ) : EmulatorRuntime {
+    init {
+        require(stopMessageTimeoutMillis > 0) { "Stop message timeout must be positive" }
+    }
+
     private val sessionMutex = Mutex()
     private val mutableState = MutableStateFlow<RuntimeState>(RuntimeState.Idle)
     private val mutableDiagnostics = MutableSharedFlow<DiagnosticEvent>(extraBufferCapacity = 32)
@@ -92,15 +99,25 @@ class Box64EmulatorRuntime(
             mutableState.value = RuntimeState.Running(sessionId)
             Result.success(sessionId)
         } catch (cancellation: CancellationException) {
-            startedProcess?.destroyForcibly()
-            mutableState.value = RuntimeState.Idle
+            try {
+                startedProcess?.destroyForcibly()
+            } catch (cleanupFailure: Exception) {
+                cancellation.addSuppressed(cleanupFailure)
+            } finally {
+                mutableState.value = RuntimeState.Idle
+            }
             throw cancellation
         } catch (exception: Exception) {
-            startedProcess?.destroyForcibly()
-            mutableState.value = RuntimeState.Failed(
-                RuntimeErrorCode.TRANSLATOR_START_FAILED,
-                exception.message ?: exception.javaClass.simpleName,
-            )
+            try {
+                startedProcess?.destroyForcibly()
+            } catch (cleanupFailure: Exception) {
+                exception.addSuppressed(cleanupFailure)
+            } finally {
+                mutableState.value = RuntimeState.Failed(
+                    RuntimeErrorCode.TRANSLATOR_START_FAILED,
+                    exception.message ?: exception.javaClass.simpleName,
+                )
+            }
             emitDiagnostic("launch", exception)
             Result.failure(exception)
         }
@@ -113,33 +130,78 @@ class Box64EmulatorRuntime(
         var failure: Exception? = null
         var explicitCancellation: CancellationException? = null
 
+        fun recordFailure(exception: Exception) {
+            val primary = explicitCancellation ?: failure
+            if (primary == null) {
+                failure = exception
+            } else if (primary !== exception) {
+                primary.addSuppressed(exception)
+            }
+        }
+
+        fun recordCancellation(cancellation: CancellationException) {
+            val primary = explicitCancellation
+            if (primary == null) {
+                failure?.let(cancellation::addSuppressed)
+                failure = null
+                explicitCancellation = cancellation
+            } else if (primary !== cancellation) {
+                primary.addSuppressed(cancellation)
+            }
+        }
+
+        fun forceDestroyPreservingFailure() {
+            try {
+                process.destroyForcibly()
+            } catch (cleanupFailure: Exception) {
+                recordFailure(cleanupFailure)
+            }
+        }
+
         withContext(NonCancellable) {
             try {
-                controlChannel.send(RuntimeMessage.Stop)
-            } catch (cancellation: CancellationException) {
-                explicitCancellation = cancellation
-            } catch (exception: Exception) {
-                failure = exception
-                emitDiagnostic("protocol", exception)
-            }
-
-            try {
-                if (!processWaiter.waitFor(process, GRACEFUL_STOP_MILLIS)) {
-                    process.destroy()
-                    if (!processWaiter.waitFor(process, DESTROY_STOP_MILLIS)) {
-                        process.destroyForcibly()
+                try {
+                    withTimeout(stopMessageTimeoutMillis) {
+                        controlChannel.send(RuntimeMessage.Stop)
                     }
+                } catch (timeout: TimeoutCancellationException) {
+                    val exception = IllegalStateException(
+                        "Timed out sending Stop after ${stopMessageTimeoutMillis}ms",
+                        timeout,
+                    )
+                    recordFailure(exception)
+                    emitDiagnostic("protocol", exception)
+                } catch (cancellation: CancellationException) {
+                    recordCancellation(cancellation)
+                } catch (exception: Exception) {
+                    recordFailure(exception)
+                    emitDiagnostic("protocol", exception)
                 }
-            } catch (cancellation: CancellationException) {
-                explicitCancellation = cancellation
-                process.destroyForcibly()
-            } catch (exception: Exception) {
-                failure = failure ?: exception
-                process.destroyForcibly()
-                emitDiagnostic("process", exception)
+
+                try {
+                    if (!processWaiter.waitFor(process, GRACEFUL_STOP_MILLIS)) {
+                        process.destroy()
+                        if (!processWaiter.waitFor(process, DESTROY_STOP_MILLIS)) {
+                            forceDestroyPreservingFailure()
+                        }
+                    }
+                } catch (cancellation: CancellationException) {
+                    recordCancellation(cancellation)
+                    forceDestroyPreservingFailure()
+                } catch (exception: Exception) {
+                    recordFailure(exception)
+                    forceDestroyPreservingFailure()
+                    emitDiagnostic("process", exception)
+                }
             } finally {
                 ownedProcess = null
-                mutableState.value = RuntimeState.Stopped(process.exitCode ?: UNKNOWN_EXIT_CODE)
+                val exitCode = try {
+                    process.exitCode
+                } catch (exitFailure: Exception) {
+                    recordFailure(exitFailure)
+                    null
+                }
+                mutableState.value = RuntimeState.Stopped(exitCode ?: UNKNOWN_EXIT_CODE)
             }
         }
 
@@ -169,6 +231,7 @@ class Box64EmulatorRuntime(
     companion object {
         const val GRACEFUL_STOP_MILLIS = 5_000L
         const val DESTROY_STOP_MILLIS = 2_000L
+        const val STOP_MESSAGE_TIMEOUT_MILLIS = 1_000L
         const val UNKNOWN_EXIT_CODE = -1
 
         fun defaultProcessWaiter(): RuntimeProcessWaiter = RuntimeProcessWaiter { process, timeout ->

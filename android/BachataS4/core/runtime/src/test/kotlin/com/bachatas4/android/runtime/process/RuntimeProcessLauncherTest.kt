@@ -63,6 +63,23 @@ class RuntimeProcessLauncherTest {
     }
 
     @Test
+    fun redirectsChildStreamsSoFullPipesCannotBlockRuntime() {
+        val request = validRequest()
+        var captured: ProcessBuilder? = null
+        val launcher = RuntimeProcessLauncher { builder ->
+            captured = builder
+            FakeProcessHandle()
+        }
+
+        launcher.launch(request)
+
+        assertEquals(ProcessBuilder.Redirect.Type.WRITE, captured!!.redirectOutput().type())
+        assertEquals(ProcessBuilder.Redirect.Type.WRITE, captured!!.redirectError().type())
+        assertEquals("/dev/null", captured!!.redirectOutput().file().path)
+        assertEquals("/dev/null", captured!!.redirectError().file().path)
+    }
+
+    @Test
     fun rejectsBox64WhoseCanonicalParentEscapesNativeLibraryDir() {
         val request = validRequest()
         val outside = temporaryFolder.newFile("outside-box64").toPath()

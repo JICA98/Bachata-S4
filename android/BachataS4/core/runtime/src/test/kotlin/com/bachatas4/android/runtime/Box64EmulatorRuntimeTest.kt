@@ -8,7 +8,9 @@ import com.bachatas4.android.runtime.protocol.RuntimeMessage
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -115,16 +117,84 @@ class Box64EmulatorRuntimeTest {
         assertEquals(2, launchCount)
     }
 
+    @Test
+    fun hangingStopSenderTimesOutBeforeProcessEscalation() = runTest {
+        val process = FakeOwnedProcess()
+        val waits = mutableListOf<Long>()
+        val runtime = runtime(
+            processLauncher = { process },
+            controlChannel = { awaitCancellation() },
+            processWaiter = { _, timeout ->
+                waits += timeout
+                false
+            },
+            stopMessageTimeoutMillis = 50L,
+        )
+        runtime.launch(LAUNCH_REQUEST).getOrThrow()
+
+        val result = runtime.stop()
+
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull()!!.message!!.contains("Timed out sending Stop"))
+        assertEquals(listOf(5_000L, 2_000L), waits)
+        assertTrue(process.destroyed)
+        assertTrue(process.destroyedForcibly)
+        assertEquals(RuntimeState.Stopped(-1), runtime.state.value)
+    }
+
+    @Test
+    fun forceDestroyFailureDoesNotMaskWaitFailureOrKeepOwnership() = runTest {
+        val waitFailure = IllegalStateException("wait failed")
+        val forceFailure = IllegalStateException("force failed")
+        var launchCount = 0
+        val runtime = runtime(
+            processLauncher = {
+                launchCount++
+                FakeOwnedProcess(forceFailure = forceFailure)
+            },
+            processWaiter = { _, _ -> throw waitFailure },
+        )
+        runtime.launch(LAUNCH_REQUEST).getOrThrow()
+
+        val result = runtime.stop()
+
+        assertTrue(result.isFailure)
+        assertTrue(result.exceptionOrNull() === waitFailure)
+        assertEquals(listOf(forceFailure), waitFailure.suppressed.toList())
+        assertEquals(RuntimeState.Stopped(-1), runtime.state.value)
+        assertTrue(runtime.launch(LAUNCH_REQUEST).isSuccess)
+        assertEquals(2, launchCount)
+    }
+
+    @Test
+    fun forceDestroyFailureDoesNotMaskCancellation() = runTest {
+        val cancellation = CancellationException("wait cancelled")
+        val forceFailure = IllegalStateException("force failed")
+        val runtime = runtime(
+            processLauncher = { FakeOwnedProcess(forceFailure = forceFailure) },
+            processWaiter = { _, _ -> throw cancellation },
+        )
+        runtime.launch(LAUNCH_REQUEST).getOrThrow()
+
+        val thrown = runCatching { runtime.stop() }.exceptionOrNull()
+
+        assertTrue(thrown === cancellation)
+        assertEquals(listOf(forceFailure), cancellation.suppressed.toList())
+        assertEquals(RuntimeState.Stopped(-1), runtime.state.value)
+    }
+
     private fun runtime(
         processLauncher: RuntimeProcessFactory,
         controlChannel: RuntimeControlChannel = RuntimeControlChannel { },
         processWaiter: RuntimeProcessWaiter = RuntimeProcessWaiter { _, _ -> true },
+        stopMessageTimeoutMillis: Long = 1_000L,
     ) = Box64EmulatorRuntime(
         installationVerifier = RuntimeInstallationVerifier { },
         processLauncher = processLauncher,
         requestFactory = RuntimeProcessRequestFactory { _, _ -> PROCESS_REQUEST },
         controlChannel = controlChannel,
         processWaiter = processWaiter,
+        stopMessageTimeoutMillis = stopMessageTimeoutMillis,
         sessionIdProvider = SessionIdProvider { "session-1" },
     )
 
@@ -141,6 +211,7 @@ class Box64EmulatorRuntimeTest {
 
 private class FakeOwnedProcess(
     override val exitCode: Int? = null,
+    private val forceFailure: Exception? = null,
 ) : RuntimeProcessHandle {
     override val isAlive: Boolean
         get() = !destroyed && !destroyedForcibly && exitCode == null
@@ -154,6 +225,7 @@ private class FakeOwnedProcess(
 
     override fun destroyForcibly() {
         destroyedForcibly = true
+        forceFailure?.let { throw it }
     }
 
     override fun waitFor(timeout: Long, unit: TimeUnit): Boolean = false

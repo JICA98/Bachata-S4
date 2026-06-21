@@ -1,5 +1,6 @@
 package com.bachatas4.android.runtime.process
 
+import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
@@ -65,6 +66,8 @@ class RuntimeProcessLauncher(
     fun launch(request: RuntimeProcessRequest): RuntimeProcessHandle {
         val builder = ProcessBuilder(command(request))
         builder.directory(request.runtimeRoot.toRealPath().toFile())
+        builder.redirectOutput(NULL_DEVICE)
+        builder.redirectError(NULL_DEVICE)
         builder.environment().apply {
             clear()
             request.environment.forEach { (name, value) ->
@@ -76,6 +79,7 @@ class RuntimeProcessLauncher(
 
     private companion object {
         const val BOX64_LIBRARY = "libbox64.so"
+        val NULL_DEVICE = File("/dev/null")
         val ALLOWED_ENVIRONMENT = setOf(
             "HOME",
             "BOX64_PATH",
