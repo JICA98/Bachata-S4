@@ -3,14 +3,17 @@ package com.bachatas4.android.runtime.process
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
 
 data class RuntimeProcessRequest(
     val nativeLibraryDir: Path,
     val runtimeRoot: Path,
+    val overrideRoot: Path,
     val shadPs4Executable: Path,
     val socketPath: String,
     val environment: Map<String, String> = emptyMap(),
+    val arguments: List<String> = emptyList(),
 )
 
 interface RuntimeProcessHandle {
@@ -35,15 +38,17 @@ class RuntimeProcessLauncher(
 ) {
     fun command(request: RuntimeProcessRequest): List<String> {
         val nativeLibraryDir = request.nativeLibraryDir.toRealPath()
-        val box64 = request.nativeLibraryDir.resolve(BOX64_LIBRARY).toRealPath()
-        if (box64.parent != nativeLibraryDir) {
-            throw SecurityException("Box64 must be owned by nativeLibraryDir")
-        }
-        require(Files.isRegularFile(box64) && Files.isExecutable(box64)) {
-            "Box64 is not an executable APK native library: $box64"
-        }
+        val loader = request.nativeLibraryDir.resolve(HOST_LOADER_LIBRARY).toRealPath()
+        val box64 = request.nativeLibraryDir.resolve(HOST_BOX64_LIBRARY).toRealPath()
+        validateNativeFile(nativeLibraryDir, loader, "Host glibc loader")
+        validateNativeFile(nativeLibraryDir, box64, "Host Box64")
 
         val runtimeRoot = request.runtimeRoot.toRealPath()
+        val hostDirectory = runtimeRoot.resolve(HOST_DIRECTORY).toRealPath()
+        require(hostDirectory.startsWith(runtimeRoot) && Files.isDirectory(hostDirectory)) {
+            "Host runtime directory escapes runtime root: $hostDirectory"
+        }
+        val overrideRoot = request.overrideRoot.toRealPath()
         val shadPs4 = request.shadPs4Executable.toRealPath()
         if (!shadPs4.startsWith(runtimeRoot)) {
             throw SecurityException("Runtime executable escapes runtime root: $shadPs4")
@@ -51,16 +56,28 @@ class RuntimeProcessLauncher(
         require(Files.isRegularFile(shadPs4) && Files.isReadable(shadPs4)) {
             "Runtime executable is not a readable file: $shadPs4"
         }
-        require(request.socketPath.isNotBlank() && '\u0000' !in request.socketPath) {
+        val socketPath = Paths.get(request.socketPath).toAbsolutePath().normalize()
+        require(request.socketPath.isNotBlank() && '\u0000' !in request.socketPath && socketPath.startsWith(overrideRoot)) {
             "Invalid runtime socket path"
         }
+        request.arguments.forEach { require('\u0000' !in it) { "Runtime argument contains NUL" } }
 
         return listOf(
+            loader.toString(),
+            "--library-path",
+            hostDirectory.toString(),
             box64.toString(),
             shadPs4.toString(),
+            "--override-root",
+            overrideRoot.toString(),
             "--bachata-socket",
             request.socketPath,
-        )
+        ) + request.arguments
+    }
+
+    private fun validateNativeFile(nativeLibraryDir: Path, path: Path, label: String) {
+        if (path.parent != nativeLibraryDir) throw SecurityException("$label must be owned by nativeLibraryDir")
+        require(Files.isRegularFile(path) && Files.isReadable(path)) { "$label is not readable: $path" }
     }
 
     fun launch(request: RuntimeProcessRequest): RuntimeProcessHandle {
@@ -78,17 +95,24 @@ class RuntimeProcessLauncher(
     }
 
     private companion object {
-        const val BOX64_LIBRARY = "libbox64.so"
+        const val HOST_DIRECTORY = "host"
+        const val HOST_LOADER_LIBRARY = "libbachata_host_loader.so"
+        const val HOST_BOX64_LIBRARY = "libbachata_host_box64.so"
         val NULL_DEVICE = File("/dev/null")
         val ALLOWED_ENVIRONMENT = setOf(
             "HOME",
+            "LD_LIBRARY_PATH",
             "BOX64_PATH",
             "BOX64_LD_LIBRARY_PATH",
+            "BOX64_EMULATED_LIBS",
+            "BACHATA_ALSA_SOCKET",
             "DISPLAY",
+            "SDL_VIDEODRIVER",
             "TMPDIR",
             "XDG_CACHE_HOME",
             "MESA_SHADER_CACHE_DIR",
             "VK_ICD_FILENAMES",
+            "GLIBC_TUNABLES",
         )
     }
 }

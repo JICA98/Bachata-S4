@@ -5,17 +5,24 @@ project_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
 source_dir="$project_root/runtime/sources/box64"
 build_dir="$project_root/runtime/build/box64"
 output="$project_root/android/BachataS4/core/runtime/src/main/jniLibs/arm64-v8a/libbox64.so"
+entrypoint_patch="$project_root/runtime/patches/box64-winlator-glibc-entrypoint.patch"
 expected_revision=50c8b90b09b433ab0767de44af2d0731cb0748b7
 : "${ANDROID_NDK_ROOT:?ANDROID_NDK_ROOT must point to a pinned Android NDK}"
 
 test -f "$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake"
 test "$(git -C "$source_dir" rev-parse HEAD)" = "$expected_revision"
+if ! git -C "$source_dir" apply --reverse --check "$entrypoint_patch" 2>/dev/null; then
+  git -C "$source_dir" diff --quiet
+  git -C "$source_dir" apply --check "$entrypoint_patch"
+  git -C "$source_dir" apply "$entrypoint_patch"
+fi
 
 cmake -S "$source_dir" -B "$build_dir" -G Ninja \
   -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake" \
   -DANDROID_ABI=arm64-v8a \
   -DANDROID_PLATFORM=31 \
   -DANDROID=ON \
+  -DWINLATOR_GLIBC=ON \
   -DARM64=ON \
   -DARM_DYNAREC=ON \
   -DBAD_SIGNAL=ON \

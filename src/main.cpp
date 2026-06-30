@@ -22,6 +22,9 @@
 #include "core/user_settings.h"
 #include "emulator.h"
 #include "imgui/big_picture/big_picture.h"
+#ifdef ENABLE_BACHATA_RUNTIME
+#include "platform/bachata/runtime_client.h"
+#endif
 
 #ifdef _WIN32
 #include <windows.h>
@@ -53,6 +56,9 @@ int main(int argc, char* argv[]) {
     std::optional<std::string> gamePath;
     std::vector<std::string> gameArgs;
     std::optional<std::filesystem::path> overrideRoot;
+#ifdef ENABLE_BACHATA_RUNTIME
+    std::optional<std::filesystem::path> bachataSocket;
+#endif
     std::optional<int> waitPid;
     bool waitForDebugger = false;
 
@@ -79,6 +85,9 @@ int main(int argc, char* argv[]) {
     app.add_option("-f,--fullscreen", fullscreenStr, "Fullscreen mode (true|false)");
 
     app.add_option("--override-root", overrideRoot)->check(CLI::ExistingDirectory);
+#ifdef ENABLE_BACHATA_RUNTIME
+    app.add_option("--bachata-socket", bachataSocket, "Bachata Android runtime control socket");
+#endif
 
     app.add_flag("--wait-for-debugger", waitForDebugger);
     app.add_option("--wait-for-pid", waitPid);
@@ -115,6 +124,27 @@ int main(int argc, char* argv[]) {
     } catch (const CLI::ParseError& e) {
         return app.exit(e);
     }
+
+#ifdef ENABLE_BACHATA_RUNTIME
+    auto runtime_client = Platform::Bachata::RuntimeClient::Disabled();
+    if (bachataSocket.has_value()) {
+        if (!overrideRoot.has_value() ||
+            !Platform::Bachata::ValidateSocketPath(*bachataSocket, *overrideRoot)) {
+            std::cerr << "--bachata-socket must be absolute and inside --override-root\n";
+            return 1;
+        }
+        auto connected = Platform::Bachata::RuntimeClient::Connect(*bachataSocket);
+        if (!connected.has_value() || !connected->SendHello()) {
+            std::cerr << "Failed to connect Bachata runtime socket\n";
+            return 1;
+        }
+        runtime_client = std::move(*connected);
+        if (!runtime_client.SendStarting()) {
+            std::cerr << "Failed to send Bachata Starting event\n";
+            return 1;
+        }
+    }
+#endif
 
     if (waitPid)
         Core::Debugger::WaitForPid(*waitPid);
@@ -168,6 +198,10 @@ int main(int argc, char* argv[]) {
             gameArgs.erase(gameArgs.begin());
         } else {
             LOG_ERROR(Debug, "Please provide a game path or ID.");
+#ifdef ENABLE_BACHATA_RUNTIME
+            runtime_client.SendError("CONTENT_INVALID");
+            runtime_client.SendStopped(1);
+#endif
             return 1;
         }
     }
@@ -221,6 +255,10 @@ int main(int argc, char* argv[]) {
         }
         if (!found) {
             LOG_ERROR(Debug, "Game ID or file path not found: {}", *gamePath);
+#ifdef ENABLE_BACHATA_RUNTIME
+            runtime_client.SendError("CONTENT_INVALID");
+            runtime_client.SendStopped(1);
+#endif
             return 1;
         }
     }
@@ -228,6 +266,15 @@ int main(int argc, char* argv[]) {
     auto* emulator = Common::Singleton<Core::Emulator>::Instance();
     emulator->executableName = argv[0];
     emulator->waitForDebuggerBeforeRun = waitForDebugger;
+#ifdef ENABLE_BACHATA_RUNTIME
+    emulator->onRuntimeRunning = [&runtime_client]() { runtime_client.SendRunning(); };
+    emulator->onRuntimeError = [&runtime_client](std::string_view code) {
+        runtime_client.SendError(code);
+    };
+    emulator->onRuntimeStopped = [&runtime_client](int exit_code) {
+        runtime_client.SendStopped(exit_code);
+    };
+#endif
     emulator->Run(ebootPath, gameArgs, overrideRoot);
 
     return 0;

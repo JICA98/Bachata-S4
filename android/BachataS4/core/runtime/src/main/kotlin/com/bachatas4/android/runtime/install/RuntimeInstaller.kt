@@ -5,6 +5,7 @@ import java.io.InputStream
 import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Files
 import java.nio.file.Path
+import java.nio.file.Paths
 import java.nio.file.StandardCopyOption
 import java.nio.file.StandardOpenOption
 import java.security.MessageDigest
@@ -111,7 +112,7 @@ class RuntimeInstaller(
 
     private fun safeRelativePath(staging: Path, rawPath: String): Path {
         require(rawPath.isNotBlank()) { "Runtime path is blank" }
-        val relative = Path.of(rawPath.replace('\\', '/')).normalize()
+        val relative = Paths.get(rawPath.replace('\\', '/')).normalize()
         if (relative.isAbsolute || relative.toString().isEmpty()) {
             throw SecurityException("Absolute or empty runtime path: $rawPath")
         }

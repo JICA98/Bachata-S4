@@ -28,6 +28,11 @@ public class UnixSocketConfig {
         return new UnixSocketConfig(socketFile.getPath());
     }
 
+    public static UnixSocketConfig createAbstract(String path) {
+        if (!path.startsWith("/")) throw new IllegalArgumentException("Abstract X11 path must be absolute: " + path);
+        return new UnixSocketConfig("abstract:" + path);
+    }
+
     private static void deleteRecursively(File file) {
         File[] children = file.listFiles();
         if (children != null) for (File child : children) deleteRecursively(child);

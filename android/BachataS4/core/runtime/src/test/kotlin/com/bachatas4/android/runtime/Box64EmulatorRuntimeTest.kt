@@ -203,6 +203,7 @@ class Box64EmulatorRuntimeTest {
         val PROCESS_REQUEST = RuntimeProcessRequest(
             nativeLibraryDir = Path.of("/apk/lib"),
             runtimeRoot = Path.of("/data/runtime"),
+            overrideRoot = Path.of("/data"),
             shadPs4Executable = Path.of("/data/runtime/bin/shadps4"),
             socketPath = "/data/runtime/session.sock",
         )

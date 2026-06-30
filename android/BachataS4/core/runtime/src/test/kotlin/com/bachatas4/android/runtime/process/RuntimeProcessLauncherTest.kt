@@ -6,7 +6,6 @@ import java.util.concurrent.TimeUnit
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertThrows
-import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
@@ -22,8 +21,13 @@ class RuntimeProcessLauncherTest {
 
         assertEquals(
             listOf(
-                request.nativeLibraryDir.resolve("libbox64.so").toRealPath().toString(),
+                request.nativeLibraryDir.resolve("libbachata_host_loader.so").toRealPath().toString(),
+                "--library-path",
+                request.runtimeRoot.resolve("host").toRealPath().toString(),
+                request.nativeLibraryDir.resolve("libbachata_host_box64.so").toRealPath().toString(),
                 request.shadPs4Executable.toRealPath().toString(),
+                "--override-root",
+                request.overrideRoot.toRealPath().toString(),
                 "--bachata-socket",
                 request.socketPath,
             ),
@@ -84,8 +88,8 @@ class RuntimeProcessLauncherTest {
         val request = validRequest()
         val outside = temporaryFolder.newFile("outside-box64").toPath()
         outside.toFile().setExecutable(true)
-        Files.delete(request.nativeLibraryDir.resolve("libbox64.so"))
-        Files.createSymbolicLink(request.nativeLibraryDir.resolve("libbox64.so"), outside)
+        Files.delete(request.nativeLibraryDir.resolve("libbachata_host_box64.so"))
+        Files.createSymbolicLink(request.nativeLibraryDir.resolve("libbachata_host_box64.so"), outside)
         val launcher = RuntimeProcessLauncher { FakeProcessHandle() }
 
         assertThrows(SecurityException::class.java) { launcher.command(request) }
@@ -105,15 +109,17 @@ class RuntimeProcessLauncherTest {
     private fun validRequest(environment: Map<String, String> = emptyMap()): RuntimeProcessRequest {
         val base = temporaryFolder.newFolder().toPath()
         val nativeLibraryDir = Files.createDirectories(base.resolve("apk/lib"))
-        val box64 = Files.write(nativeLibraryDir.resolve("libbox64.so"), byteArrayOf(1))
-        assertTrue(box64.toFile().setExecutable(true))
+        Files.write(nativeLibraryDir.resolve("libbachata_host_loader.so"), byteArrayOf(1))
+        Files.write(nativeLibraryDir.resolve("libbachata_host_box64.so"), byteArrayOf(1))
         val runtimeRoot = Files.createDirectories(base.resolve("runtime"))
+        Files.createDirectories(runtimeRoot.resolve("host"))
         val shadPs4 = Files.write(runtimeRoot.resolve("bin/shadps4").also {
             Files.createDirectories(it.parent)
         }, byteArrayOf(2))
         return RuntimeProcessRequest(
             nativeLibraryDir = nativeLibraryDir,
             runtimeRoot = runtimeRoot,
+            overrideRoot = base,
             shadPs4Executable = shadPs4,
             socketPath = base.resolve("runtime.sock").toString(),
             environment = environment,

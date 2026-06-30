@@ -32,6 +32,8 @@ import kotlinx.coroutines.sync.withLock
 class WinlatorEmbeddedXServer(
     context: Context,
     private val socketRoot: File,
+    private val useAbstractXSocket: Boolean = false,
+    private val useSharedMemoryAudio: Boolean = true,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) : EmbeddedXServer {
     override val display: String = ":0"
@@ -48,7 +50,10 @@ class WinlatorEmbeddedXServer(
 
         val xServer = XServer(ScreenInfo(width, height))
         val xConnector = XConnectorEpoll(
-            UnixSocketConfig.create(socketRoot.path, UnixSocketConfig.XSERVER_PATH),
+            when {
+                useAbstractXSocket -> UnixSocketConfig.createAbstract(UnixSocketConfig.XSERVER_PATH)
+                else -> UnixSocketConfig.create(socketRoot.path, UnixSocketConfig.XSERVER_PATH)
+            },
             XClientConnectionHandler(xServer),
             XClientRequestHandler(),
         ).apply {
@@ -57,9 +62,10 @@ class WinlatorEmbeddedXServer(
             setCanReceiveAncillaryMessages(true)
         }
         ALSAClient.assignFramesPerBuffer(appContext)
+        val audioOptions = ALSAClient.Options().apply { useSharedMemory = useSharedMemoryAudio }
         val alsaConnector = XConnectorEpoll(
             UnixSocketConfig.create(socketRoot.path, UnixSocketConfig.ALSA_SERVER_PATH),
-            ALSAClientConnectionHandler(ALSAClient.Options()),
+            ALSAClientConnectionHandler(audioOptions),
             ALSARequestHandler(),
         ).apply { setMultithreadedClients(true) }
         val renderer = SurfaceWindowRenderer(scope, surface, xServer)

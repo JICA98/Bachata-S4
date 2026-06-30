@@ -4,7 +4,6 @@ import android.util.Log;
 import com.winlator.xserver.extensions.BigReqExtension;
 import com.winlator.xserver.extensions.DRI3Extension;
 import com.winlator.xserver.extensions.Extension;
-import com.winlator.xserver.extensions.GLXExtension;
 import com.winlator.xserver.extensions.MITSHMExtension;
 import com.winlator.xserver.extensions.PresentExtension;
 import com.winlator.xserver.extensions.SyncExtension;
@@ -162,8 +161,7 @@ public class XServer {
             new DRI3Extension(this, opcode--),
             new PresentExtension(this, opcode--),
             new SyncExtension(this, opcode--),
-            new XComposite(this, opcode--),
-            new GLXExtension(this, opcode--)
+            new XComposite(this, opcode--)
         };
     }
 

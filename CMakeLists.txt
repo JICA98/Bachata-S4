@@ -39,7 +39,13 @@ cmake_dependent_option(ENABLE_SYSTEM_VULKAN "Enable the system Vulkan driver" OF
 option(ENABLE_DISCORD_RPC "Enable the Discord RPC integration" ON)
 option(ENABLE_UPDATER "Enables the options to updater" ON)
 option(ENABLE_TESTS "Build unit tests (requires GTest)" OFF)
+option(ENABLE_BACHATA_RUNTIME "Build x86-64 Android-container runtime mode" OFF)
 option(ENABLE_SYSTEM_LIBRARIES "Enable building against system libraries" OFF)
+
+if (ENABLE_BACHATA_RUNTIME)
+    set(ENABLE_DISCORD_RPC OFF)
+    set(ENABLE_UPDATER OFF)
+endif()
 
 # First, determine whether to use CMAKE_OSX_ARCHITECTURES or CMAKE_SYSTEM_PROCESSOR.
 if (APPLE AND CMAKE_OSX_ARCHITECTURES)
@@ -1190,6 +1196,14 @@ add_executable(shadps4
     src/sdl_window.h
     src/sdl_window.cpp
 )
+
+if (ENABLE_BACHATA_RUNTIME)
+    target_compile_definitions(shadps4 PRIVATE ENABLE_BACHATA_RUNTIME)
+    target_sources(shadps4 PRIVATE
+        src/platform/bachata/runtime_client.cpp
+        src/platform/bachata/runtime_client.h
+    )
+endif()
 
 create_target_directory_groups(shadps4)
 
