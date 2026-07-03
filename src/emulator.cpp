@@ -386,9 +386,13 @@ void Emulator::Run(std::filesystem::path file, std::vector<std::string> args,
     Common::Singleton<FileSys::HandleTable>::Instance()->CreateStdHandles();
 
     // Initialize components
+#ifndef ENABLE_BACHATA_RUNTIME
     memory = Core::Memory::Instance();
+#endif
     controllers = Common::Singleton<Input::GameControllers>::Instance();
+#ifndef ENABLE_BACHATA_RUNTIME
     linker = Common::Singleton<Core::Linker>::Instance();
+#endif
 
     // Load renderdoc module
     VideoCore::LoadRenderDoc();
@@ -431,6 +435,11 @@ void Emulator::Run(std::filesystem::path file, std::vector<std::string> args,
 
     std::filesystem::path icon_path = mnt->GetHostPath("/app0/sce_sys/icon0.png");
     window->SetIcon(icon_path);
+
+#ifdef ENABLE_BACHATA_RUNTIME
+    memory = Core::Memory::Instance();
+    linker = Common::Singleton<Core::Linker>::Instance();
+#endif
 
     const auto& mount_data_dir = Common::FS::GetUserPath(Common::FS::PathType::GameDataDir);
     mnt->Mount(mount_data_dir, "/data");

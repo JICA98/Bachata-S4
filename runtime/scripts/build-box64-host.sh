@@ -7,6 +7,7 @@ build_dir="$project_root/runtime/build/box64-host"
 stage_dir="$project_root/runtime/build/box64-host-stage"
 expected_revision=50c8b90b09b433ab0767de44af2d0731cb0748b7
 quick_exit_patch="$project_root/runtime/patches/box64-cxa-quick-exit.patch"
+vulkan_qcom_patch="$project_root/runtime/patches/box64-vulkan-dispatch-tile-qcom.patch"
 
 for tool in cmake ninja aarch64-linux-gnu-gcc aarch64-linux-gnu-g++ readelf; do
   command -v "$tool" >/dev/null || { echo "$tool is required" >&2; exit 1; }
@@ -15,6 +16,10 @@ test "$(git -C "$source_dir" rev-parse HEAD)" = "$expected_revision"
 if ! git -C "$source_dir" apply --reverse --check "$quick_exit_patch" 2>/dev/null; then
   git -C "$source_dir" apply --check "$quick_exit_patch"
   git -C "$source_dir" apply "$quick_exit_patch"
+fi
+if ! git -C "$source_dir" apply --reverse --check "$vulkan_qcom_patch" 2>/dev/null; then
+  git -C "$source_dir" apply --check "$vulkan_qcom_patch"
+  git -C "$source_dir" apply "$vulkan_qcom_patch"
 fi
 
 cmake -S "$source_dir" -B "$build_dir" -G Ninja \

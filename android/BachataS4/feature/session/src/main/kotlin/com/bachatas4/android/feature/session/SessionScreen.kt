@@ -52,7 +52,9 @@ fun SessionScreen(
         Button(
             modifier = Modifier.padding(12.dp),
             onClick = {
-                context.startService(Intent(ManagedSession.ACTION_STOP).setPackage(context.packageName))
+                context.startService(
+                    Intent(ManagedSession.ACTION_STOP).setClassName(context.packageName, ManagedSession.SERVICE_CLASS),
+                )
             },
         ) { Text("Stop") }
     }

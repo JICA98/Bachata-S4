@@ -2,6 +2,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 
 #include <map>
+#include <fstream>
+#include <string>
+#include <vector>
 #include "common/alignment.h"
 #include "common/arch.h"
 #include "common/assert.h"
@@ -42,7 +45,11 @@ constexpr VAddr USER_MIN = 0x7000000000ULL;
 constexpr VAddr SYSTEM_RESERVED_MAX = 0xFFFFFFFFFULL;
 constexpr VAddr USER_MIN = 0x1000000000ULL;
 #endif
-#if defined(__linux__)
+#if defined(ENABLE_BACHATA_RUNTIME)
+// Android devices commonly expose a 39-bit userspace. Keep the managed guest range below
+// native mappings near the top of that space; compact titles use addresses inside this range.
+constexpr VAddr USER_MAX = 0x3FFFFFFFFFULL;
+#elif defined(__linux__)
 // Linux maps the shadPS4 executable around here, so limit the user maximum
 constexpr VAddr USER_MAX = 0x54FFFFFFFFFFULL;
 #elif defined(__FreeBSD__)
@@ -641,7 +648,48 @@ struct AddressSpace::Impl {
         map_flags |= MAP_NORESERVE;
 #endif
 
-#if defined(__APPLE__) && defined(ARCH_X86_64)
+#if defined(ENABLE_BACHATA_RUNTIME)
+        std::vector<std::pair<VAddr, VAddr>> occupied_ranges;
+        std::ifstream process_maps{"/proc/self/maps"};
+        for (std::string line; std::getline(process_maps, line);) {
+            const auto separator = line.find('-');
+            const auto end = line.find(' ', separator + 1);
+            if (separator == std::string::npos || end == std::string::npos) {
+                continue;
+            }
+            occupied_ranges.emplace_back(std::stoull(line.substr(0, separator), nullptr, 16),
+                                         std::stoull(line.substr(separator + 1, end - separator - 1),
+                                                    nullptr, 16));
+        }
+
+        const VAddr region_begin = SYSTEM_MANAGED_MIN;
+        const VAddr region_end = USER_MAX + 1;
+        const auto virtual_size = region_end - region_begin;
+        VAddr cursor = region_begin;
+        for (const auto [mapped_begin, mapped_end] : occupied_ranges) {
+            if (mapped_end <= region_begin || mapped_begin >= region_end) {
+                continue;
+            }
+            const VAddr gap_end = std::min(mapped_begin, region_end);
+            if (cursor < gap_end &&
+                mmap(reinterpret_cast<void*>(cursor), gap_end - cursor, protection_flags,
+                     map_flags, -1, 0) == MAP_FAILED) {
+                LOG_CRITICAL(Kernel_Vmm, "mmap gap failed: {}", strerror(errno));
+                throw std::bad_alloc{};
+            }
+            cursor = std::max(cursor, std::min(mapped_end, region_end));
+        }
+        if (cursor < region_end &&
+            mmap(reinterpret_cast<void*>(cursor), region_end - cursor, protection_flags,
+                 map_flags, -1, 0) == MAP_FAILED) {
+            LOG_CRITICAL(Kernel_Vmm, "mmap final gap failed: {}", strerror(errno));
+            throw std::bad_alloc{};
+        }
+        auto* virtual_base = reinterpret_cast<u8*>(SYSTEM_MANAGED_MIN);
+        system_managed_base = virtual_base;
+        system_reserved_base = reinterpret_cast<u8*>(SYSTEM_RESERVED_MIN);
+        user_base = reinterpret_cast<u8*>(USER_MIN);
+#elif defined(__APPLE__) && defined(ARCH_X86_64)
         // On ARM64 Macs, we run into limitations due to the commpage from 0xFC0000000 - 0xFFFFFFFFF
         // and the GPU carveout region from 0x1000000000 - 0x6FFFFFFFFF. Because this creates gaps
         // in the available virtual memory region, we map memory space using three distinct parts.
@@ -695,6 +743,15 @@ struct AddressSpace::Impl {
         m_free_regions.insert({system_managed_addr, system_managed_addr + system_managed_size});
         m_free_regions.insert({system_reserved_addr, system_reserved_addr + system_reserved_size});
         m_free_regions.insert({user_addr, user_addr + user_size});
+#ifdef ENABLE_BACHATA_RUNTIME
+        for (const auto [mapped_begin, mapped_end] : occupied_ranges) {
+            const VAddr begin = std::max(mapped_begin, SYSTEM_MANAGED_MIN);
+            const VAddr end = std::min(mapped_end, USER_MAX + 1);
+            if (begin < end) {
+                m_free_regions.subtract({begin, end});
+            }
+        }
+#endif
 
 #ifdef __APPLE__
         const auto shm_path = fmt::format("/BackingDmem{}", getpid());
@@ -705,7 +762,7 @@ struct AddressSpace::Impl {
         }
         shm_unlink(shm_path.c_str());
 #else
-#ifndef __FreeBSD__
+#if !defined(__FreeBSD__) && !defined(ENABLE_BACHATA_RUNTIME)
         madvise(virtual_base, virtual_size, MADV_HUGEPAGE);
 #endif
         // NOTE: If you add MFD_HUGETLB or whatever, remember that FBSD will break (libc bug)

@@ -33,6 +33,7 @@ class WinlatorEmbeddedXServer(
     context: Context,
     private val socketRoot: File,
     private val useAbstractXSocket: Boolean = false,
+    private val xSocketPath: String = UnixSocketConfig.XSERVER_PATH,
     private val useSharedMemoryAudio: Boolean = true,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
 ) : EmbeddedXServer {
@@ -52,7 +53,7 @@ class WinlatorEmbeddedXServer(
         val xConnector = XConnectorEpoll(
             when {
                 useAbstractXSocket -> UnixSocketConfig.createAbstract(UnixSocketConfig.XSERVER_PATH)
-                else -> UnixSocketConfig.create(socketRoot.path, UnixSocketConfig.XSERVER_PATH)
+                else -> UnixSocketConfig.create(socketRoot.path, xSocketPath)
             },
             XClientConnectionHandler(xServer),
             XClientRequestHandler(),

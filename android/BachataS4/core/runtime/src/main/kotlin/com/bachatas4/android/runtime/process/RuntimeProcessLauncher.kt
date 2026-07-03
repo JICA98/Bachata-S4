@@ -10,10 +10,12 @@ data class RuntimeProcessRequest(
     val nativeLibraryDir: Path,
     val runtimeRoot: Path,
     val overrideRoot: Path,
+    val storageRoot: Path = overrideRoot,
     val shadPs4Executable: Path,
     val socketPath: String,
     val environment: Map<String, String> = emptyMap(),
     val arguments: List<String> = emptyList(),
+    val outputPath: Path? = null,
 )
 
 interface RuntimeProcessHandle {
@@ -48,7 +50,10 @@ class RuntimeProcessLauncher(
         require(hostDirectory.startsWith(runtimeRoot) && Files.isDirectory(hostDirectory)) {
             "Host runtime directory escapes runtime root: $hostDirectory"
         }
+        val overrideRootArgument = request.overrideRoot.toAbsolutePath().normalize()
         val overrideRoot = request.overrideRoot.toRealPath()
+        val storageRoot = request.storageRoot.toRealPath()
+        require(overrideRoot.startsWith(storageRoot)) { "Game override escapes app storage" }
         val shadPs4 = request.shadPs4Executable.toRealPath()
         if (!shadPs4.startsWith(runtimeRoot)) {
             throw SecurityException("Runtime executable escapes runtime root: $shadPs4")
@@ -56,8 +61,11 @@ class RuntimeProcessLauncher(
         require(Files.isRegularFile(shadPs4) && Files.isReadable(shadPs4)) {
             "Runtime executable is not a readable file: $shadPs4"
         }
-        val socketPath = Paths.get(request.socketPath).toAbsolutePath().normalize()
-        require(request.socketPath.isNotBlank() && '\u0000' !in request.socketPath && socketPath.startsWith(overrideRoot)) {
+        val rawSocketPath = Paths.get(request.socketPath)
+        val socketPath = rawSocketPath.parent?.toRealPath()?.resolve(rawSocketPath.fileName)?.normalize()
+        require(request.socketPath.isNotBlank() && '\u0000' !in request.socketPath &&
+            rawSocketPath.isAbsolute && socketPath?.startsWith(storageRoot) == true
+        ) {
             "Invalid runtime socket path"
         }
         request.arguments.forEach { require('\u0000' !in it) { "Runtime argument contains NUL" } }
@@ -69,9 +77,11 @@ class RuntimeProcessLauncher(
             box64.toString(),
             shadPs4.toString(),
             "--override-root",
-            overrideRoot.toString(),
+            overrideRootArgument.toString(),
+            "--bachata-storage-root",
+            storageRoot.toString(),
             "--bachata-socket",
-            request.socketPath,
+            socketPath.toString(),
         ) + request.arguments
     }
 
@@ -81,10 +91,25 @@ class RuntimeProcessLauncher(
     }
 
     fun launch(request: RuntimeProcessRequest): RuntimeProcessHandle {
-        val builder = ProcessBuilder(command(request))
+        val command = command(request)
+        val shadPs4 = request.shadPs4Executable.toRealPath()
+        if (!Files.isExecutable(shadPs4)) {
+            check(shadPs4.toFile().setExecutable(true, true) && Files.isExecutable(shadPs4)) {
+                "Unable to make verified runtime executable owner-executable: $shadPs4"
+            }
+        }
+        val builder = ProcessBuilder(command)
         builder.directory(request.runtimeRoot.toRealPath().toFile())
-        builder.redirectOutput(NULL_DEVICE)
-        builder.redirectError(NULL_DEVICE)
+        val outputPath = request.outputPath
+        if (outputPath == null) {
+            builder.redirectOutput(NULL_DEVICE)
+            builder.redirectError(NULL_DEVICE)
+        } else {
+            val parent = outputPath.toAbsolutePath().normalize().parent.toRealPath()
+            require(parent.startsWith(request.storageRoot.toRealPath())) { "Runtime output escapes app storage" }
+            builder.redirectErrorStream(true)
+            builder.redirectOutput(outputPath.toFile())
+        }
         builder.environment().apply {
             clear()
             request.environment.forEach { (name, value) ->
@@ -103,11 +128,15 @@ class RuntimeProcessLauncher(
             "HOME",
             "LD_LIBRARY_PATH",
             "BOX64_PATH",
+            "BOX64_LOG",
+            "BOX64_LOAD_ADDR",
+            "BOX64_PREFER_WRAPPED",
             "BOX64_LD_LIBRARY_PATH",
             "BOX64_EMULATED_LIBS",
             "BACHATA_ALSA_SOCKET",
             "DISPLAY",
             "SDL_VIDEODRIVER",
+            "SDL_VULKAN_LIBRARY",
             "TMPDIR",
             "XDG_CACHE_HOME",
             "MESA_SHADER_CACHE_DIR",

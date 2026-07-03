@@ -62,6 +62,7 @@ constexpr std::size_t COMMAND_BUFFER_POOL_SIZE = 4;
 
 CommandPool::CommandPool(const Instance& instance, MasterSemaphore* master_semaphore)
     : ResourcePool{master_semaphore, COMMAND_BUFFER_POOL_SIZE}, instance{instance} {
+    std::fprintf(stderr, "BACHATA_COMMAND_POOL_ENTER\n");
     const vk::CommandPoolCreateInfo pool_create_info = {
         .flags = vk::CommandPoolCreateFlagBits::eTransient |
                  vk::CommandPoolCreateFlagBits::eResetCommandBuffer,
@@ -73,6 +74,7 @@ CommandPool::CommandPool(const Instance& instance, MasterSemaphore* master_semap
                vk::to_string(pool_result));
     cmd_pool = std::move(pool);
     SetObjectName(device, *cmd_pool, "CommandPool");
+    std::fprintf(stderr, "BACHATA_COMMAND_POOL_READY\n");
 }
 
 CommandPool::~CommandPool() = default;

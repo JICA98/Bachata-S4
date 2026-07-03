@@ -12,6 +12,13 @@ done
 
 llvm_ar=$(command -v llvm-ar-21 || command -v llvm-ar)
 llvm_ranlib=$(command -v llvm-ranlib-21 || command -v llvm-ranlib)
+sdl_patch="$project_root/runtime/patches/sdl3-winlator-x11.patch"
+if git -C "$project_root/externals/sdl3" apply --check "$sdl_patch"; then
+  git -C "$project_root/externals/sdl3" apply "$sdl_patch"
+elif ! git -C "$project_root/externals/sdl3" apply --reverse --check "$sdl_patch"; then
+  echo "SDL3 Winlator patch does not apply cleanly" >&2
+  exit 1
+fi
 
 cmake -S "$project_root" -B "$build_dir" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
@@ -27,6 +34,15 @@ cmake -S "$project_root" -B "$build_dir" -G Ninja \
   -DENABLE_DISCORD_RPC=OFF \
   -DENABLE_UPDATER=OFF \
   -DENABLE_TESTS=OFF \
+  -DSDL_X11_XCURSOR=OFF \
+  -DSDL_X11_XDBE=OFF \
+  -DSDL_X11_XINPUT=OFF \
+  -DSDL_X11_XFIXES=OFF \
+  -DSDL_X11_XRANDR=OFF \
+  -DSDL_X11_XSCRNSAVER=OFF \
+  -DSDL_X11_XSHAPE=OFF \
+  -DSDL_X11_XSYNC=OFF \
+  -DSDL_X11_XTEST=OFF \
   -DSDL_WAYLAND=OFF
 cmake --build "$build_dir" --target shadps4
 

@@ -593,10 +593,25 @@ void RenderDrawData(ImDrawData& draw_data, vk::CommandBuffer command_buffer,
         // Upload vertex/index data into a single contiguous GPU buffer
         ImDrawVert* vtx_dst = nullptr;
         ImDrawIdx* idx_dst = nullptr;
-        vtx_dst = (ImDrawVert*)CheckVkResult(
-            v.device.mapMemory(frb.vertex.buffer_memory, 0, vertex_size, vk::MemoryMapFlags{}));
-        idx_dst = (ImDrawIdx*)CheckVkResult(
-            v.device.mapMemory(frb.index.buffer_memory, 0, index_size, vk::MemoryMapFlags{}));
+        void* vertex_data = nullptr;
+        void* index_data = nullptr;
+        const vk::Result vertex_result = v.device.mapMemory(
+            frb.vertex.buffer_memory, 0, vertex_size, vk::MemoryMapFlags{}, &vertex_data);
+        const vk::Result index_result = v.device.mapMemory(
+            frb.index.buffer_memory, 0, index_size, vk::MemoryMapFlags{}, &index_data);
+        std::fprintf(stderr,
+                     "BACHATA_IMGUI_DRAW_MAP vertex_size=%llu vertex_result=%d vertex=%p "
+                     "index_size=%llu index_result=%d index=%p\n",
+                     static_cast<unsigned long long>(vertex_size), static_cast<int>(vertex_result),
+                     vertex_data, static_cast<unsigned long long>(index_size),
+                     static_cast<int>(index_result), index_data);
+        if (vertex_result != vk::Result::eSuccess || index_result != vk::Result::eSuccess) {
+            if (vertex_result == vk::Result::eSuccess) v.device.unmapMemory(frb.vertex.buffer_memory);
+            if (index_result == vk::Result::eSuccess) v.device.unmapMemory(frb.index.buffer_memory);
+            return;
+        }
+        vtx_dst = static_cast<ImDrawVert*>(vertex_data);
+        idx_dst = static_cast<ImDrawIdx*>(index_data);
         for (int n = 0; n < draw_data.CmdListsCount; n++) {
             const ImDrawList* cmd_list = draw_data.CmdLists[n];
             memcpy(vtx_dst, cmd_list->VtxBuffer.Data,
@@ -806,7 +821,18 @@ static bool CreateFontsTexture() {
 
     // Upload to Buffer:
     {
-        char* map = (char*)CheckVkResult(v.device.mapMemory(upload_buffer_memory, 0, upload_size));
+        void* mapped = nullptr;
+        const vk::Result map_result = v.device.mapMemory(upload_buffer_memory, 0, upload_size,
+                                                         vk::MemoryMapFlags{}, &mapped);
+        std::fprintf(stderr,
+                     "BACHATA_IMGUI_MAP memory=%p size=%llu result=%d data=%p\n",
+                     static_cast<void*>(static_cast<VkDeviceMemory>(upload_buffer_memory)),
+                     static_cast<unsigned long long>(upload_size), static_cast<int>(map_result),
+                     mapped);
+        if (map_result != vk::Result::eSuccess) {
+            return false;
+        }
+        char* map = static_cast<char*>(mapped);
         memcpy(map, pixels, upload_size);
         vk::MappedMemoryRange range[1]{
             {

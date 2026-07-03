@@ -28,6 +28,8 @@ import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeoutException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -81,7 +83,9 @@ class EmulationService : Service() {
         var boundSocket: LocalSocket? = null
         var serverSocket: LocalServerSocket? = null
         var clientSocket: LocalSocket? = null
+        val acceptExecutor = Executors.newSingleThreadExecutor()
         val controlFile = File(filesDir, "runtime-control.sock").apply { delete() }
+        val outputFile = File(filesDir, "runtime-session.log").apply { delete() }
         try {
             require(gameId.matches(Regex("[A-Za-z0-9._-]+"))) { "Invalid game id" }
             val gamesRoot = File(filesDir, "games").canonicalFile
@@ -92,10 +96,18 @@ class EmulationService : Service() {
 
             ManagedSession.update(ManagedSessionState.Preparing("runtime"))
             val runtimeRoot = installRuntime()
+            runtimeRoot.resolve(".local/share").toFile().mkdirs()
+            runtimeRoot.resolve(".config").toFile().mkdirs()
             ManagedSession.update(ManagedSessionState.Preparing("display"))
             val target = withTimeout(SURFACE_TIMEOUT_MS) { ManagedSession.surface.filterNotNull().first() }
-            val socketRoot = File(cacheDir, "session-sockets").apply { mkdirs() }
-            xServer = WinlatorEmbeddedXServer(this, socketRoot, useAbstractXSocket = true, useSharedMemoryAudio = false)
+            val socketRoot = File(filesDir, "x").apply { mkdirs() }
+            xServer = WinlatorEmbeddedXServer(
+                this,
+                socketRoot,
+                useAbstractXSocket = false,
+                xSocketPath = "/X0",
+                useSharedMemoryAudio = false,
+            )
             xServer.start(target.surface, target.width, target.height)
 
             boundSocket = LocalSocket().also {
@@ -107,14 +119,26 @@ class EmulationService : Service() {
                 RuntimeProcessRequest(
                     nativeLibraryDir = Paths.get(applicationInfo.nativeLibraryDir),
                     runtimeRoot = runtimeRoot,
-                    overrideRoot = filesDir.toPath(),
+                    overrideRoot = gameRoot.toPath(),
+                    storageRoot = filesDir.toPath(),
                     shadPs4Executable = runtimeRoot.resolve("bin/shadps4"),
                     socketPath = controlFile.path,
                     environment = environment,
                     arguments = listOf("-g", eboot.path),
+                    outputPath = outputFile.toPath(),
                 ),
             )
-            clientSocket = serverSocket.accept()
+            val acceptFuture = acceptExecutor.submit<LocalSocket> { serverSocket.accept() }
+            while (clientSocket == null) {
+                clientSocket = try {
+                    acceptFuture.get(ACCEPT_POLL_MILLIS, TimeUnit.MILLISECONDS)
+                } catch (_: TimeoutException) {
+                    check(process?.isAlive == true) {
+                        "shadPS4 exited before socket connect: ${process?.exitCode}"
+                    }
+                    null
+                }
+            }
             clientSocket.inputStream.bufferedReader().forEachLine { frame ->
                 when {
                     frame == "BACHATA/1 EVENT Running" -> ManagedSession.update(ManagedSessionState.Running(gameId))
@@ -128,8 +152,11 @@ class EmulationService : Service() {
         } catch (_: CancellationException) {
             ManagedSession.update(ManagedSessionState.Stopped(process?.exitCode))
         } catch (error: Exception) {
+            val childOutput = runCatching { outputFile.readLines().takeLast(MAX_ERROR_LOG_LINES).joinToString(" | ") }
+                .getOrDefault("")
+            val detail = listOfNotNull(error.message, childOutput.ifBlank { null }).joinToString(": ")
             ManagedSession.update(
-                ManagedSessionState.Failed(RuntimeErrorCode.BACKEND_CRASHED, error.message ?: error.javaClass.simpleName),
+                ManagedSessionState.Failed(RuntimeErrorCode.BACKEND_CRASHED, detail.ifBlank { error.javaClass.simpleName }),
             )
         } finally {
             process?.destroyForcibly()
@@ -137,6 +164,7 @@ class EmulationService : Service() {
             runCatching { clientSocket?.close() }
             runCatching { serverSocket?.close() }
             runCatching { boundSocket?.close() }
+            acceptExecutor.shutdownNow()
             runCatching { xServer?.let { runBlocking { it.stop() } } }
             controlFile.delete()
             stopForeground(STOP_FOREGROUND_REMOVE)
@@ -160,13 +188,16 @@ class EmulationService : Service() {
 
     private fun runtimeEnvironment(runtimeRoot: Path, socketRoot: File, display: String) = mapOf(
         "HOME" to runtimeRoot.toString(),
-        "LD_LIBRARY_PATH" to "${applicationInfo.nativeLibraryDir}:${runtimeRoot.resolve("host")}",
         "BOX64_PATH" to runtimeRoot.resolve("bin").toString(),
+        "BOX64_LOG" to "1",
+        "BOX64_LOAD_ADDR" to "0x6000000000",
+        "BOX64_PREFER_WRAPPED" to "1",
         "BOX64_LD_LIBRARY_PATH" to "${runtimeRoot.resolve("lib/x86_64-linux-gnu")}:${runtimeRoot.resolve("lib64")}",
         "BOX64_EMULATED_LIBS" to EMULATED_LIBRARIES,
         "BACHATA_ALSA_SOCKET" to File(socketRoot, UnixSocketConfig.ALSA_SERVER_PATH).path,
         "DISPLAY" to display,
         "SDL_VIDEODRIVER" to "x11",
+        "SDL_VULKAN_LIBRARY" to runtimeRoot.resolve("host/libvulkan.so.1").toString(),
         "TMPDIR" to cacheDir.path,
         "XDG_CACHE_HOME" to File(cacheDir, "xdg").apply { mkdirs() }.path,
         "VK_ICD_FILENAMES" to runtimeRoot.resolve("host/vulkan/icd.d/freedreno_icd.json").toString(),
@@ -190,7 +221,9 @@ class EmulationService : Service() {
             this, 0, Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         val stop = PendingIntent.getService(
-            this, 1, Intent(ManagedSession.ACTION_STOP).setPackage(packageName), PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            this, 1,
+            Intent(ManagedSession.ACTION_STOP).setClassName(packageName, ManagedSession.SERVICE_CLASS),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_media_play)
@@ -207,6 +240,8 @@ class EmulationService : Service() {
         const val NOTIFICATION_ID = 41
         const val SURFACE_TIMEOUT_MS = 30_000L
         const val PROCESS_EXIT_TIMEOUT_SECONDS = 5L
-        const val EMULATED_LIBRARIES = "libSDL2-2.0.so.0:libX11.so.6:libX11-xcb.so.1:libXcursor.so.1:libXext.so.6:libXfixes.so.3:libXi.so.6:libXrandr.so.2:libXrender.so.1:libXss.so.1:libxcb.so.1:libXau.so.6:libXdmcp.so.6:libxkbcommon.so.0:libudev.so.1:libuuid.so.1"
+        const val ACCEPT_POLL_MILLIS = 250L
+        const val MAX_ERROR_LOG_LINES = 20
+        const val EMULATED_LIBRARIES = "libSDL2-2.0.so.0:libudev.so.1:libuuid.so.1"
     }
 }

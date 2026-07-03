@@ -298,7 +298,11 @@ Users UserManager::CreateDefaultUsers() {
             std::filesystem::create_directory(user_dir / "trophy");
             std::filesystem::create_directory(user_dir / "inputs");
             if (u.user_id == 1000) {
+#ifdef ENABLE_BACHATA_RUNTIME
+                constexpr TransferOption user_choice = TransferOption::Nothing;
+#else
                 TransferOption user_choice = AskMigrationOption();
+#endif
                 CheckAndMigrateSaves(user_choice);
                 CheckAndMigrateTrophies(user_choice);
             }

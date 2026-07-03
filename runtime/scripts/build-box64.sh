@@ -6,6 +6,7 @@ source_dir="$project_root/runtime/sources/box64"
 build_dir="$project_root/runtime/build/box64"
 output="$project_root/android/BachataS4/core/runtime/src/main/jniLibs/arm64-v8a/libbox64.so"
 entrypoint_patch="$project_root/runtime/patches/box64-winlator-glibc-entrypoint.patch"
+vulkan_qcom_patch="$project_root/runtime/patches/box64-vulkan-dispatch-tile-qcom.patch"
 expected_revision=50c8b90b09b433ab0767de44af2d0731cb0748b7
 : "${ANDROID_NDK_ROOT:?ANDROID_NDK_ROOT must point to a pinned Android NDK}"
 
@@ -15,6 +16,10 @@ if ! git -C "$source_dir" apply --reverse --check "$entrypoint_patch" 2>/dev/nul
   git -C "$source_dir" diff --quiet
   git -C "$source_dir" apply --check "$entrypoint_patch"
   git -C "$source_dir" apply "$entrypoint_patch"
+fi
+if ! git -C "$source_dir" apply --reverse --check "$vulkan_qcom_patch" 2>/dev/null; then
+  git -C "$source_dir" apply --check "$vulkan_qcom_patch"
+  git -C "$source_dir" apply "$vulkan_qcom_patch"
 fi
 
 cmake -S "$source_dir" -B "$build_dir" -G Ninja \

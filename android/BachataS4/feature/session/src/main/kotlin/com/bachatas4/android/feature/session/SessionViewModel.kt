@@ -30,7 +30,7 @@ class SessionViewModel @Inject constructor(
                 return@launch
             }
             context.startForegroundService(
-                Intent(ManagedSession.ACTION_START).setPackage(context.packageName)
+                Intent(ManagedSession.ACTION_START).setClassName(context.packageName, ManagedSession.SERVICE_CLASS)
                     .putExtra(ManagedSession.EXTRA_GAME_ID, game.id)
                     .putExtra(ManagedSession.EXTRA_GAME_PATH, game.relativePath),
             )

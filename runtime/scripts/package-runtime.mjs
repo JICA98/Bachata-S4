@@ -33,6 +33,18 @@ function copy(source, target, mode) {
   chmodSync(target, mode);
 }
 
+function patchFixedString(file, original, replacement) {
+  const bytes = readFileSync(file);
+  const source = Buffer.from(original);
+  const target = Buffer.from(replacement);
+  if (target.length > source.length) fail(`Replacement is too long for ${file}`);
+  const offset = bytes.indexOf(source);
+  if (offset < 0 || bytes.indexOf(source, offset + 1) >= 0) fail(`Expected one ${original} string in ${file}`);
+  bytes.fill(0, offset, offset + source.length);
+  target.copy(bytes, offset);
+  writeFileSync(file, bytes);
+}
+
 function disableArm64SetRobustList(file, expectedCount) {
   const bytes = readFileSync(file);
   let patched = 0;
@@ -155,10 +167,15 @@ const nativeOutputDir = resolve(projectRoot, "android/BachataS4/core/runtime/src
 const componentLock = JSON.parse(readFileSync(resolve(projectRoot, "runtime/locks/components.lock.json"), "utf8"));
 const inputLock = JSON.parse(readFileSync(resolve(projectRoot, "runtime/locks/runtime-inputs.lock.json"), "utf8"));
 const revisions = Object.fromEntries(componentLock.components.map(({ name, revision }) => [name, revision]));
+const winlatorTurnipArchive = resolve(projectRoot, "runtime/sources/winlator-components/installable_components/turnip/turnip-25.0.0.tzst");
+const winlatorTurnipSha256 = "4a57d0fe980b3685a0e36326de8bf9d30de86075fa4e934213b8b8cfde8f492e";
 
 for (const input of inputLock.inputs) {
   const bytes = readFileSync(join(inputDir, input.name));
   if (sha256(bytes) !== input.sha256) fail(`Locked input hash mismatch: ${input.name}`);
+}
+if (sha256(readFileSync(winlatorTurnipArchive)) !== winlatorTurnipSha256) {
+  fail("Winlator Turnip 25.0.0 archive hash mismatch");
 }
 for (const component of ["glibc-packages", "winlator-app", "winlator-components"]) {
   const sourceDir = resolve(projectRoot, `runtime/sources/${component}`);
@@ -230,7 +247,7 @@ run("tar", ["--zstd", "-xf", inputByPrefix("vulkan-icd-loader-1.4.350.1-1-x86_64
 run("tar", ["-xf", inputByPrefix("libstdc++-16.1.1+r12+g301eb08fa2c5-1-aarch64"), "-C", armStdcppExtract]);
 run("tar", ["-xf", inputByPrefix("zlib-"), "-C", armZlibExtract]);
 run("tar", ["-xf", inputByPrefix("libdrm-"), "-C", armDrmExtract]);
-run("tar", ["--zstd", "-xf", resolve(projectRoot, "runtime/sources/winlator-app/app/src/main/assets/graphics_driver/turnip-26.1.0.tzst"), "-C", turnipExtract]);
+run("tar", ["--zstd", "-xf", winlatorTurnipArchive, "-C", turnipExtract]);
 run("tar", [
   "--zstd", "-xf", resolve(projectRoot, "runtime/sources/winlator-app/app/src/main/assets/rootfs.tzst"),
   "-C", hostExtract, "--strip-components=3",
@@ -375,7 +392,7 @@ writeFileSync(turnipIcd, `${JSON.stringify({
   ICD: {
     library_path: "../../libvulkan_freedreno.so",
     library_arch: "64",
-    api_version: "1.4.348",
+    api_version: "1.1.246",
   },
 }, null, 2)}\n`);
 copy(join(glibcArmExtract, "usr/lib/ld-linux-aarch64.so.1"), join(nativeOutputDir, "libbachata_host_loader.so"), 0o755);
@@ -404,6 +421,13 @@ for (const library of [
   "libxcb-sync.so", "libxcb-sync.so.1", "libxcb-sync.so.1.0.0",
 ]) {
   copy(join(hostExtract, library), join(rootfs, `host/${library}`), 0o755);
+}
+for (const library of ["libxcb.so", "libxcb.so.1", "libxcb.so.1.1.0"]) {
+  patchFixedString(
+    join(rootfs, `host/${library}`),
+    "/data/data/com.winlator/files/rootfs/tmp/.X11-unix/X",
+    "/data/data/com.bachatas4.android/files/x/X",
+  );
 }
 copy(join(libxssExtract, "usr/lib/libXss.so.1.0.0"), join(rootfs, "host/libXss.so.1"), 0o755);
 copy(join(libxssExtract, "usr/lib/libXss.so.1.0.0"), join(rootfs, "host/libXss.so"), 0o755);

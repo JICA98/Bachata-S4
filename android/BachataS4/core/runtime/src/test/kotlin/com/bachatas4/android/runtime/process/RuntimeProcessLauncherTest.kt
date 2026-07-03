@@ -28,6 +28,8 @@ class RuntimeProcessLauncherTest {
                 request.shadPs4Executable.toRealPath().toString(),
                 "--override-root",
                 request.overrideRoot.toRealPath().toString(),
+                "--bachata-storage-root",
+                request.storageRoot.toRealPath().toString(),
                 "--bachata-socket",
                 request.socketPath,
             ),
@@ -81,6 +83,17 @@ class RuntimeProcessLauncherTest {
         assertEquals(ProcessBuilder.Redirect.Type.WRITE, captured!!.redirectError().type())
         assertEquals("/dev/null", captured!!.redirectOutput().file().path)
         assertEquals("/dev/null", captured!!.redirectError().file().path)
+    }
+
+    @Test
+    fun allowsGameOverrideInsideSeparateStorageRoot() {
+        val request = validRequest()
+        val gameRoot = Files.createDirectories(request.storageRoot.resolve("games/CUSA00001"))
+        val launcher = RuntimeProcessLauncher { FakeProcessHandle() }
+
+        val command = launcher.command(request.copy(overrideRoot = gameRoot))
+
+        assertEquals(gameRoot.toRealPath().toString(), command[6])
     }
 
     @Test
