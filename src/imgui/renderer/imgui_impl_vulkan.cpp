@@ -599,12 +599,6 @@ void RenderDrawData(ImDrawData& draw_data, vk::CommandBuffer command_buffer,
             frb.vertex.buffer_memory, 0, vertex_size, vk::MemoryMapFlags{}, &vertex_data);
         const vk::Result index_result = v.device.mapMemory(
             frb.index.buffer_memory, 0, index_size, vk::MemoryMapFlags{}, &index_data);
-        std::fprintf(stderr,
-                     "BACHATA_IMGUI_DRAW_MAP vertex_size=%llu vertex_result=%d vertex=%p "
-                     "index_size=%llu index_result=%d index=%p\n",
-                     static_cast<unsigned long long>(vertex_size), static_cast<int>(vertex_result),
-                     vertex_data, static_cast<unsigned long long>(index_size),
-                     static_cast<int>(index_result), index_data);
         if (vertex_result != vk::Result::eSuccess || index_result != vk::Result::eSuccess) {
             if (vertex_result == vk::Result::eSuccess) v.device.unmapMemory(frb.vertex.buffer_memory);
             if (index_result == vk::Result::eSuccess) v.device.unmapMemory(frb.index.buffer_memory);
@@ -824,11 +818,6 @@ static bool CreateFontsTexture() {
         void* mapped = nullptr;
         const vk::Result map_result = v.device.mapMemory(upload_buffer_memory, 0, upload_size,
                                                          vk::MemoryMapFlags{}, &mapped);
-        std::fprintf(stderr,
-                     "BACHATA_IMGUI_MAP memory=%p size=%llu result=%d data=%p\n",
-                     static_cast<void*>(static_cast<VkDeviceMemory>(upload_buffer_memory)),
-                     static_cast<unsigned long long>(upload_size), static_cast<int>(map_result),
-                     mapped);
         if (map_result != vk::Result::eSuccess) {
             return false;
         }

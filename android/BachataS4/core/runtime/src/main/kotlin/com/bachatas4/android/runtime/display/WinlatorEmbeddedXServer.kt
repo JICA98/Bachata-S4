@@ -142,13 +142,20 @@ private class SurfaceWindowRenderer(
         try {
             canvas = surface.lockHardwareCanvas()
             canvas.drawColor(Color.BLACK)
-            canvas.save()
-            canvas.scale(
-                targetWidth.toFloat() / xServer.screenInfo.width,
-                targetHeight.toFloat() / xServer.screenInfo.height,
-            )
-            xServer.windowManager.rootWindow.children.forEach { drawWindow(canvas, it) }
-            canvas.restore()
+            xServer.windowManager.rootWindow.children.forEach { window ->
+                val bounds = aspectFitBounds(
+                    window.width.toInt(), window.height.toInt(), canvas.width, canvas.height,
+                )
+                val scale = (bounds.right - bounds.left) / window.width
+                canvas.save()
+                canvas.translate(
+                    bounds.left - window.rootX * scale,
+                    bounds.top - window.rootY * scale,
+                )
+                canvas.scale(scale, scale)
+                drawWindow(canvas, window)
+                canvas.restore()
+            }
         } catch (_: IllegalArgumentException) {
             // Surface was replaced between isValid and lockHardwareCanvas.
         } finally {
