@@ -307,6 +307,7 @@ set(AUDIO_LIB src/core/libraries/audio/audioin.cpp
               src/core/libraries/audio/audioout_error.h
               src/core/libraries/audio/sdl_audio_out.cpp
               src/core/libraries/audio/openal_audio_out.cpp
+              src/core/libraries/audio/bachata_audio_out.cpp
               src/core/libraries/audio/openal_manager.h
               src/core/libraries/ngs2/ngs2.cpp
               src/core/libraries/ngs2/ngs2.h
@@ -1202,6 +1203,7 @@ if (ENABLE_BACHATA_RUNTIME)
     target_sources(shadps4 PRIVATE
         src/platform/bachata/runtime_client.cpp
         src/platform/bachata/controller_snapshot.cpp
+        src/platform/bachata/audio_transport.cpp
         src/platform/bachata/runtime_client.h
     )
 endif()
