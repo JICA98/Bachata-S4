@@ -299,6 +299,22 @@ int main(int argc, char* argv[]) {
     emulator->executableName = argv[0];
     emulator->waitForDebuggerBeforeRun = waitForDebugger;
 #ifdef ENABLE_BACHATA_RUNTIME
+    if (runtime_client.IsEnabled() &&
+        !runtime_client.StartInputReader([](const Platform::Bachata::ControllerSnapshot& snapshot) {
+            auto* controllers = Common::Singleton<Input::GameControllers>::Instance();
+            const std::array<int, 6> axes = {
+                snapshot.left_x,       snapshot.left_y, snapshot.right_x,
+                snapshot.right_y,      snapshot.left_trigger, snapshot.right_trigger,
+            };
+            (*controllers)[0]->ApplyRemoteState(
+                static_cast<Libraries::Pad::OrbisPadButtonDataOffset>(snapshot.buttons), axes,
+                snapshot.touch_down, snapshot.touch_x / 1920.0f, snapshot.touch_y / 1080.0f);
+        })) {
+        std::cerr << "Failed to start Bachata input reader\n";
+        runtime_client.SendError("INPUT_UNAVAILABLE");
+        runtime_client.SendStopped(1);
+        return 1;
+    }
     emulator->onRuntimeRunning = [&runtime_client]() { runtime_client.SendRunning(); };
     emulator->onRuntimeError = [&runtime_client](std::string_view code) {
         runtime_client.SendError(code);

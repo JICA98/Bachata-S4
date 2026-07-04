@@ -1201,6 +1201,7 @@ if (ENABLE_BACHATA_RUNTIME)
     target_compile_definitions(shadps4 PRIVATE ENABLE_BACHATA_RUNTIME)
     target_sources(shadps4 PRIVATE
         src/platform/bachata/runtime_client.cpp
+        src/platform/bachata/controller_snapshot.cpp
         src/platform/bachata/runtime_client.h
     )
 endif()

@@ -17,6 +17,8 @@ import com.bachatas4.android.model.RuntimeErrorCode
 import com.bachatas4.android.runtime.display.WinlatorEmbeddedXServer
 import com.bachatas4.android.runtime.install.RuntimeInstaller
 import com.bachatas4.android.runtime.install.RuntimeManifest
+import com.bachatas4.android.runtime.input.ControllerFrameEncoder
+import com.bachatas4.android.runtime.input.ControllerSnapshot
 import com.bachatas4.android.runtime.process.RuntimeProcessHandle
 import com.bachatas4.android.runtime.process.RuntimeProcessLauncher
 import com.bachatas4.android.runtime.process.RuntimeProcessRequest
@@ -87,6 +89,7 @@ class EmulationService : Service() {
         var boundSocket: LocalSocket? = null
         var serverSocket: LocalServerSocket? = null
         var clientSocket: LocalSocket? = null
+        var controllerSink: ((ControllerSnapshot) -> Unit)? = null
         val acceptExecutor = Executors.newSingleThreadExecutor()
         val controlFile = File(filesDir, "runtime-control.sock").apply { delete() }
         val outputFile = File(filesDir, "runtime-session.log").apply { delete() }
@@ -146,6 +149,21 @@ class EmulationService : Service() {
                     null
                 }
             }
+            val encoder = ControllerFrameEncoder()
+            val controllerOutput = clientSocket.outputStream
+            val writeLock = Any()
+            val sink: (ControllerSnapshot) -> Unit = { snapshot ->
+                encoder.encode(snapshot)?.let { frame ->
+                    runCatching {
+                        synchronized(writeLock) {
+                            controllerOutput.write(frame)
+                            controllerOutput.flush()
+                        }
+                    }
+                }
+            }
+            controllerSink = sink
+            ManagedSession.attachControllerSink(sink)
             clientSocket.inputStream.bufferedReader().forEachLine { frame ->
                 when {
                     frame == "BACHATA/1 EVENT Running" -> ManagedSession.update(ManagedSessionState.Running(gameId))
@@ -166,6 +184,10 @@ class EmulationService : Service() {
                 ManagedSessionState.Failed(RuntimeErrorCode.BACKEND_CRASHED, detail.ifBlank { error.javaClass.simpleName }),
             )
         } finally {
+            controllerSink?.let { sink ->
+                ManagedSession.submitController(ControllerSnapshot.Neutral)
+                ManagedSession.detachControllerSink(sink)
+            }
             process?.destroyForcibly()
             process = null
             runCatching { clientSocket?.close() }

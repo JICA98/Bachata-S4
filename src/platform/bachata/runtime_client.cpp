@@ -5,6 +5,7 @@
 
 #include <cerrno>
 #include <cstring>
+#include <limits>
 #include <sstream>
 
 #ifndef _WIN32
@@ -114,20 +115,24 @@ bool ValidateSocketPath(const std::filesystem::path& socket_path,
 
 RuntimeClient::RuntimeClient(int fd) : fd_(fd) {}
 
-RuntimeClient::RuntimeClient(RuntimeClient&& other) noexcept : fd_(other.fd_) {
+RuntimeClient::RuntimeClient(RuntimeClient&& other) noexcept
+    : fd_(other.fd_), input_thread_(std::move(other.input_thread_)) {
     other.fd_ = -1;
 }
 
 RuntimeClient& RuntimeClient::operator=(RuntimeClient&& other) noexcept {
     if (this != &other) {
+        StopInputReader();
         Close();
         fd_ = other.fd_;
+        input_thread_ = std::move(other.input_thread_);
         other.fd_ = -1;
     }
     return *this;
 }
 
 RuntimeClient::~RuntimeClient() {
+    StopInputReader();
     Close();
 }
 
@@ -187,6 +192,77 @@ bool RuntimeClient::SendStopped(int exit_code) {
 
 bool RuntimeClient::SendError(std::string_view code) {
     return SendLine("BACHATA/1 ERROR code=" + std::string(code) + "\n");
+}
+
+bool RuntimeClient::StartInputReader(std::function<void(const ControllerSnapshot&)> handler) {
+    if (!IsEnabled() || input_thread_.joinable() || !handler) {
+        return false;
+    }
+#ifdef _WIN32
+    return false;
+#else
+    const int input_fd = fd_;
+    input_thread_ = std::jthread([input_fd, handler = std::move(handler)](std::stop_token stop) {
+        constexpr std::size_t MaxInputFrameBytes = 512;
+        std::string line;
+        std::uint64_t last_sequence = 0;
+        bool received = false;
+        bool overflow = false;
+        char value = 0;
+        while (!stop.stop_requested()) {
+            const ssize_t count = ::recv(input_fd, &value, 1, 0);
+            if (count == 0) {
+                break;
+            }
+            if (count < 0) {
+                if (errno == EINTR) {
+                    continue;
+                }
+                break;
+            }
+            if (value != '\n') {
+                if (line.size() < MaxInputFrameBytes) {
+                    line.push_back(value);
+                } else {
+                    overflow = true;
+                }
+                continue;
+            }
+            if (!overflow) {
+                line.push_back('\n');
+                const auto snapshot = ParseControllerSnapshot(line);
+                if (snapshot && (!received || snapshot->sequence > last_sequence)) {
+                    handler(*snapshot);
+                    last_sequence = snapshot->sequence;
+                    received = true;
+                }
+            }
+            line.clear();
+            overflow = false;
+        }
+        if (received) {
+            ControllerSnapshot neutral{};
+            neutral.sequence = last_sequence == std::numeric_limits<std::uint64_t>::max()
+                                   ? last_sequence
+                                   : last_sequence + 1;
+            handler(neutral);
+        }
+    });
+    return true;
+#endif
+}
+
+void RuntimeClient::StopInputReader() {
+    if (!input_thread_.joinable()) {
+        return;
+    }
+    input_thread_.request_stop();
+#ifndef _WIN32
+    if (fd_ >= 0) {
+        ::shutdown(fd_, SHUT_RD);
+    }
+#endif
+    input_thread_.join();
 }
 
 bool RuntimeClient::SendLine(std::string_view line) {

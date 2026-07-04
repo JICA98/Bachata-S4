@@ -2,6 +2,8 @@ package com.bachatas4.android.runtime.session
 
 import android.view.Surface
 import com.bachatas4.android.model.RuntimeErrorCode
+import com.bachatas4.android.runtime.input.ControllerSnapshot
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -29,6 +31,7 @@ object ManagedSession {
 
     private val mutableSurface = MutableStateFlow<RuntimeSurface?>(null)
     private val mutableState = MutableStateFlow<ManagedSessionState>(ManagedSessionState.Idle)
+    private val controllerSink = AtomicReference<((ControllerSnapshot) -> Unit)?>(null)
     val surface: StateFlow<RuntimeSurface?> = mutableSurface
     val state: StateFlow<ManagedSessionState> = mutableState
 
@@ -37,4 +40,7 @@ object ManagedSession {
         if (mutableSurface.value?.surface === surface) mutableSurface.value = null
     }
     fun update(value: ManagedSessionState) { mutableState.value = value }
+    fun attachControllerSink(sink: (ControllerSnapshot) -> Unit) { controllerSink.set(sink) }
+    fun detachControllerSink(sink: (ControllerSnapshot) -> Unit) { controllerSink.compareAndSet(sink, null) }
+    fun submitController(snapshot: ControllerSnapshot) { controllerSink.get()?.invoke(snapshot) }
 }

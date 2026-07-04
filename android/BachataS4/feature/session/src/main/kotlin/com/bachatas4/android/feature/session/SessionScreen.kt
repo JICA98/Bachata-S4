@@ -4,6 +4,7 @@ import android.content.Intent
 import android.view.SurfaceHolder
 import android.view.SurfaceView
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
@@ -20,6 +21,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.bachatas4.android.runtime.session.ManagedSession
 import com.bachatas4.android.runtime.session.ManagedSessionState
 import com.bachatas4.android.runtime.session.RuntimeSurface
+import com.bachatas4.android.feature.session.controller.FixedControllerOverlay
 
 @Composable
 fun SessionScreen(
@@ -30,24 +32,27 @@ fun SessionScreen(
     val state by viewModel.state.collectAsState()
     LaunchedEffect(gameId) { viewModel.launch(gameId) }
     Column(modifier = Modifier.fillMaxSize()) {
-        AndroidView(
-            modifier = Modifier.weight(1f),
-            factory = { currentContext ->
-                SurfaceView(currentContext).also { view ->
-                    view.holder.addCallback(object : SurfaceHolder.Callback {
-                        override fun surfaceCreated(holder: SurfaceHolder) = Unit
-                        override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-                            if (width > 0 && height > 0) {
-                                ManagedSession.attachSurface(RuntimeSurface(holder.surface, width, height))
+        Box(modifier = Modifier.weight(1f)) {
+            AndroidView(
+                modifier = Modifier.fillMaxSize(),
+                factory = { currentContext ->
+                    SurfaceView(currentContext).also { view ->
+                        view.holder.addCallback(object : SurfaceHolder.Callback {
+                            override fun surfaceCreated(holder: SurfaceHolder) = Unit
+                            override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+                                if (width > 0 && height > 0) {
+                                    ManagedSession.attachSurface(RuntimeSurface(holder.surface, width, height))
+                                }
                             }
-                        }
-                        override fun surfaceDestroyed(holder: SurfaceHolder) {
-                            ManagedSession.detachSurface(holder.surface)
-                        }
-                    })
-                }
-            },
-        )
+                            override fun surfaceDestroyed(holder: SurfaceHolder) {
+                                ManagedSession.detachSurface(holder.surface)
+                            }
+                        })
+                    }
+                },
+            )
+            FixedControllerOverlay(onSnapshot = ManagedSession::submitController)
+        }
         Text(state.label(), modifier = Modifier.padding(12.dp))
         Button(
             modifier = Modifier.padding(12.dp),
