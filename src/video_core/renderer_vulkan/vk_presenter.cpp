@@ -668,6 +668,18 @@ Frame* Presenter::PrepareLastFrame() {
 }
 
 static vk::Format GetFrameViewFormat(const Libraries::VideoOut::PixelFormat format) {
+#ifdef ENABLE_BACHATA_RUNTIME
+    // Winlator's X11 DRI3 path exposes the guest frame with the opposite R/B
+    // memory order from desktop WSI. Compensate in the sampled image view.
+    switch (format) {
+    case Libraries::VideoOut::PixelFormat::A8B8G8R8Srgb:
+        return vk::Format::eB8G8R8A8Srgb;
+    case Libraries::VideoOut::PixelFormat::A8R8G8B8Srgb:
+        return vk::Format::eR8G8B8A8Srgb;
+    default:
+        break;
+    }
+#endif
     switch (format) {
     case Libraries::VideoOut::PixelFormat::A8B8G8R8Srgb:
         return vk::Format::eR8G8B8A8Srgb;
