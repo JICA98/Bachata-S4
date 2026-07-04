@@ -1,6 +1,7 @@
 package com.bachatas4.android
 
 import android.os.Bundle
+import android.os.Build
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,9 +18,16 @@ class MainActivity : ComponentActivity() {
         setContent {
             AppTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    BachataNavHost()
+                    BachataNavHost(startDestination = initialRouteForSoc(Build.SOC_MODEL))
                 }
             }
         }
     }
 }
+
+internal fun initialRouteForSoc(soc: String): String =
+    if (soc.equals("SM8650", ignoreCase = true) || soc.equals("SM8750", ignoreCase = true)) {
+        BachataRoutes.Library
+    } else {
+        BachataRoutes.Setup
+    }

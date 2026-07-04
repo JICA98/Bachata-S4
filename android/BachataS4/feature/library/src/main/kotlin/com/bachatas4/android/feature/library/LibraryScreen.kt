@@ -20,8 +20,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.documentfile.provider.DocumentFile
 import com.bachatas4.android.data.ContentImportRequest
 import com.bachatas4.android.data.ContentImporter
+import com.bachatas4.android.data.ContentTreeEntry
 import com.bachatas4.android.data.GameRepository
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
@@ -46,15 +48,21 @@ fun LibraryScreen(
     LaunchedEffect(dependencies) {
         dependencies.gameRepository().observeGames().collectLatest(viewModel::setGames)
     }
-    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
             runCatching {
                 context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                val id = "GAME-${UUID.randomUUID()}"
-                val title = uri.lastPathSegment?.substringAfterLast('/')?.ifBlank { null } ?: id
-                val result = dependencies.contentImporter().importGame(
+                val root = requireNotNull(DocumentFile.fromTreeUri(context, uri)) {
+                    "Cannot read selected folder"
+                }
+                val title = root.name?.ifBlank { null } ?: "Imported game"
+                val id = Regex("CUSA\\d{5}", RegexOption.IGNORE_CASE)
+                    .find(title)?.value?.uppercase() ?: "GAME-${UUID.randomUUID()}"
+                val entries = root.toImportEntries()
+                val result = dependencies.contentImporter().importGameTree(
                     ContentImportRequest(id = id, title = title, sourceUri = uri.toString()),
+                    entries,
                 )
                 dependencies.gameRepository().addImportedGame(result, uri.toString(), System.currentTimeMillis())
             }.onFailure { error = it.message ?: it.javaClass.simpleName }
@@ -65,7 +73,7 @@ fun LibraryScreen(
         state = state,
         error = error,
         onOpenSettings = onOpenSettings,
-        onImport = { picker.launch(arrayOf("application/octet-stream", "application/x-executable")) },
+        onImport = { picker.launch(null) },
         onLaunch = onLaunch,
     )
 }
@@ -84,7 +92,7 @@ fun LibraryContent(
             Text("Settings")
         }
         Button(onClick = onImport) {
-            Text("Import extracted eboot.bin")
+            Text("Import extracted game folder")
         }
         error?.let { Text("Import failed: $it") }
         state.games.forEach { game ->
@@ -93,6 +101,17 @@ fun LibraryContent(
         }
     }
 }
+
+private fun DocumentFile.toImportEntries(prefix: String = ""): List<ContentTreeEntry> =
+    listFiles().flatMap { child ->
+        val name = child.name ?: return@flatMap emptyList()
+        val relativePath = if (prefix.isEmpty()) name else "$prefix/$name"
+        when {
+            child.isDirectory -> child.toImportEntries(relativePath)
+            child.isFile -> listOf(ContentTreeEntry(relativePath, child.uri.toString()))
+            else -> emptyList()
+        }
+    }
 
 @EntryPoint
 @InstallIn(SingletonComponent::class)

@@ -147,6 +147,46 @@ class ContentImporterTest {
         assertFalse(File(temporaryFolder.root, "escape").exists())
     }
 
+    @Test
+    fun importGameTreePreservesFilesAndRequiresEboot() = runTest {
+        val files = mapOf(
+            "content://eboot" to "exe".toByteArray(),
+            "content://param" to "meta".toByteArray(),
+        )
+        val importer = ContentImporter(
+            filesDir = temporaryFolder.root,
+            source = ImportSource { uri -> ByteArrayInputStream(files.getValue(uri)) },
+            idFactory = { "fixed" },
+        )
+
+        val result = importer.importGameTree(
+            ContentImportRequest("CUSA00005", "Tree", "content://tree"),
+            listOf(
+                ContentTreeEntry("eboot.bin", "content://eboot"),
+                ContentTreeEntry("sce_sys/param.sfo", "content://param"),
+            ),
+        )
+
+        assertEquals(7, result.bytesCopied)
+        assertEquals("exe", File(temporaryFolder.root, "games/CUSA00005/eboot.bin").readText())
+        assertEquals("meta", File(temporaryFolder.root, "games/CUSA00005/sce_sys/param.sfo").readText())
+    }
+
+    @Test
+    fun importGameTreeRejectsEscapingPath() = runTest {
+        val importer = importerFor("payload".toByteArray())
+
+        val error = assertImportException {
+            importer.importGameTree(
+                ContentImportRequest("CUSA00006", "Escape", "content://tree"),
+                listOf(ContentTreeEntry("../outside", sourceUri)),
+            )
+        }
+
+        assertEquals(RuntimeErrorCode.CONTENT_INVALID, error.code)
+        assertFalse(File(temporaryFolder.root, "outside").exists())
+    }
+
     private fun importerFor(bytes: ByteArray): ContentImporter =
         ContentImporter(
             filesDir = temporaryFolder.root,

@@ -24,6 +24,7 @@ object ManagedSession {
     const val ACTION_STOP = "com.bachatas4.android.action.STOP_EMULATION"
     const val EXTRA_GAME_ID = "game_id"
     const val EXTRA_GAME_PATH = "game_path"
+    const val EXTRA_VULKAN_DRIVER = "vulkan_driver"
     const val SERVICE_CLASS = "com.bachatas4.android.service.EmulationService"
 
     private val mutableSurface = MutableStateFlow<RuntimeSurface?>(null)

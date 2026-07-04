@@ -13,6 +13,7 @@ const EXPECTED_COMPONENTS = [
   { name: "mesa", url: "https://gitlab.freedesktop.org/mesa/mesa.git", revision: "6984e91b5fe1d1c204e54954a4282fcdc0c44b78", license: "MIT" },
 ];
 const EXPECTED_INPUTS = [
+  { name: "Turnip_v25.3.0_R11.zip", url: "https://github.com/K11MCH1/AdrenoToolsDrivers/releases/download/v25.3.0-rc.11/Turnip_v25.3.0_R11.zip", sha256: "0452bdd5e966ca94b58ba7c489db3648df6715d862e38cfa939ec62625293b40" },
   { name: "glibc-2.43+r22+g8362e8ce10b2-2-x86_64.pkg.tar.zst", url: "https://archive.archlinux.org/packages/g/glibc/glibc-2.43%2Br22%2Bg8362e8ce10b2-2-x86_64.pkg.tar.zst", sha256: "2c20828b3a571b272697671c90b1e3a8c426d6a7e7fb99a242099373f2710fe1" },
   { name: "glibc-2.43+r22+g8362e8ce10b2-2-aarch64.pkg.tar.xz", url: "https://de3.mirror.archlinuxarm.org/aarch64/core/glibc-2.43+r22+g8362e8ce10b2-2-aarch64.pkg.tar.xz", sha256: "8fac217e98c6e4342326726b2640ac254e8c82032f06f30bfa13ebbcc4fcb25b" },
   { name: "libstdc++-16.1.1+r12+g301eb08fa2c5-1-x86_64.pkg.tar.zst", url: "https://archive.archlinux.org/packages/l/libstdc%2B%2B/libstdc%2B%2B-16.1.1%2Br12%2Bg301eb08fa2c5-1-x86_64.pkg.tar.zst", sha256: "5eb8ab787086682875805e7eaad8728e73bad687aba00c9460ecb261c3762aeb" },
@@ -64,6 +65,8 @@ const REQUIRED_RUNTIME_PATHS = [
   "host/libvulkan.so.1",
   "host/libvulkan_freedreno.so",
   "host/vulkan/icd.d/freedreno_icd.json",
+  "host/vulkan/icd.d/turnip-25.0.0.json",
+  "host/vulkan/icd.d/turnip-26.1.0.json",
   "host/libc.so",
   "host/libc.so.6",
   "host/libdl.so.2",
@@ -96,6 +99,9 @@ const REQUIRED_RUNTIME_PATHS = [
   "host/libXdmcp.so.6",
   "host/libxcb.so",
   "host/libxcb.so.1",
+  "drivers/turnip-25.3.0-r11/vulkan.ad07xx.so",
+  "drivers/turnip-25.0.0/libvulkan_freedreno.so",
+  "drivers/turnip-26.1.0/libvulkan_freedreno.so",
   "lib/x86_64-linux-gnu/libc.so.6",
   "lib/x86_64-linux-gnu/libdl.so.2",
   "lib/x86_64-linux-gnu/libgcc_s.so.1",

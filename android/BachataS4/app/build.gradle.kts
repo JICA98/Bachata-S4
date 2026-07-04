@@ -60,4 +60,5 @@ dependencies {
     ksp(libs.hilt.compiler)
     ksp(libs.kotlin.metadata.jvm)
     androidTestImplementation(libs.androidx.test.runner)
+    testImplementation(libs.junit)
 }

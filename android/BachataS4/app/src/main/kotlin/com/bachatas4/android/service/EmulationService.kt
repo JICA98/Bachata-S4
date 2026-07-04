@@ -20,6 +20,8 @@ import com.bachatas4.android.runtime.install.RuntimeManifest
 import com.bachatas4.android.runtime.process.RuntimeProcessHandle
 import com.bachatas4.android.runtime.process.RuntimeProcessLauncher
 import com.bachatas4.android.runtime.process.RuntimeProcessRequest
+import com.bachatas4.android.runtime.process.RuntimeVulkanDriver
+import com.bachatas4.android.runtime.process.VulkanDriverConfiguration
 import com.bachatas4.android.runtime.session.ManagedSession
 import com.bachatas4.android.runtime.session.ManagedSessionState
 import com.winlator.xconnector.UnixSocketConfig
@@ -63,7 +65,9 @@ class EmulationService : Service() {
                 } else {
                     val gameId = intent.getStringExtra(ManagedSession.EXTRA_GAME_ID).orEmpty()
                     val gamePath = intent.getStringExtra(ManagedSession.EXTRA_GAME_PATH).orEmpty()
-                    sessionJob = scope.launch { runSession(gameId, gamePath) }
+                    val driverName = intent.getStringExtra(ManagedSession.EXTRA_VULKAN_DRIVER)
+                        ?: RuntimeVulkanDriver.TURNIP_26_1_0.name
+                    sessionJob = scope.launch { runSession(gameId, gamePath, RuntimeVulkanDriver.valueOf(driverName)) }
                 }
             }
         }
@@ -78,7 +82,7 @@ class EmulationService : Service() {
         super.onDestroy()
     }
 
-    private suspend fun runSession(gameId: String, relativePath: String) {
+    private suspend fun runSession(gameId: String, relativePath: String, vulkanDriver: RuntimeVulkanDriver) {
         var xServer: WinlatorEmbeddedXServer? = null
         var boundSocket: LocalSocket? = null
         var serverSocket: LocalServerSocket? = null
@@ -114,10 +118,12 @@ class EmulationService : Service() {
                 it.bind(LocalSocketAddress(controlFile.path, LocalSocketAddress.Namespace.FILESYSTEM))
             }
             serverSocket = LocalServerSocket(boundSocket.fileDescriptor)
-            val environment = runtimeEnvironment(runtimeRoot, socketRoot, xServer.display)
+            val nativeLibraryDir = Paths.get(applicationInfo.nativeLibraryDir)
+            val driverConfiguration = VulkanDriverConfiguration.resolve(vulkanDriver, runtimeRoot)
+            val environment = runtimeEnvironment(runtimeRoot, socketRoot, xServer.display) + driverConfiguration.environment
             process = RuntimeProcessLauncher().launch(
                 RuntimeProcessRequest(
-                    nativeLibraryDir = Paths.get(applicationInfo.nativeLibraryDir),
+                    nativeLibraryDir = nativeLibraryDir,
                     runtimeRoot = runtimeRoot,
                     overrideRoot = gameRoot.toPath(),
                     storageRoot = filesDir.toPath(),
@@ -126,6 +132,7 @@ class EmulationService : Service() {
                     environment = environment,
                     arguments = listOf("-g", eboot.path),
                     outputPath = outputFile.toPath(),
+                    box64Mode = driverConfiguration.box64Mode,
                 ),
             )
             val acceptFuture = acceptExecutor.submit<LocalSocket> { serverSocket.accept() }
@@ -197,10 +204,8 @@ class EmulationService : Service() {
         "BACHATA_ALSA_SOCKET" to File(socketRoot, UnixSocketConfig.ALSA_SERVER_PATH).path,
         "DISPLAY" to display,
         "SDL_VIDEODRIVER" to "x11",
-        "SDL_VULKAN_LIBRARY" to runtimeRoot.resolve("host/libvulkan.so.1").toString(),
         "TMPDIR" to cacheDir.path,
         "XDG_CACHE_HOME" to File(cacheDir, "xdg").apply { mkdirs() }.path,
-        "VK_ICD_FILENAMES" to runtimeRoot.resolve("host/vulkan/icd.d/freedreno_icd.json").toString(),
         "GLIBC_TUNABLES" to "glibc.pthread.rseq=0",
     )
 

@@ -167,8 +167,12 @@ const nativeOutputDir = resolve(projectRoot, "android/BachataS4/core/runtime/src
 const componentLock = JSON.parse(readFileSync(resolve(projectRoot, "runtime/locks/components.lock.json"), "utf8"));
 const inputLock = JSON.parse(readFileSync(resolve(projectRoot, "runtime/locks/runtime-inputs.lock.json"), "utf8"));
 const revisions = Object.fromEntries(componentLock.components.map(({ name, revision }) => [name, revision]));
+const turnipArchiveName = "Turnip_v25.3.0_R11.zip";
+const turnipArchive = join(inputDir, turnipArchiveName);
 const winlatorTurnipArchive = resolve(projectRoot, "runtime/sources/winlator-components/installable_components/turnip/turnip-25.0.0.tzst");
 const winlatorTurnipSha256 = "4a57d0fe980b3685a0e36326de8bf9d30de86075fa4e934213b8b8cfde8f492e";
+const winlatorTurnip261Archive = resolve(projectRoot, "runtime/sources/winlator-app/app/src/main/assets/graphics_driver/turnip-26.1.0.tzst");
+const winlatorTurnip261Sha256 = "9b4a10975456197e403c2b6a8a9781a8fd42ccf5048262a8cdea6538bb68d288";
 
 for (const input of inputLock.inputs) {
   const bytes = readFileSync(join(inputDir, input.name));
@@ -176,6 +180,9 @@ for (const input of inputLock.inputs) {
 }
 if (sha256(readFileSync(winlatorTurnipArchive)) !== winlatorTurnipSha256) {
   fail("Winlator Turnip 25.0.0 archive hash mismatch");
+}
+if (sha256(readFileSync(winlatorTurnip261Archive)) !== winlatorTurnip261Sha256) {
+  fail("Winlator Turnip 26.1.0 archive hash mismatch");
 }
 for (const component of ["glibc-packages", "winlator-app", "winlator-components"]) {
   const sourceDir = resolve(projectRoot, `runtime/sources/${component}`);
@@ -222,8 +229,10 @@ const vulkanGuestExtract = join(extractDir, "vulkan-x86_64");
 const armStdcppExtract = join(extractDir, "libstdcpp-arm64");
 const armZlibExtract = join(extractDir, "zlib-arm64");
 const armDrmExtract = join(extractDir, "libdrm-arm64");
-const turnipExtract = join(extractDir, "turnip-arm64");
-for (const directory of [rootfs, glibcExtract, glibcArmExtract, libstdcppExtract, libgccExtract, certificatesExtract, sdlExtract, ...guestX11Extracts.values(), libxssExtract, libxkbcommonHostExtract, dbusExtract, systemdExtract, systemdGuestExtract, utilLinuxGuestExtract, hostExtract, vulkanArmExtract, vulkanGuestExtract, armStdcppExtract, armZlibExtract, armDrmExtract, turnipExtract]) mkdirSync(directory, { recursive: true });
+const turnipGlibcExtract = join(extractDir, "turnip-glibc-arm64");
+const turnip261Extract = join(extractDir, "turnip-26.1.0-arm64");
+const turnipAndroidExtract = join(extractDir, "turnip-android-arm64");
+for (const directory of [rootfs, glibcExtract, glibcArmExtract, libstdcppExtract, libgccExtract, certificatesExtract, sdlExtract, ...guestX11Extracts.values(), libxssExtract, libxkbcommonHostExtract, dbusExtract, systemdExtract, systemdGuestExtract, utilLinuxGuestExtract, hostExtract, vulkanArmExtract, vulkanGuestExtract, armStdcppExtract, armZlibExtract, armDrmExtract, turnipGlibcExtract, turnip261Extract, turnipAndroidExtract]) mkdirSync(directory, { recursive: true });
 const inputByPrefix = (prefix) => join(inputDir, inputLock.inputs.find(({ name }) => name.startsWith(prefix)).name);
 run("tar", ["--zstd", "-xf", inputByPrefix("glibc-2.43+r22+g8362e8ce10b2-2-x86_64"), "-C", glibcExtract]);
 run("tar", ["-xf", inputByPrefix("glibc-2.43+r22+g8362e8ce10b2-2-aarch64"), "-C", glibcArmExtract]);
@@ -247,7 +256,13 @@ run("tar", ["--zstd", "-xf", inputByPrefix("vulkan-icd-loader-1.4.350.1-1-x86_64
 run("tar", ["-xf", inputByPrefix("libstdc++-16.1.1+r12+g301eb08fa2c5-1-aarch64"), "-C", armStdcppExtract]);
 run("tar", ["-xf", inputByPrefix("zlib-"), "-C", armZlibExtract]);
 run("tar", ["-xf", inputByPrefix("libdrm-"), "-C", armDrmExtract]);
-run("tar", ["--zstd", "-xf", winlatorTurnipArchive, "-C", turnipExtract]);
+run("tar", ["--zstd", "-xf", winlatorTurnipArchive, "-C", turnipGlibcExtract]);
+run("tar", ["--zstd", "-xf", winlatorTurnip261Archive, "-C", turnip261Extract]);
+run("unzip", ["-q", turnipArchive, "-d", turnipAndroidExtract]);
+const turnipMetadata = JSON.parse(readFileSync(join(turnipAndroidExtract, "meta.json"), "utf8"));
+if (turnipMetadata.name !== "Mesa Turnip Driver v25.3.0-R11") fail("Unexpected Turnip driver name");
+if (turnipMetadata.minApi !== 27) fail("Unexpected Turnip minimum Android API");
+if (turnipMetadata.libraryName !== "vulkan.ad07xx.so") fail("Unexpected Turnip library name");
 run("tar", [
   "--zstd", "-xf", resolve(projectRoot, "runtime/sources/winlator-app/app/src/main/assets/rootfs.tzst"),
   "-C", hostExtract, "--strip-components=3",
@@ -384,17 +399,21 @@ for (const library of ["libz.so", "libz.so.1", "libz.so.1.3.2"]) {
 for (const library of ["libdrm.so", "libdrm.so.2", "libdrm.so.2.134.0"]) {
   copy(join(armDrmExtract, `usr/lib/${library}`), join(rootfs, `host/${library}`), 0o755);
 }
-copy(join(turnipExtract, "usr/lib/libvulkan_freedreno.so"), join(rootfs, "host/libvulkan_freedreno.so"), 0o755);
-const turnipIcd = join(rootfs, "host/vulkan/icd.d/freedreno_icd.json");
-mkdirSync(dirname(turnipIcd), { recursive: true });
-writeFileSync(turnipIcd, `${JSON.stringify({
-  file_format_version: "1.0.1",
-  ICD: {
-    library_path: "../../libvulkan_freedreno.so",
-    library_arch: "64",
-    api_version: "1.1.246",
-  },
-}, null, 2)}\n`);
+copy(join(turnipGlibcExtract, "usr/lib/libvulkan_freedreno.so"), join(rootfs, "drivers/turnip-25.0.0/libvulkan_freedreno.so"), 0o755);
+copy(join(turnip261Extract, "usr/lib/libvulkan_freedreno.so"), join(rootfs, "drivers/turnip-26.1.0/libvulkan_freedreno.so"), 0o755);
+copy(join(turnip261Extract, "usr/lib/libvulkan_freedreno.so"), join(rootfs, "host/libvulkan_freedreno.so"), 0o755);
+copy(join(turnipAndroidExtract, "vulkan.ad07xx.so"), join(rootfs, "drivers/turnip-25.3.0-r11/vulkan.ad07xx.so"), 0o755);
+const writeTurnipIcd = (name, libraryPath, apiVersion) => {
+  const target = join(rootfs, `host/vulkan/icd.d/${name}`);
+  mkdirSync(dirname(target), { recursive: true });
+  writeFileSync(target, `${JSON.stringify({
+    file_format_version: "1.0.1",
+    ICD: { library_path: libraryPath, library_arch: "64", api_version: apiVersion },
+  }, null, 2)}\n`);
+};
+writeTurnipIcd("freedreno_icd.json", "../../libvulkan_freedreno.so", "1.4.318");
+writeTurnipIcd("turnip-25.0.0.json", "../../../drivers/turnip-25.0.0/libvulkan_freedreno.so", "1.1.246");
+writeTurnipIcd("turnip-26.1.0.json", "../../../drivers/turnip-26.1.0/libvulkan_freedreno.so", "1.4.318");
 copy(join(glibcArmExtract, "usr/lib/ld-linux-aarch64.so.1"), join(nativeOutputDir, "libbachata_host_loader.so"), 0o755);
 copy(hostBox64Binary, join(nativeOutputDir, "libbachata_host_box64.so"), 0o755);
 for (const library of ["libc.so", "libc.so.6", "libdl.so.2", "libm.so.6", "libpthread.so.0", "libresolv.so.2"]) {

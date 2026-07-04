@@ -8,6 +8,8 @@ import com.bachatas4.android.data.GameRepository
 import com.bachatas4.android.model.RuntimeErrorCode
 import com.bachatas4.android.runtime.session.ManagedSession
 import com.bachatas4.android.runtime.session.ManagedSessionState
+import com.bachatas4.android.runtime.process.RuntimeVulkanDriver
+import com.bachatas4.android.runtime.process.RuntimeVulkanDriverPreference
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -30,9 +32,19 @@ class SessionViewModel @Inject constructor(
                 return@launch
             }
             context.startForegroundService(
+                // Read once: changing Settings cannot mutate an active session.
                 Intent(ManagedSession.ACTION_START).setClassName(context.packageName, ManagedSession.SERVICE_CLASS)
                     .putExtra(ManagedSession.EXTRA_GAME_ID, game.id)
-                    .putExtra(ManagedSession.EXTRA_GAME_PATH, game.relativePath),
+                    .putExtra(ManagedSession.EXTRA_GAME_PATH, game.relativePath)
+                    .putExtra(
+                        ManagedSession.EXTRA_VULKAN_DRIVER,
+                        RuntimeVulkanDriverPreference.decode(
+                            context.getSharedPreferences(
+                                RuntimeVulkanDriverPreference.FILE_NAME,
+                                Context.MODE_PRIVATE,
+                            ).getString(RuntimeVulkanDriverPreference.KEY, null),
+                        ).name,
+                    ),
             )
         }
     }

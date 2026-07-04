@@ -32,6 +32,11 @@ data class ContentImportResult(
     val sha256: String,
 )
 
+data class ContentTreeEntry(
+    val relativePath: String,
+    val sourceUri: String,
+)
+
 class ContentImportException(
     val code: RuntimeErrorCode,
     message: String,
@@ -55,6 +60,57 @@ class ContentImporter(
     private val source: ImportSource,
     private val idFactory: () -> String = { UUID.randomUUID().toString() },
 ) {
+    suspend fun importGameTree(
+        request: ContentImportRequest,
+        entries: List<ContentTreeEntry>,
+    ): ContentImportResult = withContext(Dispatchers.IO) {
+        validateGameId(request.id)
+        val gamesDir = File(filesDir, "games").canonicalFile
+        gamesDir.mkdirs()
+        val destination = File(gamesDir, request.id).canonicalFile
+        requireInside(gamesDir, destination)
+        if (destination.exists()) {
+            throw ContentImportException(RuntimeErrorCode.CONTENT_INVALID, "Game already imported")
+        }
+        if (entries.none { it.relativePath == "eboot.bin" }) {
+            throw ContentImportException(RuntimeErrorCode.CONTENT_INVALID, "Selected folder has no eboot.bin")
+        }
+
+        val staging = File(gamesDir, ".import-${idFactory()}").canonicalFile
+        requireInside(gamesDir, staging)
+        var completed = false
+        try {
+            staging.deleteRecursively()
+            staging.mkdirs()
+            val digest = MessageDigest.getInstance("SHA-256")
+            var bytesCopied = 0L
+            entries.sortedBy(ContentTreeEntry::relativePath).forEach { entry ->
+                val payload = File(staging, entry.relativePath).canonicalFile
+                requireInside(staging, payload)
+                payload.parentFile?.mkdirs()
+                bytesCopied += copyUri(entry.sourceUri, payload, digest)
+            }
+            validateBytes(request, bytesCopied)
+            val sha256 = digest.digest().joinToString("") { "%02x".format(it) }
+            validateDigest(request, sha256)
+            moveAtomically(staging, destination)
+            completed = true
+            ContentImportResult(
+                Game(request.id, request.title, "games/${request.id}"),
+                bytesCopied,
+                sha256,
+            )
+        } catch (security: SecurityException) {
+            throw ContentImportException(
+                RuntimeErrorCode.CONTENT_PERMISSION_LOST,
+                "Source permission lost",
+                security,
+            )
+        } finally {
+            if (!completed) staging.deleteRecursively()
+        }
+    }
+
     suspend fun importGame(request: ContentImportRequest): ContentImportResult =
         withContext(Dispatchers.IO) {
             validateGameId(request.id)
@@ -109,8 +165,16 @@ class ContentImporter(
         payload: File,
         digest: MessageDigest,
     ): Long {
+        return copyUri(request.sourceUri, payload, digest)
+    }
+
+    private suspend fun copyUri(
+        sourceUri: String,
+        payload: File,
+        digest: MessageDigest,
+    ): Long {
         var total = 0L
-        source.open(request.sourceUri).use { input ->
+        source.open(sourceUri).use { input ->
             FileOutputStream(payload).use { output ->
                 val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                 while (true) {

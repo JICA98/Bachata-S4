@@ -38,6 +38,26 @@ class RuntimeProcessLauncherTest {
     }
 
     @Test
+    fun buildsApkNativeBox64CommandForAndroidDriver() {
+        val request = validRequest().copy(box64Mode = Box64Mode.APK_NATIVE)
+        val launcher = RuntimeProcessLauncher { FakeProcessHandle() }
+
+        assertEquals(
+            listOf(
+                request.nativeLibraryDir.resolve("libbox64.so").toRealPath().toString(),
+                request.shadPs4Executable.toRealPath().toString(),
+                "--override-root",
+                request.overrideRoot.toRealPath().toString(),
+                "--bachata-storage-root",
+                request.storageRoot.toRealPath().toString(),
+                "--bachata-socket",
+                request.socketPath,
+            ),
+            launcher.command(request),
+        )
+    }
+
+    @Test
     fun clearsInheritedEnvironmentAndCopiesOnlyAllowlist() {
         val request = validRequest(
             environment = mapOf(
@@ -124,6 +144,7 @@ class RuntimeProcessLauncherTest {
         val nativeLibraryDir = Files.createDirectories(base.resolve("apk/lib"))
         Files.write(nativeLibraryDir.resolve("libbachata_host_loader.so"), byteArrayOf(1))
         Files.write(nativeLibraryDir.resolve("libbachata_host_box64.so"), byteArrayOf(1))
+        Files.write(nativeLibraryDir.resolve("libbox64.so"), byteArrayOf(1)).toFile().setExecutable(true)
         val runtimeRoot = Files.createDirectories(base.resolve("runtime"))
         Files.createDirectories(runtimeRoot.resolve("host"))
         val shadPs4 = Files.write(runtimeRoot.resolve("bin/shadps4").also {
@@ -136,6 +157,7 @@ class RuntimeProcessLauncherTest {
             shadPs4Executable = shadPs4,
             socketPath = base.resolve("runtime.sock").toString(),
             environment = environment,
+            box64Mode = Box64Mode.HOST_GLIBC,
         )
     }
 }

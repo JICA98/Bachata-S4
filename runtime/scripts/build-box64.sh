@@ -21,7 +21,6 @@ if ! git -C "$source_dir" apply --reverse --check "$vulkan_qcom_patch" 2>/dev/nu
   git -C "$source_dir" apply --check "$vulkan_qcom_patch"
   git -C "$source_dir" apply "$vulkan_qcom_patch"
 fi
-
 cmake -S "$source_dir" -B "$build_dir" -G Ninja \
   -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake" \
   -DANDROID_ABI=arm64-v8a \

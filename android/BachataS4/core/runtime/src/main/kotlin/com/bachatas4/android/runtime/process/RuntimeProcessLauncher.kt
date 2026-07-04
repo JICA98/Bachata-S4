@@ -16,6 +16,7 @@ data class RuntimeProcessRequest(
     val environment: Map<String, String> = emptyMap(),
     val arguments: List<String> = emptyList(),
     val outputPath: Path? = null,
+    val box64Mode: Box64Mode = Box64Mode.HOST_GLIBC,
 )
 
 interface RuntimeProcessHandle {
@@ -40,11 +41,6 @@ class RuntimeProcessLauncher(
 ) {
     fun command(request: RuntimeProcessRequest): List<String> {
         val nativeLibraryDir = request.nativeLibraryDir.toRealPath()
-        val loader = request.nativeLibraryDir.resolve(HOST_LOADER_LIBRARY).toRealPath()
-        val box64 = request.nativeLibraryDir.resolve(HOST_BOX64_LIBRARY).toRealPath()
-        validateNativeFile(nativeLibraryDir, loader, "Host glibc loader")
-        validateNativeFile(nativeLibraryDir, box64, "Host Box64")
-
         val runtimeRoot = request.runtimeRoot.toRealPath()
         val hostDirectory = runtimeRoot.resolve(HOST_DIRECTORY).toRealPath()
         require(hostDirectory.startsWith(runtimeRoot) && Files.isDirectory(hostDirectory)) {
@@ -70,11 +66,21 @@ class RuntimeProcessLauncher(
         }
         request.arguments.forEach { require('\u0000' !in it) { "Runtime argument contains NUL" } }
 
-        return listOf(
-            loader.toString(),
-            "--library-path",
-            hostDirectory.toString(),
-            box64.toString(),
+        val box64Command = when (request.box64Mode) {
+            Box64Mode.APK_NATIVE -> {
+                val box64 = request.nativeLibraryDir.resolve(BOX64_LIBRARY).toRealPath()
+                validateNativeExecutable(nativeLibraryDir, box64, "APK native Box64")
+                listOf(box64.toString())
+            }
+            Box64Mode.HOST_GLIBC -> {
+                val loader = request.nativeLibraryDir.resolve(HOST_LOADER_LIBRARY).toRealPath()
+                val box64 = request.nativeLibraryDir.resolve(HOST_BOX64_LIBRARY).toRealPath()
+                validateNativeFile(nativeLibraryDir, loader, "Host glibc loader")
+                validateNativeFile(nativeLibraryDir, box64, "Host Box64")
+                listOf(loader.toString(), "--library-path", hostDirectory.toString(), box64.toString())
+            }
+        }
+        return box64Command + listOf(
             shadPs4.toString(),
             "--override-root",
             overrideRootArgument.toString(),
@@ -88,6 +94,11 @@ class RuntimeProcessLauncher(
     private fun validateNativeFile(nativeLibraryDir: Path, path: Path, label: String) {
         if (path.parent != nativeLibraryDir) throw SecurityException("$label must be owned by nativeLibraryDir")
         require(Files.isRegularFile(path) && Files.isReadable(path)) { "$label is not readable: $path" }
+    }
+
+    private fun validateNativeExecutable(nativeLibraryDir: Path, path: Path, label: String) {
+        validateNativeFile(nativeLibraryDir, path, label)
+        require(Files.isExecutable(path)) { "$label is not executable: $path" }
     }
 
     fun launch(request: RuntimeProcessRequest): RuntimeProcessHandle {
@@ -123,6 +134,7 @@ class RuntimeProcessLauncher(
         const val HOST_DIRECTORY = "host"
         const val HOST_LOADER_LIBRARY = "libbachata_host_loader.so"
         const val HOST_BOX64_LIBRARY = "libbachata_host_box64.so"
+        const val BOX64_LIBRARY = "libbox64.so"
         val NULL_DEVICE = File("/dev/null")
         val ALLOWED_ENVIRONMENT = setOf(
             "HOME",
