@@ -424,3 +424,16 @@ result
 
 # Local implementation worktrees
 .worktrees/
+
+/android/BachataS4/.gradle/
+/android/BachataS4/build-logic/.gradle/
+/android/BachataS4/**/build/
+/android/BachataS4/local.properties
+/android/BachataS4/.idea/
+/android/BachataS4/app/src/main/assets/runtime/
+/android/BachataS4/core/runtime/src/main/jniLibs/
+/android/BachataS4/keystore/
+/android/BachataS4/*.jks
+/android/BachataS4/*.keystore
+/runtime/build/
+/runtime/sources/

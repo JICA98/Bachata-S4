@@ -60,6 +60,7 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL DebugUtilsCallback(
 }
 
 vk::SurfaceKHR CreateSurface(vk::Instance instance, const Frontend::WindowSDL& emu_window) {
+    std::fprintf(stderr, "BACHATA_SURFACE_ENTER\n");
     const auto& window_info = emu_window.GetWindowInfo();
     vk::SurfaceKHR surface{};
 
@@ -121,6 +122,7 @@ vk::SurfaceKHR CreateSurface(vk::Instance instance, const Frontend::WindowSDL& e
         UNREACHABLE();
     }
 
+    std::fprintf(stderr, "BACHATA_SURFACE_READY\n");
     return surface;
 }
 

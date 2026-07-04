@@ -292,3 +292,29 @@ gtest_discover_tests(shadps4_http_test
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
     DISCOVERY_TIMEOUT 60
 )
+
+# ===========================================================================
+# Bachata Android runtime protocol tests
+# ===========================================================================
+
+set(BACHATA_RUNTIME_TEST_SOURCES
+    ${CMAKE_SOURCE_DIR}/src/platform/bachata/runtime_client.cpp
+    platform/test_bachata_runtime_client.cpp
+)
+
+add_executable(shadps4_bachata_runtime_test ${BACHATA_RUNTIME_TEST_SOURCES})
+
+target_include_directories(shadps4_bachata_runtime_test PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}
+)
+target_compile_features(shadps4_bachata_runtime_test PRIVATE cxx_std_23)
+
+target_link_libraries(shadps4_bachata_runtime_test PRIVATE
+    GTest::gtest_main
+)
+
+gtest_discover_tests(shadps4_bachata_runtime_test
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    DISCOVERY_TIMEOUT 60
+)

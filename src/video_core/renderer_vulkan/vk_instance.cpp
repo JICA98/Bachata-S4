@@ -164,9 +164,13 @@ Instance::Instance(Frontend::WindowSDL& window, s32 physical_device_index,
                VK_VERSION_MAJOR(properties.apiVersion), VK_VERSION_MINOR(properties.apiVersion));
 
     CreateDevice();
+    std::fprintf(stderr, "BACHATA_INSTANCE_DEVICE_READY\n");
     CollectPhysicalMemoryInfo();
+    std::fprintf(stderr, "BACHATA_INSTANCE_MEMORY_READY\n");
     CollectImageFormatInfo();
+    std::fprintf(stderr, "BACHATA_INSTANCE_FORMATS_READY\n");
     CollectToolingInfo();
+    std::fprintf(stderr, "BACHATA_INSTANCE_READY\n");
 }
 
 Instance::~Instance() {
@@ -702,6 +706,12 @@ void Instance::CollectImageFormatInfo() {
     LOG_INFO(Render_Vulkan, "Block Texel View support: {}",
              supports_block_texel_view ? "Yes" : "No");
 
+#ifdef ENABLE_BACHATA_RUNTIME
+    // Remaining checks only produce diagnostics. Some Turnip format-property paths block when
+    // reached through Box64, while format support is already cached for renderer decisions.
+    return;
+#endif
+
     // Check and log format support details.
     for (const auto& format : LiverpoolToVK::SurfaceFormats()) {
         if (!IsFormatSupported(format.vk_format, format.flags)) {
@@ -726,6 +736,11 @@ void Instance::CollectImageFormatInfo() {
 }
 
 void Instance::CollectToolingInfo() const {
+#ifdef ENABLE_BACHATA_RUNTIME
+    // Turnip's tool-properties query can block indefinitely through Box64. Tool metadata is
+    // diagnostic-only and is not required for device creation or rendering.
+    return;
+#endif
     if (driver_id == vk::DriverId::eAmdProprietary ||
         driver_id == vk::DriverId::eIntelProprietaryWindows) {
         // AMD: Causes issues with Reshade.

@@ -20,10 +20,14 @@ static constexpr vk::SurfaceFormatKHR SURFACE_FORMAT_HDR = {
 
 Swapchain::Swapchain(const Instance& instance_, const Frontend::WindowSDL& window_)
     : instance{instance_}, window{window_}, surface{CreateSurface(instance.GetInstance(), window)} {
+    std::fprintf(stderr, "BACHATA_SWAPCHAIN_FORMAT_ENTER\n");
     FindPresentFormat();
+    std::fprintf(stderr, "BACHATA_SWAPCHAIN_FORMAT_READY\n");
     FindPresentMode();
+    std::fprintf(stderr, "BACHATA_SWAPCHAIN_MODE_READY\n");
 
     Create(window.GetWidth(), window.GetHeight());
+    std::fprintf(stderr, "BACHATA_SWAPCHAIN_READY\n");
     ImGui::Core::Initialize(instance, window, image_count, surface_format.format);
 }
 
