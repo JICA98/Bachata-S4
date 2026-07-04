@@ -187,6 +187,35 @@ class ContentImporterTest {
         assertFalse(File(temporaryFolder.root, "outside").exists())
     }
 
+    @Test
+    fun importGameTreeRejectsInsufficientStorageBeforeOpeningFiles() = runTest {
+        var opened = false
+        val importer = ContentImporter(
+            filesDir = temporaryFolder.root,
+            source = ImportSource {
+                opened = true
+                ByteArrayInputStream(byteArrayOf())
+            },
+            idFactory = { "fixed" },
+            availableBytes = { 8L * 1024 * 1024 * 1024 },
+        )
+
+        val error = assertImportException {
+            importer.importGameTree(
+                ContentImportRequest("CUSA00900", "Large", "content://tree"),
+                listOf(
+                    ContentTreeEntry("eboot.bin", "content://eboot", 90L * 1024 * 1024),
+                    ContentTreeEntry("data.pkg", "content://data", 25L * 1024 * 1024 * 1024),
+                ),
+            )
+        }
+
+        assertEquals(RuntimeErrorCode.CONTENT_INVALID, error.code)
+        assertTrue(error.message!!.contains("requires"))
+        assertFalse(opened)
+        assertFalse(File(temporaryFolder.root, "games/.import-fixed").exists())
+    }
+
     private fun importerFor(bytes: ByteArray): ContentImporter =
         ContentImporter(
             filesDir = temporaryFolder.root,

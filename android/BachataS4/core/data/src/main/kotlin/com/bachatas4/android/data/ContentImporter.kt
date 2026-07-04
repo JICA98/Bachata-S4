@@ -35,6 +35,7 @@ data class ContentImportResult(
 data class ContentTreeEntry(
     val relativePath: String,
     val sourceUri: String,
+    val expectedBytes: Long? = null,
 )
 
 class ContentImportException(
@@ -59,6 +60,7 @@ class ContentImporter(
     private val filesDir: File,
     private val source: ImportSource,
     private val idFactory: () -> String = { UUID.randomUUID().toString() },
+    private val availableBytes: (File) -> Long = File::getUsableSpace,
 ) {
     suspend fun importGameTree(
         request: ContentImportRequest,
@@ -74,6 +76,20 @@ class ContentImporter(
         }
         if (entries.none { it.relativePath == "eboot.bin" }) {
             throw ContentImportException(RuntimeErrorCode.CONTENT_INVALID, "Selected folder has no eboot.bin")
+        }
+        val requiredBytes = entries.fold(0L) { total, entry ->
+            val size = entry.expectedBytes ?: return@fold total
+            if (size < 0 || Long.MAX_VALUE - total < size) {
+                throw ContentImportException(RuntimeErrorCode.CONTENT_INVALID, "Selected folder size is invalid")
+            }
+            total + size
+        }
+        val usableBytes = availableBytes(gamesDir)
+        if (requiredBytes > 0 && requiredBytes > usableBytes) {
+            throw ContentImportException(
+                RuntimeErrorCode.CONTENT_INVALID,
+                "Import requires ${formatGiB(requiredBytes)} GiB but only ${formatGiB(usableBytes)} GiB is available",
+            )
         }
 
         val staging = File(gamesDir, ".import-${idFactory()}").canonicalFile
@@ -110,6 +126,8 @@ class ContentImporter(
             if (!completed) staging.deleteRecursively()
         }
     }
+
+    private fun formatGiB(bytes: Long): String = "%.1f".format(bytes / (1024.0 * 1024.0 * 1024.0))
 
     suspend fun importGame(request: ContentImportRequest): ContentImportResult =
         withContext(Dispatchers.IO) {
