@@ -9,6 +9,7 @@
 #include "core/libraries/disc_map/disc_map.h"
 #include "core/libraries/font/font.h"
 #include "core/libraries/font/fontft.h"
+#include "core/libraries/fios2/fios2.h"
 #include "core/libraries/jpeg/jpegenc.h"
 #include "core/libraries/kernel/kernel.h"
 #include "core/libraries/kernel/orbis_error.h"
@@ -129,6 +130,20 @@ s32 loadModuleInternal(s32 index, s32 argc, const void* argv, s32* res_out) {
     }
 
     s32 start_result = 0;
+    // Bloodborne ships libSceFios2 as a game module, but its LLE path opens menu assets without
+    // reading them. Use the synchronous HLE implementation, matching the native Android port.
+    if (index == 3) {
+        LOG_INFO(Lib_SysModule, "Using HLE libSceFios2 for {}", game_info->GameSerial());
+        Fios2::RegisterLib(&linker->GetHLESymbols());
+        linker->RelocateAllImports();
+        static s32 fios_stub_handle = 90;
+        mod.handle = fios_stub_handle++;
+        mod.is_loaded++;
+        if (res_out != nullptr) {
+            *res_out = ORBIS_OK;
+        }
+        return ORBIS_OK;
+    }
     // Most of the logic the actual module has here is to get the correct location of this module.
     // Since we only care about a small subset of LLEs, we can simplify this logic.
     if ((mod.flags & OrbisSysmoduleModuleInternalFlags::IsGame) != 0) {

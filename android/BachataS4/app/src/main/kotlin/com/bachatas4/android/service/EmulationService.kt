@@ -15,6 +15,7 @@ import androidx.core.app.NotificationCompat
 import com.bachatas4.android.MainActivity
 import com.bachatas4.android.model.RuntimeErrorCode
 import com.bachatas4.android.runtime.diagnostics.SessionLog
+import com.bachatas4.android.runtime.config.ShadPs4ConfigManager
 import com.bachatas4.android.runtime.display.WinlatorEmbeddedXServer
 import com.bachatas4.android.runtime.install.RuntimeInstaller
 import com.bachatas4.android.runtime.install.RuntimeManifest
@@ -145,9 +146,17 @@ class EmulationService : Service() {
             }
             serverSocket = LocalServerSocket(boundSocket.fileDescriptor)
             val nativeLibraryDir = Paths.get(applicationInfo.nativeLibraryDir)
-            val driverConfiguration = VulkanDriverConfiguration.resolve(vulkanDriver, installedRuntime)
+            val driverConfiguration = VulkanDriverConfiguration.resolve(
+                vulkanDriver,
+                installedRuntime,
+                File(filesDir, "vulkan-drivers/custom").toPath(),
+            )
             sessionLog.info("Vulkan", "driver=$vulkanDriver box64Mode=${driverConfiguration.box64Mode}")
-            val environment = runtimeEnvironment(installedRuntime, socketRoot, xServer.display) + driverConfiguration.environment
+            val runtimeHome = filesDir.toPath().resolve("runtime-home")
+            ShadPs4ConfigManager.applyAndroidCompatibilityProfile(runtimeHome)
+            sessionLog.info("Vulkan", "persistent pipeline cache enabled home=$runtimeHome")
+            val environment = runtimeEnvironment(installedRuntime, runtimeHome, socketRoot, xServer.display) +
+                driverConfiguration.environment
             process = RuntimeProcessLauncher().launch(
                 RuntimeProcessRequest(
                     nativeLibraryDir = nativeLibraryDir,
@@ -196,6 +205,7 @@ class EmulationService : Service() {
                         sessionLog.info("Session", "backend reported Running")
                         ManagedSession.update(ManagedSessionState.Running(gameId))
                     }
+                    frame == "BACHATA/1 EVENT Frame" -> ManagedSession.recordPresentedFrame()
                     frame.startsWith("BACHATA/1 ERROR code=") -> {
                         sessionLog.error("Backend", frame)
                         ManagedSession.update(
@@ -264,12 +274,13 @@ class EmulationService : Service() {
         }
     }
 
-    private fun runtimeEnvironment(runtimeRoot: Path, socketRoot: File, display: String) = mapOf(
-        "HOME" to runtimeRoot.toString(),
+    private fun runtimeEnvironment(runtimeRoot: Path, runtimeHome: Path, socketRoot: File, display: String) = mapOf(
+        "HOME" to runtimeHome.toString(),
         "BOX64_PATH" to runtimeRoot.resolve("bin").toString(),
         "BOX64_LOG" to "1",
         "BOX64_LOAD_ADDR" to "0x6000000000",
         "BOX64_PREFER_WRAPPED" to "1",
+        "BOX64_DYNAREC_CALLRET" to "1",
         "BOX64_LD_LIBRARY_PATH" to "${runtimeRoot.resolve("lib/x86_64-linux-gnu")}:${runtimeRoot.resolve("lib64")}",
         "BOX64_EMULATED_LIBS" to EMULATED_LIBRARIES,
         "BACHATA_ALSA_SOCKET" to File(socketRoot, UnixSocketConfig.ALSA_SERVER_PATH).path,

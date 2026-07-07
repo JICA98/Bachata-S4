@@ -1,9 +1,13 @@
 // SPDX-FileCopyrightText: Copyright 2024 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <atomic>
+#include <cstring>
+
 #include "common/logging/log.h"
 #include "core/aerolib/aerolib.h"
 #include "core/aerolib/stubs.h"
+#include "core/libraries/kernel/file_system.h"
 
 namespace Core::AeroLib {
 
@@ -15,15 +19,22 @@ namespace Core::AeroLib {
 // If it runs out of stubs with name information, it will return
 // a default implementation without function name details
 
-constexpr u32 MAX_STUBS = 8192;
+// Bloodborne's eboot plus late-loaded libc exceeds 8192 imports. Keep enough named slots for the
+// libc/FIOS boundary so missing imports remain diagnosable and can be routed to HLE functions.
+constexpr u32 MAX_STUBS = 12288;
 
 u64 UnresolvedStub() {
     LOG_ERROR(Core, "Returning zero to {}", __builtin_return_address(0));
     return 0;
 }
 
-static u64 UnknownStub() {
-    LOG_ERROR(Core, "Returning zero to {}", __builtin_return_address(0));
+static u64 UnknownStub(u64 arg0, u64 arg1, u64 arg2, u64 arg3, u64 arg4, u64 arg5) {
+    static std::atomic_uint32_t traces{};
+    if (traces.fetch_add(1, std::memory_order_relaxed) < 256) {
+        LOG_ERROR(Core,
+                  "UnknownStub caller={} args={:#x},{:#x},{:#x},{:#x},{:#x},{:#x}; returning zero",
+                  __builtin_return_address(0), arg0, arg1, arg2, arg3, arg4, arg5);
+    }
     return 0;
 }
 
@@ -56,6 +67,24 @@ constexpr auto stub_handlers = MakeStubArray(std::make_index_sequence<MAX_STUBS>
 static u32 UsedStubEntries;
 
 u64 GetStub(const char* nid) {
+    // These heavily used file APIs occur after the named-stub capacity in the generated aerolib
+    // table. LLE modules such as Bloodborne's libc still import them late, so preserve their HLE
+    // implementations instead of collapsing them to UnknownStub.
+    if (std::strcmp(nid, "AqBioC2vF3I") == 0) {
+        return reinterpret_cast<u64>(&Libraries::Kernel::posix_read);
+    }
+    if (std::strcmp(nid, "Cg4srZ6TKbU") == 0) {
+        return reinterpret_cast<u64>(&Libraries::Kernel::sceKernelRead);
+    }
+    if (std::strcmp(nid, "Oy6IpwgtYOk") == 0) {
+        return reinterpret_cast<u64>(&Libraries::Kernel::posix_lseek);
+    }
+    if (std::strcmp(nid, "oib76F-12fk") == 0) {
+        return reinterpret_cast<u64>(&Libraries::Kernel::sceKernelLseek);
+    }
+    if (std::strcmp(nid, "kBwCPsYX-m4") == 0) {
+        return reinterpret_cast<u64>(&Libraries::Kernel::sceKernelFstat);
+    }
     if (UsedStubEntries >= MAX_STUBS) {
         return (u64)&UnknownStub;
     }

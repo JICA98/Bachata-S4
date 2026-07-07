@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.background
 import androidx.compose.material3.Button
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -16,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.bachatas4.android.runtime.session.ManagedSession
@@ -30,6 +32,8 @@ fun SessionScreen(
 ) {
     val context = LocalContext.current
     val state by viewModel.state.collectAsState()
+    val frames by viewModel.frameTelemetry.collectAsState()
+    val device by viewModel.deviceTelemetry.collectAsState()
     LaunchedEffect(gameId) { viewModel.launch(gameId) }
     Column(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.weight(1f)) {
@@ -52,6 +56,14 @@ fun SessionScreen(
                 },
             )
             FixedControllerOverlay(onSnapshot = ManagedSession::submitController)
+            Text(
+                text = "FPS %.1f (%.1f ms)  GPU %s  RAM %d/%d MB".format(
+                    frames.fps, frames.frameTimeMs, device.gpuLoad, device.ramUsedMb, device.ramTotalMb,
+                ),
+                color = Color.White,
+                modifier = Modifier.align(androidx.compose.ui.Alignment.TopStart)
+                    .padding(8.dp).background(Color.Black.copy(alpha = 0.65f)).padding(6.dp),
+            )
         }
         Text(state.label(), modifier = Modifier.padding(12.dp))
         Button(

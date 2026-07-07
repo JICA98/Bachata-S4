@@ -4,6 +4,7 @@
 #include "platform/bachata/runtime_client.h"
 
 #include <cerrno>
+#include <atomic>
 #include <cstring>
 #include <limits>
 #include <sstream>
@@ -16,6 +17,8 @@
 
 namespace Platform::Bachata {
 namespace {
+
+std::atomic<RuntimeClient*> active_runtime_client{};
 
 constexpr std::string_view Prefix = "BACHATA/1 ";
 
@@ -186,6 +189,20 @@ bool RuntimeClient::SendRunning() {
     return SendLine("BACHATA/1 EVENT Running\n");
 }
 
+bool RuntimeClient::SendFramePresented() {
+    return SendLine("BACHATA/1 EVENT Frame\n");
+}
+
+void SetActiveRuntimeClient(RuntimeClient* client) {
+    active_runtime_client.store(client, std::memory_order_release);
+}
+
+void ReportPresentedFrame() {
+    if (auto* client = active_runtime_client.load(std::memory_order_acquire); client != nullptr) {
+        client->SendFramePresented();
+    }
+}
+
 bool RuntimeClient::SendStopped(int exit_code) {
     return SendLine("BACHATA/1 EVENT Stopped exit_code=" + std::to_string(exit_code) + "\n");
 }
@@ -273,6 +290,7 @@ bool RuntimeClient::SendLine(std::string_view line) {
 #ifdef _WIN32
     return false;
 #else
+    std::scoped_lock lock{send_mutex_};
     const char* data = line.data();
     size_t remaining = line.size();
     while (remaining > 0) {

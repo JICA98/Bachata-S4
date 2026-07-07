@@ -860,6 +860,9 @@ Frame* Presenter::PrepareBlankFrame(bool present_thread) {
 }
 
 void Presenter::Present(Frame* frame, bool is_reusing_frame) {
+    static std::atomic_uint32_t present_traces{};
+    const u32 trace_id = present_traces.fetch_add(1, std::memory_order_relaxed);
+    const bool trace = trace_id < 32;
     // Free the frame for reuse
     const auto free_frame = [&] {
         if (!is_reusing_frame) {
@@ -883,6 +886,9 @@ void Presenter::Present(Frame* frame, bool is_reusing_frame) {
             free_frame();
             return;
         }
+    }
+    if (trace) {
+        LOG_INFO(Render_Vulkan, "BACHATA_PRESENT_TRACE id={} stage=acquire_done", trace_id);
     }
 
     // Reset fence for queue submission. Do it here instead of GetRenderFrame() because we may
@@ -1096,11 +1102,19 @@ void Presenter::Present(Frame* frame, bool is_reusing_frame) {
     info.AddSignal(swapchain.GetPresentReadySemaphore());
     info.AddSignal(frame->present_done);
     scheduler.Flush(info);
+    if (trace) {
+        LOG_INFO(Render_Vulkan, "BACHATA_PRESENT_TRACE id={} stage=flush_done", trace_id);
+    }
 
     // Present to swapchain.
     {
         std::scoped_lock submit_lock{Scheduler::submit_mutex};
-        if (!swapchain.Present()) {
+        const bool presented = swapchain.Present();
+        if (trace) {
+            LOG_INFO(Render_Vulkan, "BACHATA_PRESENT_TRACE id={} stage=present_done ok={}", trace_id,
+                     presented);
+        }
+        if (!presented) {
             swapchain.Recreate(window.GetWidth(), window.GetHeight());
         }
     }

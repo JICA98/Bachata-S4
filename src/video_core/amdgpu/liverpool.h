@@ -231,6 +231,10 @@ private:
     std::queue<Common::UniqueFunction<void>> command_queue{};
     std::thread::id gpu_id;
     s32 curr_qid{-1};
+#ifdef ENABLE_BACHATA_RUNTIME
+    u32 debug_last_opcode{};
+    u64 debug_resume_count{};
+#endif
 };
 
 } // namespace AmdGpu

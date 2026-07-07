@@ -7,6 +7,9 @@ build_dir="$project_root/runtime/build/box64"
 output="$project_root/android/BachataS4/core/runtime/src/main/jniLibs/arm64-v8a/libbox64.so"
 entrypoint_patch="$project_root/runtime/patches/box64-winlator-glibc-entrypoint.patch"
 vulkan_qcom_patch="$project_root/runtime/patches/box64-vulkan-dispatch-tile-qcom.patch"
+adrenotools_vulkan_patch="$project_root/runtime/patches/box64-adrenotools-vulkan.patch"
+vex_write_opcode_patch="$project_root/runtime/patches/box64-vex-write-opcode.patch"
+native_write_opcode_patch="$project_root/runtime/patches/box64-native-write-opcode.patch"
 expected_revision=50c8b90b09b433ab0767de44af2d0731cb0748b7
 : "${ANDROID_NDK_ROOT:?ANDROID_NDK_ROOT must point to a pinned Android NDK}"
 
@@ -20,6 +23,18 @@ fi
 if ! git -C "$source_dir" apply --reverse --check "$vulkan_qcom_patch" 2>/dev/null; then
   git -C "$source_dir" apply --check "$vulkan_qcom_patch"
   git -C "$source_dir" apply "$vulkan_qcom_patch"
+fi
+if ! git -C "$source_dir" apply --reverse --check "$adrenotools_vulkan_patch" 2>/dev/null; then
+  git -C "$source_dir" apply --check "$adrenotools_vulkan_patch"
+  git -C "$source_dir" apply "$adrenotools_vulkan_patch"
+fi
+if ! git -C "$source_dir" apply --reverse --check "$vex_write_opcode_patch" 2>/dev/null; then
+  git -C "$source_dir" apply --check "$vex_write_opcode_patch"
+  git -C "$source_dir" apply "$vex_write_opcode_patch"
+fi
+if ! git -C "$source_dir" apply --reverse --check "$native_write_opcode_patch" 2>/dev/null; then
+  git -C "$source_dir" apply --check "$native_write_opcode_patch"
+  git -C "$source_dir" apply "$native_write_opcode_patch"
 fi
 cmake -S "$source_dir" -B "$build_dir" -G Ninja \
   -DCMAKE_TOOLCHAIN_FILE="$ANDROID_NDK_ROOT/build/cmake/android.toolchain.cmake" \

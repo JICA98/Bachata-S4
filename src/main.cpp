@@ -180,6 +180,11 @@ int main(int argc, char* argv[]) {
     auto emu_state = std::make_shared<EmulatorState>();
     EmulatorState::SetInstance(emu_state);
     UserSettings.Load();
+#ifdef ENABLE_BACHATA_RUNTIME
+    // Desktop input discovery logs in player one during its first controller scan. The
+    // Android runtime bypasses that scan, so bootstrap the same user-service login event.
+    UserManagement.LoginUser(UserManagement.GetUserByPlayerIndex(1), 1);
+#endif
 
     // Initialize key manager
     auto key_manager = KeyManager::GetInstance();
@@ -316,6 +321,7 @@ int main(int argc, char* argv[]) {
         return 1;
     }
     emulator->onRuntimeRunning = [&runtime_client]() { runtime_client.SendRunning(); };
+    Platform::Bachata::SetActiveRuntimeClient(&runtime_client);
     emulator->onRuntimeError = [&runtime_client](std::string_view code) {
         runtime_client.SendError(code);
     };
