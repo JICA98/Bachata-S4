@@ -307,6 +307,7 @@ set(AUDIO_LIB src/core/libraries/audio/audioin.cpp
               src/core/libraries/audio/audioout_error.h
               src/core/libraries/audio/sdl_audio_out.cpp
               src/core/libraries/audio/openal_audio_out.cpp
+              src/core/libraries/audio/bachata_audio_out.cpp
               src/core/libraries/audio/openal_manager.h
               src/core/libraries/ngs2/ngs2.cpp
               src/core/libraries/ngs2/ngs2.h
@@ -509,6 +510,8 @@ set(SYSTEM_LIBS src/core/libraries/system/commondialog.cpp
                 src/core/libraries/web_browser_dialog/webbrowserdialog.h
                 src/core/libraries/font/font.cpp
                 src/core/libraries/font/font.h
+                src/core/libraries/fios2/fios2.cpp
+                src/core/libraries/fios2/fios2.h
                 src/core/libraries/font/font_internal.cpp
                 src/core/libraries/font/font_internal.h
                 src/core/libraries/font/fontft.cpp
@@ -1201,6 +1204,8 @@ if (ENABLE_BACHATA_RUNTIME)
     target_compile_definitions(shadps4 PRIVATE ENABLE_BACHATA_RUNTIME)
     target_sources(shadps4 PRIVATE
         src/platform/bachata/runtime_client.cpp
+        src/platform/bachata/controller_snapshot.cpp
+        src/platform/bachata/audio_transport.cpp
         src/platform/bachata/runtime_client.h
     )
 endif()

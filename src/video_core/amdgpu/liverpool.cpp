@@ -123,6 +123,13 @@ void Liverpool::Process(std::stop_token stoken) {
                 task = queue.submits.front();
             }
             task.resume();
+#ifdef ENABLE_BACHATA_RUNTIME
+            if (++debug_resume_count % 1'000 == 0) {
+                LOG_WARNING(Render_Vulkan,
+                            "GPU coroutine active resumes={} queue={} opcode={:#x} submits={}",
+                            debug_resume_count, curr_qid, debug_last_opcode, num_submits.load());
+            }
+#endif
 
             if (task.done()) {
                 task.destroy();
@@ -163,6 +170,9 @@ Liverpool::Task Liverpool::ProcessCeUpdate(std::span<const u32> ccb) {
         }
 
         const PM4ItOpcode opcode = header->type3.opcode;
+#ifdef ENABLE_BACHATA_RUNTIME
+        debug_last_opcode = static_cast<u32>(opcode);
+#endif
         const auto* it_body = reinterpret_cast<const u32*>(header) + 1;
         switch (opcode) {
         case PM4ItOpcode::Nop: {
@@ -254,6 +264,9 @@ Liverpool::Task Liverpool::ProcessGraphics(std::span<const u32> dcb, std::span<c
         case 3:
             const u32 count = header->type3.NumWords();
             const PM4ItOpcode opcode = header->type3.opcode;
+#ifdef ENABLE_BACHATA_RUNTIME
+            debug_last_opcode = static_cast<u32>(opcode);
+#endif
             switch (opcode) {
             case PM4ItOpcode::Nop: {
                 const auto* nop = reinterpret_cast<const PM4CmdNop*>(header);
@@ -816,7 +829,25 @@ Liverpool::Task Liverpool::ProcessGraphics(std::span<const u32> dcb, std::span<c
                     vo_port->WaitVoLabel([&] { return wait_reg_mem->Test(regs.reg_array); });
                     break;
                 }
+                u64 wait_iterations = 0;
                 while (!wait_reg_mem->Test(regs.reg_array)) {
+#ifdef ENABLE_BACHATA_RUNTIME
+                    if (++wait_iterations % 1'000'000 == 0) {
+                        const bool is_memory = wait_reg_mem->mem_space.Value() ==
+                                               PM4CmdWaitRegMem::MemSpace::Memory;
+                        const u32 value = is_memory ? *wait_reg_mem->Address<const u32*>()
+                                                    : regs.reg_array[wait_reg_mem->Reg()];
+                        LOG_WARNING(Render_Vulkan,
+                                    "PM4 WAIT_REG_MEM stalled queue=gfx iterations={} space={} "
+                                    "address={:#x} value={:#x} ref={:#x} mask={:#x} function={}",
+                                    wait_iterations, is_memory ? "memory" : "register",
+                                    is_memory ? reinterpret_cast<uintptr_t>(
+                                                    wait_reg_mem->Address<const u32*>())
+                                              : wait_reg_mem->Reg(),
+                                    value, wait_reg_mem->ref, wait_reg_mem->mask,
+                                    static_cast<u32>(wait_reg_mem->function.Value()));
+                    }
+#endif
                     YIELD_GFX();
                 }
                 break;
@@ -952,6 +983,9 @@ Liverpool::Task Liverpool::ProcessCompute(std::span<const u32> acb, u32 vqid) {
         }
 
         const PM4ItOpcode opcode = header->type3.opcode;
+#ifdef ENABLE_BACHATA_RUNTIME
+        debug_last_opcode = static_cast<u32>(opcode);
+#endif
 
         const auto* it_body = reinterpret_cast<const u32*>(header) + 1;
         switch (opcode) {
@@ -1130,7 +1164,25 @@ Liverpool::Task Liverpool::ProcessCompute(std::span<const u32> acb, u32 vqid) {
         case PM4ItOpcode::WaitRegMem: {
             const auto* wait_reg_mem = reinterpret_cast<const PM4CmdWaitRegMem*>(header);
             ASSERT(wait_reg_mem->engine.Value() == PM4CmdWaitRegMem::Engine::Me);
+            u64 wait_iterations = 0;
             while (!wait_reg_mem->Test(regs.reg_array)) {
+#ifdef ENABLE_BACHATA_RUNTIME
+                if (++wait_iterations % 1'000'000 == 0) {
+                    const bool is_memory = wait_reg_mem->mem_space.Value() ==
+                                           PM4CmdWaitRegMem::MemSpace::Memory;
+                    const u32 value = is_memory ? *wait_reg_mem->Address<const u32*>()
+                                                : regs.reg_array[wait_reg_mem->Reg()];
+                    LOG_WARNING(Render_Vulkan,
+                                "PM4 WAIT_REG_MEM stalled queue=asc{} iterations={} space={} "
+                                "address={:#x} value={:#x} ref={:#x} mask={:#x} function={}",
+                                vqid, wait_iterations, is_memory ? "memory" : "register",
+                                is_memory ? reinterpret_cast<uintptr_t>(
+                                                wait_reg_mem->Address<const u32*>())
+                                          : wait_reg_mem->Reg(),
+                                value, wait_reg_mem->ref, wait_reg_mem->mask,
+                                static_cast<u32>(wait_reg_mem->function.Value()));
+                }
+#endif
                 YIELD_ASC(vqid);
             }
             break;

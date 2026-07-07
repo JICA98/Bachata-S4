@@ -205,11 +205,15 @@ s32 PS4_SYSV_ABI sceAudioOutInit() {
         return ORBIS_AUDIO_OUT_ERROR_ALREADY_INIT;
     }
 
+#ifdef ENABLE_BACHATA_RUNTIME
+    audio = std::make_unique<BachataAudioOut>();
+#else
     if (EmulatorSettings.GetAudioBackend() == AudioBackend::OpenAL) {
         audio = std::make_unique<OpenALAudioOut>();
     } else {
         audio = std::make_unique<SDLAudioOut>();
     }
+#endif
 
     LOG_INFO(Lib_AudioOut, "Audio system initialized");
     return ORBIS_OK;

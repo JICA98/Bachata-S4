@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: Copyright 2024-2026 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <atomic>
+
 #include "common/assert.h"
 #include "common/elf_info.h"
 #include "common/logging/log.h"
@@ -18,6 +20,9 @@ extern std::unique_ptr<Vulkan::Presenter> presenter;
 namespace Libraries::VideoOut {
 
 static std::unique_ptr<VideoOutDriver> driver;
+static std::atomic_uint32_t submit_flip_traces{};
+static std::atomic_uint32_t eop_register_traces{};
+static std::atomic_uint32_t eop_irq_traces{};
 
 void PS4_SYSV_ABI sceVideoOutSetBufferAttribute(BufferAttribute* attribute, PixelFormat pixelFormat,
                                                 u32 tilingMode, u32 aspectRatio, u32 width,
@@ -153,6 +158,12 @@ s32 PS4_SYSV_ABI sceVideoOutIsFlipPending(s32 handle) {
 }
 
 s32 PS4_SYSV_ABI sceVideoOutSubmitFlip(s32 handle, s32 bufferIndex, s32 flipMode, s64 flipArg) {
+    const bool trace = submit_flip_traces.fetch_add(1, std::memory_order_relaxed) < 32;
+    if (trace) {
+        LOG_INFO(Lib_VideoOut,
+                 "BACHATA_FLIP_TRACE stage=guest_submit handle={} index={} mode={} arg={}",
+                 handle, bufferIndex, flipMode, flipArg);
+    }
     auto* port = driver->GetPort(handle);
     if (!port) {
         LOG_ERROR(Lib_VideoOut, "Invalid handle = {}", handle);
@@ -179,6 +190,11 @@ s32 PS4_SYSV_ABI sceVideoOutSubmitFlip(s32 handle, s32 bufferIndex, s32 flipMode
     if (!driver->SubmitFlip(port, bufferIndex, flipArg)) {
         LOG_ERROR(Lib_VideoOut, "Flip queue is full");
         return ORBIS_VIDEO_OUT_ERROR_FLIP_QUEUE_FULL;
+    }
+
+    if (trace) {
+        LOG_INFO(Lib_VideoOut, "BACHATA_FLIP_TRACE stage=guest_submit_accepted index={} arg={}",
+                 bufferIndex, flipArg);
     }
 
     return ORBIS_OK;
@@ -343,6 +359,11 @@ s32 PS4_SYSV_ABI sceVideoOutGetBufferLabelAddress(s32 handle, uintptr_t* label_a
 }
 
 s32 sceVideoOutSubmitEopFlip(s32 handle, u32 buf_id, u32 mode, s64 flip_arg, void** unk) {
+    if (eop_register_traces.fetch_add(1, std::memory_order_relaxed) < 32) {
+        LOG_INFO(Lib_VideoOut,
+                 "BACHATA_FLIP_TRACE stage=eop_register handle={} index={} mode={} arg={}", handle,
+                 buf_id, mode, flip_arg);
+    }
     auto* port = driver->GetPort(handle);
     if (!port) {
         return ORBIS_VIDEO_OUT_ERROR_INVALID_HANDLE;
@@ -350,6 +371,11 @@ s32 sceVideoOutSubmitEopFlip(s32 handle, u32 buf_id, u32 mode, s64 flip_arg, voi
 
     Platform::IrqC::Instance()->RegisterOnce(
         Platform::InterruptId::GfxFlip, [=](Platform::InterruptId irq) {
+            if (eop_irq_traces.fetch_add(1, std::memory_order_relaxed) < 32) {
+                LOG_INFO(Lib_VideoOut,
+                         "BACHATA_FLIP_TRACE stage=eop_irq index={} arg={} label={}", buf_id,
+                         flip_arg, port->buffer_labels[buf_id]);
+            }
             ASSERT_MSG(irq == Platform::InterruptId::GfxFlip, "An unexpected IRQ occured");
             ASSERT_MSG(port->buffer_labels[buf_id] == 1, "Out of order flip IRQ");
             const auto result = driver->SubmitFlip(port, buf_id, flip_arg, true);

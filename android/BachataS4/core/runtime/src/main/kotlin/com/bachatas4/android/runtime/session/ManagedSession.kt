@@ -2,6 +2,8 @@ package com.bachatas4.android.runtime.session
 
 import android.view.Surface
 import com.bachatas4.android.model.RuntimeErrorCode
+import com.bachatas4.android.runtime.input.ControllerSnapshot
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 
@@ -10,6 +12,8 @@ data class RuntimeSurface(
     val width: Int,
     val height: Int,
 )
+
+data class FrameTelemetry(val fps: Float = 0f, val frameTimeMs: Float = 0f)
 
 sealed interface ManagedSessionState {
     data object Idle : ManagedSessionState
@@ -29,12 +33,42 @@ object ManagedSession {
 
     private val mutableSurface = MutableStateFlow<RuntimeSurface?>(null)
     private val mutableState = MutableStateFlow<ManagedSessionState>(ManagedSessionState.Idle)
+    private val controllerSink = AtomicReference<((ControllerSnapshot) -> Unit)?>(null)
+    private val mutableFrameTelemetry = MutableStateFlow(FrameTelemetry())
+    private val frameTimes = ArrayDeque<Long>()
+    private var lastFrameNanos: Long? = null
     val surface: StateFlow<RuntimeSurface?> = mutableSurface
     val state: StateFlow<ManagedSessionState> = mutableState
+    val frameTelemetry: StateFlow<FrameTelemetry> = mutableFrameTelemetry
 
     fun attachSurface(value: RuntimeSurface) { mutableSurface.value = value }
     fun detachSurface(surface: Surface) {
         if (mutableSurface.value?.surface === surface) mutableSurface.value = null
     }
     fun update(value: ManagedSessionState) { mutableState.value = value }
+    fun attachControllerSink(sink: (ControllerSnapshot) -> Unit) { controllerSink.set(sink) }
+    fun detachControllerSink(sink: (ControllerSnapshot) -> Unit) { controllerSink.compareAndSet(sink, null) }
+    fun submitController(snapshot: ControllerSnapshot) { controllerSink.get()?.invoke(snapshot) }
+    @Synchronized
+    fun recordPresentedFrame(nowNanos: Long = System.nanoTime()) {
+        if (lastFrameNanos?.let { nowNanos <= it } == true) frameTimes.clear()
+        lastFrameNanos = nowNanos
+        frameTimes.addLast(nowNanos)
+        val cutoff = nowNanos - 1_000_000_000L
+        while (frameTimes.firstOrNull()?.let { it < cutoff } == true) frameTimes.removeFirst()
+        val intervals = frameTimes.size - 1
+        if (intervals > 0) {
+            val duration = nowNanos - frameTimes.first()
+            val fps = intervals * 1_000_000_000f / duration.coerceAtLeast(1L)
+            mutableFrameTelemetry.value = FrameTelemetry(fps, 1000f / fps.coerceAtLeast(0.01f))
+        }
+    }
+    @Synchronized
+    fun refreshFrameTelemetry(nowNanos: Long = System.nanoTime()) {
+        val last = lastFrameNanos ?: return
+        val idleNanos = nowNanos - last
+        if (idleNanos >= 1_000_000_000L) {
+            mutableFrameTelemetry.value = FrameTelemetry(0f, idleNanos / 1_000_000f)
+        }
+    }
 }

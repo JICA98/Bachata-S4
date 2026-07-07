@@ -14,9 +14,13 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.bachatas4.android.MainActivity
 import com.bachatas4.android.model.RuntimeErrorCode
+import com.bachatas4.android.runtime.diagnostics.SessionLog
+import com.bachatas4.android.runtime.config.ShadPs4ConfigManager
 import com.bachatas4.android.runtime.display.WinlatorEmbeddedXServer
 import com.bachatas4.android.runtime.install.RuntimeInstaller
 import com.bachatas4.android.runtime.install.RuntimeManifest
+import com.bachatas4.android.runtime.input.ControllerFrameEncoder
+import com.bachatas4.android.runtime.input.ControllerSnapshot
 import com.bachatas4.android.runtime.process.RuntimeProcessHandle
 import com.bachatas4.android.runtime.process.RuntimeProcessLauncher
 import com.bachatas4.android.runtime.process.RuntimeProcessRequest
@@ -29,6 +33,9 @@ import java.io.File
 import java.nio.file.FileAlreadyExistsException
 import java.nio.file.Path
 import java.nio.file.Paths
+import java.nio.file.StandardCopyOption
+import java.time.Instant
+import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeoutException
@@ -87,9 +94,24 @@ class EmulationService : Service() {
         var boundSocket: LocalSocket? = null
         var serverSocket: LocalServerSocket? = null
         var clientSocket: LocalSocket? = null
+        var controllerSink: ((ControllerSnapshot) -> Unit)? = null
+        var runtimeRoot: Path? = null
         val acceptExecutor = Executors.newSingleThreadExecutor()
         val controlFile = File(filesDir, "runtime-control.sock").apply { delete() }
-        val outputFile = File(filesDir, "runtime-session.log").apply { delete() }
+        val logsRoot = File(filesDir, "logs").toPath()
+        SessionLog.prune(logsRoot, keep = MAX_LOG_SESSIONS - 1)
+        val sessionLog = SessionLog.create(
+            logsRoot,
+            gameId,
+            Instant.now(),
+            UUID.randomUUID().toString().substring(0, 8),
+        )
+        val outputFile = sessionLog.backendLog.toFile()
+        sessionLog.info("Session", "start game=$gameId driver=$vulkanDriver")
+        sessionLog.info(
+            "Device",
+            "manufacturer=${android.os.Build.MANUFACTURER} model=${android.os.Build.MODEL} sdk=${android.os.Build.VERSION.SDK_INT}",
+        )
         try {
             require(gameId.matches(Regex("[A-Za-z0-9._-]+"))) { "Invalid game id" }
             val gamesRoot = File(filesDir, "games").canonicalFile
@@ -97,13 +119,17 @@ class EmulationService : Service() {
             require(gameRoot.toPath().startsWith(gamesRoot.toPath())) { "Game path escapes app storage" }
             val eboot = File(gameRoot, "eboot.bin")
             require(eboot.isFile) { "Imported eboot.bin is missing" }
+            sessionLog.info("Content", "validated game root and eboot.bin")
 
             ManagedSession.update(ManagedSessionState.Preparing("runtime"))
-            val runtimeRoot = installRuntime()
-            runtimeRoot.resolve(".local/share").toFile().mkdirs()
-            runtimeRoot.resolve(".config").toFile().mkdirs()
+            val installedRuntime = installRuntime()
+            runtimeRoot = installedRuntime
+            sessionLog.info("Runtime", "installed version=${installedRuntime.fileName}")
+            installedRuntime.resolve(".local/share").toFile().mkdirs()
+            installedRuntime.resolve(".config").toFile().mkdirs()
             ManagedSession.update(ManagedSessionState.Preparing("display"))
             val target = withTimeout(SURFACE_TIMEOUT_MS) { ManagedSession.surface.filterNotNull().first() }
+            sessionLog.info("Display", "surface=${target.width}x${target.height}")
             val socketRoot = File(filesDir, "x").apply { mkdirs() }
             xServer = WinlatorEmbeddedXServer(
                 this,
@@ -113,21 +139,31 @@ class EmulationService : Service() {
                 useSharedMemoryAudio = false,
             )
             xServer.start(target.surface, target.width, target.height)
+            sessionLog.info("Display", "embedded X server started display=${xServer.display}")
 
             boundSocket = LocalSocket().also {
                 it.bind(LocalSocketAddress(controlFile.path, LocalSocketAddress.Namespace.FILESYSTEM))
             }
             serverSocket = LocalServerSocket(boundSocket.fileDescriptor)
             val nativeLibraryDir = Paths.get(applicationInfo.nativeLibraryDir)
-            val driverConfiguration = VulkanDriverConfiguration.resolve(vulkanDriver, runtimeRoot)
-            val environment = runtimeEnvironment(runtimeRoot, socketRoot, xServer.display) + driverConfiguration.environment
+            val driverConfiguration = VulkanDriverConfiguration.resolve(
+                vulkanDriver,
+                installedRuntime,
+                File(filesDir, "vulkan-drivers/custom").toPath(),
+            )
+            sessionLog.info("Vulkan", "driver=$vulkanDriver box64Mode=${driverConfiguration.box64Mode}")
+            val runtimeHome = filesDir.toPath().resolve("runtime-home")
+            ShadPs4ConfigManager.applyAndroidCompatibilityProfile(runtimeHome)
+            sessionLog.info("Vulkan", "persistent pipeline cache enabled home=$runtimeHome")
+            val environment = runtimeEnvironment(installedRuntime, runtimeHome, socketRoot, xServer.display) +
+                driverConfiguration.environment
             process = RuntimeProcessLauncher().launch(
                 RuntimeProcessRequest(
                     nativeLibraryDir = nativeLibraryDir,
-                    runtimeRoot = runtimeRoot,
+                    runtimeRoot = installedRuntime,
                     overrideRoot = gameRoot.toPath(),
                     storageRoot = filesDir.toPath(),
-                    shadPs4Executable = runtimeRoot.resolve("bin/shadps4"),
+                    shadPs4Executable = installedRuntime.resolve("bin/shadps4"),
                     socketPath = controlFile.path,
                     environment = environment,
                     arguments = listOf("-g", eboot.path),
@@ -135,6 +171,7 @@ class EmulationService : Service() {
                     box64Mode = driverConfiguration.box64Mode,
                 ),
             )
+            sessionLog.info("Runtime", "backend process launched")
             val acceptFuture = acceptExecutor.submit<LocalSocket> { serverSocket.accept() }
             while (clientSocket == null) {
                 clientSocket = try {
@@ -146,26 +183,69 @@ class EmulationService : Service() {
                     null
                 }
             }
+            val encoder = ControllerFrameEncoder()
+            val controllerOutput = clientSocket.outputStream
+            val writeLock = Any()
+            val sink: (ControllerSnapshot) -> Unit = { snapshot ->
+                encoder.encode(snapshot)?.let { frame ->
+                    runCatching {
+                        synchronized(writeLock) {
+                            controllerOutput.write(frame)
+                            controllerOutput.flush()
+                        }
+                    }
+                }
+            }
+            controllerSink = sink
+            ManagedSession.attachControllerSink(sink)
+            sessionLog.info("Input", "controller transport attached")
             clientSocket.inputStream.bufferedReader().forEachLine { frame ->
                 when {
-                    frame == "BACHATA/1 EVENT Running" -> ManagedSession.update(ManagedSessionState.Running(gameId))
-                    frame.startsWith("BACHATA/1 ERROR code=") -> ManagedSession.update(
-                        ManagedSessionState.Failed(RuntimeErrorCode.CONTENT_INVALID, frame.substringAfter("code=")),
-                    )
+                    frame == "BACHATA/1 EVENT Running" -> {
+                        sessionLog.info("Session", "backend reported Running")
+                        ManagedSession.update(ManagedSessionState.Running(gameId))
+                    }
+                    frame == "BACHATA/1 EVENT Frame" -> ManagedSession.recordPresentedFrame()
+                    frame.startsWith("BACHATA/1 ERROR code=") -> {
+                        sessionLog.error("Backend", frame)
+                        ManagedSession.update(
+                            ManagedSessionState.Failed(RuntimeErrorCode.CONTENT_INVALID, frame.substringAfter("code=")),
+                        )
+                    }
                 }
             }
             process?.waitFor(PROCESS_EXIT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            sessionLog.info("Session", "backend stopped exitCode=${process?.exitCode}")
             ManagedSession.update(ManagedSessionState.Stopped(process?.exitCode))
         } catch (_: CancellationException) {
+            sessionLog.info("Session", "cancelled exitCode=${process?.exitCode}")
             ManagedSession.update(ManagedSessionState.Stopped(process?.exitCode))
         } catch (error: Exception) {
             val childOutput = runCatching { outputFile.readLines().takeLast(MAX_ERROR_LOG_LINES).joinToString(" | ") }
                 .getOrDefault("")
             val detail = listOfNotNull(error.message, childOutput.ifBlank { null }).joinToString(": ")
+            sessionLog.error("Session", "${error.javaClass.simpleName}: ${error.message.orEmpty()}")
             ManagedSession.update(
                 ManagedSessionState.Failed(RuntimeErrorCode.BACKEND_CRASHED, detail.ifBlank { error.javaClass.simpleName }),
             )
         } finally {
+            runtimeRoot?.resolve(".local/share/shadPS4/log/shad_log.txt")?.let { internalLog ->
+                runCatching {
+                    if (internalLog.toFile().isFile) {
+                        java.nio.file.Files.copy(
+                            internalLog,
+                            sessionLog.directory.resolve("shadps4-internal.log"),
+                            StandardCopyOption.REPLACE_EXISTING,
+                        )
+                    }
+                }.onFailure {
+                    sessionLog.warning("Logs", "internal backend log copy failed: ${it.message.orEmpty()}")
+                }
+            }
+            controllerSink?.let { sink ->
+                ManagedSession.submitController(ControllerSnapshot.Neutral)
+                ManagedSession.detachControllerSink(sink)
+            }
             process?.destroyForcibly()
             process = null
             runCatching { clientSocket?.close() }
@@ -174,6 +254,7 @@ class EmulationService : Service() {
             acceptExecutor.shutdownNow()
             runCatching { xServer?.let { runBlocking { it.stop() } } }
             controlFile.delete()
+            sessionLog.info("Session", "cleanup complete")
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
@@ -193,12 +274,13 @@ class EmulationService : Service() {
         }
     }
 
-    private fun runtimeEnvironment(runtimeRoot: Path, socketRoot: File, display: String) = mapOf(
-        "HOME" to runtimeRoot.toString(),
+    private fun runtimeEnvironment(runtimeRoot: Path, runtimeHome: Path, socketRoot: File, display: String) = mapOf(
+        "HOME" to runtimeHome.toString(),
         "BOX64_PATH" to runtimeRoot.resolve("bin").toString(),
         "BOX64_LOG" to "1",
         "BOX64_LOAD_ADDR" to "0x6000000000",
         "BOX64_PREFER_WRAPPED" to "1",
+        "BOX64_DYNAREC_CALLRET" to "1",
         "BOX64_LD_LIBRARY_PATH" to "${runtimeRoot.resolve("lib/x86_64-linux-gnu")}:${runtimeRoot.resolve("lib64")}",
         "BOX64_EMULATED_LIBS" to EMULATED_LIBRARIES,
         "BACHATA_ALSA_SOCKET" to File(socketRoot, UnixSocketConfig.ALSA_SERVER_PATH).path,
@@ -247,6 +329,7 @@ class EmulationService : Service() {
         const val PROCESS_EXIT_TIMEOUT_SECONDS = 5L
         const val ACCEPT_POLL_MILLIS = 250L
         const val MAX_ERROR_LOG_LINES = 20
+        const val MAX_LOG_SESSIONS = 10
         const val EMULATED_LIBRARIES = "libSDL2-2.0.so.0:libudev.so.1:libuuid.so.1"
     }
 }

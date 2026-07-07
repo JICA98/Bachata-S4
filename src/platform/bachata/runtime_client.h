@@ -3,10 +3,15 @@
 
 #pragma once
 
+#include <functional>
 #include <filesystem>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <thread>
+#include <mutex>
+
+#include "platform/bachata/controller_snapshot.h"
 
 namespace Platform::Bachata {
 
@@ -51,14 +56,22 @@ public:
     bool SendHello(unsigned version = RuntimeProtocolVersion);
     bool SendStarting();
     bool SendRunning();
+    bool SendFramePresented();
     bool SendStopped(int exit_code);
     bool SendError(std::string_view code);
+    bool StartInputReader(std::function<void(const ControllerSnapshot&)> handler);
+    void StopInputReader();
 
 private:
     bool SendLine(std::string_view line);
     void Close();
 
     int fd_ = -1;
+    std::jthread input_thread_;
+    std::mutex send_mutex_;
 };
+
+void SetActiveRuntimeClient(RuntimeClient* client);
+void ReportPresentedFrame();
 
 } // namespace Platform::Bachata

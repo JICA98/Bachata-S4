@@ -64,6 +64,7 @@ class RuntimeProcessLauncherTest {
                 "HOME" to "/data/home",
                 "DISPLAY" to ":0",
                 "VK_ICD_FILENAMES" to "/data/turnip.json",
+                "BOX64_DYNAREC_CALLRET" to "1",
                 "PATH" to "/system/bin",
                 "LD_PRELOAD" to "/evil.so",
             ),
@@ -81,6 +82,7 @@ class RuntimeProcessLauncherTest {
                 "HOME" to "/data/home",
                 "DISPLAY" to ":0",
                 "VK_ICD_FILENAMES" to "/data/turnip.json",
+                "BOX64_DYNAREC_CALLRET" to "1",
             ),
             captured!!.environment(),
         )

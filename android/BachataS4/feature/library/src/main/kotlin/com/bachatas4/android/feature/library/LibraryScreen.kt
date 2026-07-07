@@ -31,7 +31,9 @@ import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
 import java.util.UUID
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 fun LibraryScreen(
@@ -45,33 +47,42 @@ fun LibraryScreen(
     }
     val scope = rememberCoroutineScope()
     var error by remember { mutableStateOf<String?>(null) }
+    var importing by remember { mutableStateOf(false) }
     LaunchedEffect(dependencies) {
         dependencies.gameRepository().observeGames().collectLatest(viewModel::setGames)
     }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         scope.launch {
-            runCatching {
+            importing = true
+            error = null
+            try {
                 context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                val root = requireNotNull(DocumentFile.fromTreeUri(context, uri)) {
-                    "Cannot read selected folder"
+                val (title, entries) = withContext(Dispatchers.IO) {
+                    val root = requireNotNull(DocumentFile.fromTreeUri(context, uri)) {
+                        "Cannot read selected folder"
+                    }
+                    (root.name?.ifBlank { null } ?: "Imported game") to root.toImportEntries()
                 }
-                val title = root.name?.ifBlank { null } ?: "Imported game"
                 val id = Regex("CUSA\\d{5}", RegexOption.IGNORE_CASE)
                     .find(title)?.value?.uppercase() ?: "GAME-${UUID.randomUUID()}"
-                val entries = root.toImportEntries()
                 val result = dependencies.contentImporter().importGameTree(
                     ContentImportRequest(id = id, title = title, sourceUri = uri.toString()),
                     entries,
                 )
                 dependencies.gameRepository().addImportedGame(result, uri.toString(), System.currentTimeMillis())
-            }.onFailure { error = it.message ?: it.javaClass.simpleName }
+            } catch (failure: Throwable) {
+                error = failure.message ?: failure.javaClass.simpleName
+            } finally {
+                importing = false
+            }
         }
     }
     val state by viewModel.state.collectAsState()
     LibraryContent(
         state = state,
         error = error,
+        importing = importing,
         onOpenSettings = onOpenSettings,
         onImport = { picker.launch(null) },
         onLaunch = onLaunch,
@@ -82,6 +93,7 @@ fun LibraryScreen(
 fun LibraryContent(
     state: LibraryUiState,
     error: String?,
+    importing: Boolean,
     onOpenSettings: () -> Unit,
     onImport: () -> Unit,
     onLaunch: (String) -> Unit,
@@ -91,9 +103,10 @@ fun LibraryContent(
         Button(onClick = onOpenSettings) {
             Text("Settings")
         }
-        Button(onClick = onImport) {
+        Button(onClick = onImport, enabled = !importing) {
             Text("Import extracted game folder")
         }
+        if (importing) Text("Scanning and importing game files...")
         error?.let { Text("Import failed: $it") }
         state.games.forEach { game ->
             Text("${game.title} (${game.id})")
@@ -102,16 +115,25 @@ fun LibraryContent(
     }
 }
 
-private fun DocumentFile.toImportEntries(prefix: String = ""): List<ContentTreeEntry> =
-    listFiles().flatMap { child ->
-        val name = child.name ?: return@flatMap emptyList()
-        val relativePath = if (prefix.isEmpty()) name else "$prefix/$name"
-        when {
-            child.isDirectory -> child.toImportEntries(relativePath)
-            child.isFile -> listOf(ContentTreeEntry(relativePath, child.uri.toString()))
-            else -> emptyList()
+private fun DocumentFile.toImportEntries(): List<ContentTreeEntry> {
+    val entries = mutableListOf<ContentTreeEntry>()
+    val pending = ArrayDeque<Pair<DocumentFile, String>>()
+    pending.add(this to "")
+    while (pending.isNotEmpty()) {
+        val (directory, prefix) = pending.removeLast()
+        directory.listFiles().forEach { child ->
+            val name = child.name ?: return@forEach
+            val relativePath = if (prefix.isEmpty()) name else "$prefix/$name"
+            when {
+                child.isDirectory -> pending.add(child to relativePath)
+                child.isFile -> entries.add(
+                    ContentTreeEntry(relativePath, child.uri.toString(), child.length().coerceAtLeast(0)),
+                )
+            }
         }
     }
+    return entries
+}
 
 @EntryPoint
 @InstallIn(SingletonComponent::class)

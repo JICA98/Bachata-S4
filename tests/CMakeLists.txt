@@ -299,6 +299,8 @@ gtest_discover_tests(shadps4_http_test
 
 set(BACHATA_RUNTIME_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/platform/bachata/runtime_client.cpp
+    ${CMAKE_SOURCE_DIR}/src/platform/bachata/controller_snapshot.cpp
+    ${CMAKE_SOURCE_DIR}/src/platform/bachata/audio_transport.cpp
     platform/test_bachata_runtime_client.cpp
 )
 
