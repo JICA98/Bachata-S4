@@ -1,7 +1,12 @@
 package com.bachatas4.android.runtime.config
 
+import com.bachatas4.android.runtime.settings.RuntimeProfile
+import com.bachatas4.android.runtime.settings.RuntimeProfileResolver
+import com.bachatas4.android.runtime.settings.RuntimeSettingSpec
+import com.bachatas4.android.runtime.settings.SettingKind
 import java.nio.file.Files
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -48,5 +53,33 @@ class ShadPs4ConfigManagerTest {
         val vulkan = Json.parseToJsonElement(Files.readString(config)).jsonObject
             .getValue("Vulkan").jsonObject
         assertTrue(vulkan.getValue("pipeline_cache_enabled").jsonPrimitive.boolean)
+    }
+
+    @Test
+    fun writesResolvedSettingsWithoutReplacingUnknownConfig() {
+        val runtimeRoot = temporaryFolder.newFolder("runtime-resolved").toPath()
+        val config = runtimeRoot.resolve(".local/share/shadPS4/config.json")
+        Files.createDirectories(config.parent)
+        Files.writeString(config, """{"Future":{"keep":true},"GPU":{"null_gpu":false}}""")
+        val spec = RuntimeSettingSpec(
+            id = "gpu.null_gpu",
+            nativeKey = "GPU.null_gpu",
+            section = "GPU",
+            category = "GPU",
+            title = "Null GPU",
+            help = "Disable rendering.",
+            kind = SettingKind.BOOLEAN,
+            defaultValue = JsonPrimitive(false),
+        )
+        val resolved = RuntimeProfileResolver(listOf(spec)).resolve(
+            RuntimeProfile(values = mapOf(spec.id to JsonPrimitive(true))),
+            null,
+        )
+
+        ShadPs4ConfigManager.write(runtimeRoot, resolved)
+
+        val root = Json.parseToJsonElement(Files.readString(config)).jsonObject
+        assertTrue(root.getValue("Future").jsonObject.getValue("keep").jsonPrimitive.boolean)
+        assertTrue(root.getValue("GPU").jsonObject.getValue("null_gpu").jsonPrimitive.boolean)
     }
 }

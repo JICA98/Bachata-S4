@@ -1,5 +1,8 @@
 package com.bachatas4.android.runtime.config
 
+import com.bachatas4.android.runtime.settings.ResolvedRuntimeProfile
+import com.bachatas4.android.runtime.settings.ShadPs4JsonCodec
+import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
@@ -50,5 +53,40 @@ object ShadPs4ConfigManager {
             StandardCopyOption.REPLACE_EXISTING,
             StandardCopyOption.ATOMIC_MOVE,
         )
+    }
+
+    fun write(runtimeRoot: Path, profile: ResolvedRuntimeProfile) {
+        val config = runtimeRoot.resolve(".local/share/shadPS4/config.json")
+        Files.createDirectories(config.parent)
+        var document = if (Files.isRegularFile(config)) {
+            ShadPs4JsonCodec.parse(Files.readString(config))
+        } else {
+            ShadPs4JsonCodec.empty()
+        }
+        document = document.mergeUnknown(profile.unknownShadPs4)
+        profile.settings.values
+            .filter { it.spec.section != "Box64" && it.value != null }
+            .sortedBy { it.spec.nativeKey }
+            .forEach { setting ->
+                document = document.set(
+                    setting.spec.section,
+                    setting.spec.nativeKey.substringAfter('.'),
+                    requireNotNull(setting.value),
+                )
+            }
+        val temporary = config.resolveSibling("${config.fileName}.tmp")
+        Files.newBufferedWriter(temporary).use { it.write(document.render()) }
+        try {
+            Files.move(
+                temporary,
+                config,
+                StandardCopyOption.REPLACE_EXISTING,
+                StandardCopyOption.ATOMIC_MOVE,
+            )
+        } catch (_: AtomicMoveNotSupportedException) {
+            Files.move(temporary, config, StandardCopyOption.REPLACE_EXISTING)
+        } finally {
+            Files.deleteIfExists(temporary)
+        }
     }
 }
