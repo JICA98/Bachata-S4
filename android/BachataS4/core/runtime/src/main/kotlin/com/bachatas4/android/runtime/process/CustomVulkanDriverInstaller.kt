@@ -37,7 +37,7 @@ class CustomVulkanDriverInstaller(private val installRoot: Path) {
             Files.write(staging.resolve(metadata.libraryName), libraryBytes)
             Files.write(staging.resolve(META_FILE), metadataBytes)
             val finalLibrary = installRoot.resolve(metadata.libraryName).toAbsolutePath()
-            Files.writeString(staging.resolve(ICD_FILE), icdJson(finalLibrary))
+            Files.write(staging.resolve(ICD_FILE), icdJson(finalLibrary).encodeToByteArray())
             deleteTree(installRoot)
             try {
                 Files.move(staging, installRoot, StandardCopyOption.ATOMIC_MOVE)
@@ -53,7 +53,9 @@ class CustomVulkanDriverInstaller(private val installRoot: Path) {
     fun load(): InstalledCustomVulkanDriver? {
         val metadataFile = installRoot.resolve(META_FILE)
         if (!Files.isRegularFile(metadataFile)) return null
-        val metadata = runCatching { json.decodeFromString<Metadata>(Files.readString(metadataFile)) }.getOrNull() ?: return null
+        val metadata = runCatching {
+            json.decodeFromString<Metadata>(Files.readAllBytes(metadataFile).decodeToString())
+        }.getOrNull() ?: return null
         val library = installRoot.resolve(metadata.libraryName)
         val icd = installRoot.resolve(ICD_FILE)
         if (!Files.isRegularFile(library) || !Files.isRegularFile(icd)) return null

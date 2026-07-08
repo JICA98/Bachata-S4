@@ -12,13 +12,5 @@
         <activity
             android:name=".Gate5Activity"
             android:exported="true" />
-        <activity
-            android:name=".Gate6Activity"
-            android:configChanges="keyboardHidden|orientation|screenSize"
-            android:exported="true" />
-        <activity
-            android:name=".Gate7Activity"
-            android:configChanges="keyboardHidden|orientation|screenSize"
-            android:exported="true" />
     </application>
 </manifest>
