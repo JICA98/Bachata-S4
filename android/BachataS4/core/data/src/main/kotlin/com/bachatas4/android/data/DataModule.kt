@@ -29,4 +29,9 @@ object DataModule {
     @Provides
     fun contentImporter(@ApplicationContext context: Context): ContentImporter =
         ContentImporter(context.filesDir, ContentResolverImportSource(context.contentResolver))
+
+    @Provides
+    @Singleton
+    fun runtimeProfileStore(@ApplicationContext context: Context): RuntimeProfileStore =
+        RuntimeProfileStore(context.filesDir)
 }
