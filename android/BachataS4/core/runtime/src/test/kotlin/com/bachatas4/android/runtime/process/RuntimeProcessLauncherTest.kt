@@ -91,6 +91,26 @@ class RuntimeProcessLauncherTest {
     }
 
     @Test
+    fun allowsEveryValidatedBox64Variable() {
+        val request = validRequest(
+            environment = mapOf(
+                "BOX64_DYNAREC_BIGBLOCK" to "3",
+                "BOX64_DYNAREC_FASTNAN" to "0",
+            ),
+        )
+        var captured: ProcessBuilder? = null
+        val launcher = RuntimeProcessLauncher { builder ->
+            captured = builder
+            FakeProcessHandle()
+        }
+
+        launcher.launch(request)
+
+        assertEquals("3", captured!!.environment()["BOX64_DYNAREC_BIGBLOCK"])
+        assertEquals("0", captured!!.environment()["BOX64_DYNAREC_FASTNAN"])
+    }
+
+    @Test
     fun redirectsChildStreamsSoFullPipesCannotBlockRuntime() {
         val request = validRequest()
         var captured: ProcessBuilder? = null

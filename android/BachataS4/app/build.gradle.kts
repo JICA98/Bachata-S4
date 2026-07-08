@@ -61,4 +61,5 @@ dependencies {
     ksp(libs.kotlin.metadata.jvm)
     androidTestImplementation(libs.androidx.test.runner)
     testImplementation(libs.junit)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

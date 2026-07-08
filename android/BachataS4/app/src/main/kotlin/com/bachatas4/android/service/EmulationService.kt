@@ -13,6 +13,7 @@ import android.net.LocalSocketAddress
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import com.bachatas4.android.MainActivity
+import com.bachatas4.android.RuntimeLaunchProfileProvider
 import com.bachatas4.android.model.RuntimeErrorCode
 import com.bachatas4.android.runtime.diagnostics.SessionLog
 import com.bachatas4.android.runtime.config.ShadPs4ConfigManager
@@ -26,6 +27,7 @@ import com.bachatas4.android.runtime.process.RuntimeProcessLauncher
 import com.bachatas4.android.runtime.process.RuntimeProcessRequest
 import com.bachatas4.android.runtime.process.RuntimeVulkanDriver
 import com.bachatas4.android.runtime.process.VulkanDriverConfiguration
+import dagger.hilt.android.AndroidEntryPoint
 import com.bachatas4.android.runtime.session.ManagedSession
 import com.bachatas4.android.runtime.session.ManagedSessionState
 import com.winlator.xconnector.UnixSocketConfig
@@ -39,6 +41,7 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeoutException
+import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -52,7 +55,10 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 
+@AndroidEntryPoint
 class EmulationService : Service() {
+    @Inject lateinit var launchProfileProvider: RuntimeLaunchProfileProvider
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private var sessionJob: Job? = null
     @Volatile private var process: RuntimeProcessHandle? = null
@@ -120,6 +126,11 @@ class EmulationService : Service() {
             val eboot = File(gameRoot, "eboot.bin")
             require(eboot.isFile) { "Imported eboot.bin is missing" }
             sessionLog.info("Content", "validated game root and eboot.bin")
+            val launchProfile = launchProfileProvider.resolve(gameId)
+            sessionLog.info(
+                "Config",
+                "schema=${launchProfile.schemaVersion} settings=${launchProfileProvider.explicitSettingIds(launchProfile).joinToString(",")}",
+            )
 
             ManagedSession.update(ManagedSessionState.Preparing("runtime"))
             val installedRuntime = installRuntime()
@@ -153,10 +164,10 @@ class EmulationService : Service() {
             )
             sessionLog.info("Vulkan", "driver=$vulkanDriver box64Mode=${driverConfiguration.box64Mode}")
             val runtimeHome = filesDir.toPath().resolve("runtime-home")
-            ShadPs4ConfigManager.applyAndroidCompatibilityProfile(runtimeHome)
+            ShadPs4ConfigManager.write(runtimeHome, launchProfile)
             sessionLog.info("Vulkan", "persistent pipeline cache enabled home=$runtimeHome")
             val environment = runtimeEnvironment(installedRuntime, runtimeHome, socketRoot, xServer.display) +
-                driverConfiguration.environment
+                driverConfiguration.environment + launchProfileProvider.box64Environment(launchProfile)
             process = RuntimeProcessLauncher().launch(
                 RuntimeProcessRequest(
                     nativeLibraryDir = nativeLibraryDir,

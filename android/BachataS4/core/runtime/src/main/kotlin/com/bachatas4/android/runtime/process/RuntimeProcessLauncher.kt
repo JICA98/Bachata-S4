@@ -124,7 +124,7 @@ class RuntimeProcessLauncher(
         builder.environment().apply {
             clear()
             request.environment.forEach { (name, value) ->
-                if (name in ALLOWED_ENVIRONMENT) put(name, value)
+                if (name in ALLOWED_ENVIRONMENT || BOX64_ENVIRONMENT.matches(name)) put(name, value)
             }
         }
         return starter.start(builder)
@@ -159,6 +159,7 @@ class RuntimeProcessLauncher(
             "VK_ICD_FILENAMES",
             "GLIBC_TUNABLES",
         )
+        val BOX64_ENVIRONMENT = Regex("BOX64_[A-Z0-9_]+")
     }
 }
 
