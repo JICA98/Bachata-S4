@@ -4,7 +4,7 @@
 
 **Goal:** Add complete global/per-game shadPS4 and Box64 configuration, trusted Turnip download/ZIP import without bundled drivers, four-controller mapping, and editable touch layouts to the Android app.
 
-**Architecture:** Versioned declarative catalogs drive typed Compose controls and serialization. `core:data` persists sparse profiles, `core:runtime` validates and resolves them into shadPS4 TOML, Box64 environment, driver, and input snapshots, and feature modules render settings/driver/input workflows. Runtime launch consumes one immutable resolved profile.
+**Architecture:** Versioned declarative catalogs drive typed Compose controls and serialization. `core:data` persists sparse profiles, `core:runtime` validates and resolves them into shadPS4 JSON, Box64 environment, driver, and input snapshots, and feature modules render settings/driver/input workflows. Runtime launch consumes one immutable resolved profile.
 
 **Tech Stack:** Kotlin 2.4, Jetpack Compose Material 3, Hilt, kotlinx.serialization, DataStore/file-backed atomic persistence, Room game lookup, Java `HttpURLConnection`, Node.js packaging/schema scripts, C++20 shadPS4 runtime bridge, JUnit 4.
 
@@ -17,7 +17,7 @@
 - Trusted remote source is only `v3kt0r-87/Mesa-Turnip-Builder` and only `*-EMULATOR.zip` assets.
 - Support local ZIP import; reject unsafe or incompatible archives.
 - Do not package any Turnip shared object, ICD manifest, or archive in runtime assets or APK.
-- Preserve unknown valid TOML keys and unknown `BOX64_*` entries.
+- Preserve unknown valid shadPS4 JSON keys and unknown `BOX64_*` entries.
 - Use TDD: verify each new test fails for the intended reason before implementation.
 - Preserve unrelated dirty worktree changes and submodule state.
 
@@ -98,7 +98,7 @@ Parser requirements: nonblank unique IDs/native keys, numeric range ordering, no
 
 Generator must:
 
-1. extract all persisted shadPS4 keys from settings structs plus `TransferSettings()` TOML sections;
+1. extract all persisted shadPS4 keys from settings structs and their JSON serialization groups;
 2. extract every `### BOX64_*` heading and its documented value domain/default;
 3. merge human labels, help, ranges, risk, scope, and read-only reasons from metadata;
 4. fail when a discovered key lacks metadata or metadata references no discovered key;
@@ -167,7 +167,7 @@ Expected: FAIL because profile classes/store do not exist.
 data class RuntimeProfile(
     val schemaVersion: Int = CURRENT_SCHEMA_VERSION,
     val values: Map<String, JsonElement> = emptyMap(),
-    val unknownToml: Map<String, JsonElement> = emptyMap(),
+    val unknownShadPs4: Map<String, JsonElement> = emptyMap(),
     val unknownBox64: Map<String, String> = emptyMap(),
     val driverId: String? = null,
     val controllerSlots: List<ControllerProfile> = emptyList(),
@@ -199,53 +199,55 @@ git add android/BachataS4/core/runtime/src/main/kotlin/com/bachatas4/android/run
 git commit -m "feat(android): persist runtime profiles"
 ```
 
-### Task 3: Serialize shadPS4 TOML and Box64 environment
+### Task 3: Serialize shadPS4 JSON and Box64 environment
 
 **Files:**
-- Create: `android/BachataS4/core/runtime/src/main/kotlin/com/bachatas4/android/runtime/settings/LosslessTomlDocument.kt`
+- Create: `android/BachataS4/core/runtime/src/main/kotlin/com/bachatas4/android/runtime/settings/ShadPs4JsonCodec.kt`
 - Create: `android/BachataS4/core/runtime/src/main/kotlin/com/bachatas4/android/runtime/settings/Box64EnvironmentCodec.kt`
 - Modify: `android/BachataS4/core/runtime/src/main/kotlin/com/bachatas4/android/runtime/config/ShadPs4ConfigManager.kt`
-- Test: `android/BachataS4/core/runtime/src/test/kotlin/com/bachatas4/android/runtime/settings/LosslessTomlDocumentTest.kt`
+- Test: `android/BachataS4/core/runtime/src/test/kotlin/com/bachatas4/android/runtime/settings/ShadPs4JsonCodecTest.kt`
 - Test: `android/BachataS4/core/runtime/src/test/kotlin/com/bachatas4/android/runtime/settings/Box64EnvironmentCodecTest.kt`
 - Test: `android/BachataS4/core/runtime/src/test/kotlin/com/bachatas4/android/runtime/config/ShadPs4ConfigManagerTest.kt`
 
 **Interfaces:**
-- Produces: `ShadPs4ConfigManager.write(runtimeHome, resolvedProfile)`, `validateRawToml(text)`, `applyRawToml(profile, text)`, `Box64EnvironmentCodec.decode/encode`.
+- Produces: `ShadPs4ConfigManager.write(runtimeHome, resolvedProfile)`, `validateRawJson(text)`, `applyRawJson(profile, text)`, `Box64EnvironmentCodec.decode/encode`.
 - Consumes: `ResolvedRuntimeProfile` from Task 2.
 
 - [ ] **Step 1: Add failing round-trip tests**
 
 ```kotlin
-@Test fun `typed edit preserves unknown section and comment`() {
-    val source = "# keep\n[Future]\nvalue = { nested = true }\n[GPU]\nnullGpu = false\n"
-    val edited = LosslessTomlDocument.parse(source).set("GPU", "nullGpu", JsonPrimitive(true)).render()
-    assertTrue(edited.contains("# keep"))
-    assertTrue(edited.contains("value = { nested = true }"))
-    assertTrue(edited.contains("nullGpu = true"))
+@Test fun `typed edit preserves unknown nested fields`() {
+    val source = """{"Future":{"nested":true},"GPU":{"null_gpu":false}}"""
+    val edited = ShadPs4JsonCodec.parse(source)
+        .set("GPU", "null_gpu", JsonPrimitive(true))
+        .render()
+    assertTrue(edited.contains("\"Future\""))
+    assertTrue(edited.contains("\"nested\": true"))
+    assertTrue(edited.contains("\"null_gpu\": true"))
 }
 ```
 
-Test all supported scalar/list forms, escaped strings, duplicate key rejection, malformed raw TOML, duplicate Box64 keys, launch-owned key rejection, and deterministic output.
+Test all JSON scalar/list/object forms, malformed or non-object raw JSON, unknown-field preservation, duplicate Box64 keys, launch-owned key rejection, and deterministic output.
 
 - [ ] **Step 2: Run tests and verify RED**
 
-Run: `cd android/BachataS4 && ./gradlew :core:runtime:testDebugUnitTest --tests '*Toml*' --tests '*Box64Environment*' --tests '*ShadPs4ConfigManager*'`
+Run: `cd android/BachataS4 && ./gradlew :core:runtime:testDebugUnitTest --tests '*ShadPs4Json*' --tests '*Box64Environment*' --tests '*ShadPs4ConfigManager*'`
 
 Expected: FAIL on missing codecs/new manager API.
 
-- [ ] **Step 3: Implement lossless document and environment codec**
+- [ ] **Step 3: Implement JSON document and environment codec**
 
-Parse section headers, assignments, comments, strings, booleans, numbers, arrays, and inline tables while retaining untouched source spans. Known edits replace only the assignment value span. Raw save must fully parse known values and retain unknown spans.
+Parse a top-level JSON object with kotlinx.serialization. Known edits replace only their group/key while unknown groups, keys, nested objects, arrays, and scalar values remain. Render deterministic pretty JSON. Reject malformed input and non-object roots.
 
 Box64 raw format is exactly one `BOX64_NAME=value` per nonblank, noncomment line. Reject duplicates, invalid names, embedded NUL/newline, and launch-owned keys.
 
 - [ ] **Step 4: Replace compatibility-profile overwrite**
 
-Remove unconditional hardcoded TOML replacement. Write a resolved config atomically, retaining required Android compatibility values as resolver constraints with reasons.
+Remove unconditional hardcoded JSON replacement. Write resolved `.local/share/shadPS4/config.json` atomically, retaining required Android compatibility values as resolver constraints with reasons.
 
 - [ ] **Step 5: Run tests and verify GREEN**
 
-Run: `cd android/BachataS4 && ./gradlew :core:runtime:testDebugUnitTest --tests '*Toml*' --tests '*Box64Environment*' --tests '*ShadPs4ConfigManager*'`
+Run: `cd android/BachataS4 && ./gradlew :core:runtime:testDebugUnitTest --tests '*ShadPs4Json*' --tests '*Box64Environment*' --tests '*ShadPs4ConfigManager*'`
 
 Expected: PASS.
 
@@ -281,7 +283,7 @@ Expected: FAIL because provider is absent.
 
 - [ ] **Step 3: Implement provider and service integration**
 
-Resolve before display/process startup. Write TOML, verify selected driver, build Box64 env, then construct `RuntimeProcessRequest`. Throw a typed configuration error before process launch on any invalid state.
+Resolve before display/process startup. Write JSON, verify selected driver, build Box64 env, then construct `RuntimeProcessRequest`. Throw a typed configuration error before process launch on any invalid state.
 
 - [ ] **Step 4: Run tests and verify GREEN**
 
@@ -559,7 +561,7 @@ git commit -m "feat(android): add comprehensive settings UI"
 - Test: `android/BachataS4/feature/settings/src/test/kotlin/com/bachatas4/android/feature/settings/ProfileTransferTest.kt`
 
 **Interfaces:**
-- Produces: draft/validate/save for TOML and Box64; JSON profile import/export via Android document picker.
+- Produces: draft/validate/save for shadPS4 JSON and Box64; JSON profile import/export via Android document picker.
 - Consumes: codecs/store from Tasks 2-3.
 
 - [ ] **Step 1: Write failing draft safety tests**
@@ -778,7 +780,7 @@ git commit -m "feat(android): add touch layout editor"
 - Test: `android/BachataS4/core/data/src/test/kotlin/com/bachatas4/android/data/LegacyRuntimeSettingsMigrationTest.kt`
 
 **Interfaces:**
-- Produces: routes for global settings, game settings, drivers, controller slot, touch editor, raw TOML, raw Box64; typed launch-blocking errors.
+- Produces: routes for global settings, game settings, drivers, controller slot, touch editor, raw shadPS4 JSON, raw Box64; typed launch-blocking errors.
 - Consumes: all prior tasks.
 
 - [ ] **Step 1: Write failing route/migration tests**

@@ -15,7 +15,7 @@ This design includes:
 - Android-specific runtime settings and launch diagnostics.
 - Every documented `BOX64_*` behavior variable in `runtime/sources/box64/docs/USAGE.md`.
 - Global settings and per-game overrides.
-- Typed settings screens and validated raw `config.toml` and Box64 environment editors.
+- Typed settings screens and validated raw `config.json` and Box64 environment editors.
 - Turnip release discovery from one trusted repository, ZIP import, installed-driver management, and global/per-game driver selection.
 - Four physical controller slots, binding capture/remapping, and editable touch layouts.
 - Removal of all bundled Turnip binaries and archives from managed runtime assets and APKs.
@@ -27,7 +27,7 @@ Launch-owned process wiring remains visible but read-only: generated `HOME`, `DI
 ### Module boundaries
 
 - `core:data` owns versioned profile persistence, global/per-game merge semantics, migrations, and profile import/export.
-- `core:runtime` owns setting schemas, typed values, validation, TOML and environment serialization, resolved launch snapshots, Turnip installation, and GitHub release access.
+- `core:runtime` owns setting schemas, typed values, validation, JSON and environment serialization, resolved launch snapshots, Turnip installation, and GitHub release access.
 - `feature:settings` owns category navigation, search, typed editors, raw editors, scope selection, and diagnostics.
 - A new `feature:drivers` Gradle module owns release browsing, download/import progress, installed-driver management, and selection.
 - `feature:session` owns physical-controller binding UI, touch-layout editing, and application of resolved input profiles to the existing controller transport.
@@ -58,7 +58,7 @@ A profile contains:
 
 - schema version;
 - sparse typed setting values keyed by stable ID;
-- unknown shadPS4 TOML fields;
+- unknown shadPS4 JSON fields;
 - unknown Box64 environment entries;
 - selected driver ID;
 - four controller-slot profiles;
@@ -77,13 +77,13 @@ Profile writes use a temporary file and atomic move. Migrations make a backup be
 
 ## shadPS4 and Box64 serialization
 
-At launch, the resolver creates one immutable `ResolvedRuntimeProfile`. `ShadPs4ConfigManager` writes its shadPS4 portion to the runtime home `config.toml` without discarding unknown TOML fields. The Box64 serializer adds documented user behavior variables to the app-owned base environment. User values cannot replace launch-owned paths or sockets.
+At launch, the resolver creates one immutable `ResolvedRuntimeProfile`. `ShadPs4ConfigManager` writes its shadPS4 portion to runtime-home `.local/share/shadPS4/config.json` without discarding unknown JSON fields. The Box64 serializer adds documented user behavior variables to the app-owned base environment. User values cannot replace launch-owned paths or sockets.
 
 Typed values are validated before persistence and again during resolution. Invalid profiles block launch and report the exact native key, value, and constraint. Values are never silently clamped.
 
 Raw editors operate on drafts:
 
-- `config.toml` editor parses TOML, maps known keys into typed values, preserves unknown keys, and shows conflicts before save.
+- `config.json` editor parses JSON, maps known keys into typed values, preserves unknown keys, and shows conflicts before save.
 - Box64 editor accepts one `KEY=VALUE` per line, rejects malformed names/duplicates, maps known keys into typed values, and preserves unknown `BOX64_*` entries.
 - Validate is available without saving. Save is explicit. Invalid drafts never reach launch.
 
@@ -168,7 +168,7 @@ Edit mode supports drag, resize, hide/show, reorder, and reset. Bounds validatio
 2. `EmulationService` requests a resolved profile for the game ID.
 3. Resolver merges defaults, global values, per-game overrides, and declared compatibility constraints.
 4. Validator verifies setting values, binding integrity, selected driver availability, and raw unknown entries.
-5. Config writer atomically updates runtime-home `config.toml`.
+5. Config writer atomically updates runtime-home `.local/share/shadPS4/config.json`.
 6. Environment builder combines app-owned launch wiring, Box64 values, and selected driver environment.
 7. Session receives resolved controller/touch profiles and starts the backend.
 8. Session log records profile schema version, explicit override IDs, compatibility constraints, and driver hash. Sensitive/raw values and unnecessary absolute user paths are omitted.
@@ -191,7 +191,7 @@ TDD is required for implementation. Primary tests:
 - shadPS4 schema coverage against native settings definitions;
 - Box64 schema coverage against `USAGE.md`;
 - defaults, ranges, enums, unknown fields, merge precedence, resets, and migrations;
-- TOML/environment golden round trips and atomic write failures;
+- JSON/environment golden round trips and atomic write failures;
 - raw editor parsing and conflict handling;
 - GitHub response parsing, cache behavior, release filtering, and rate-limit failures;
 - hostile ZIP corpus, ELF validation, ICD rewriting, hashes, and atomic promotion;
@@ -204,7 +204,7 @@ Final verification runs runtime unit tests, Android unit tests, `lintDebug`, and
 
 ## Compatibility and migration
 
-Existing Vulkan preference values referencing bundled drivers migrate to System Vulkan unless a matching separately installed driver exists. Existing imported custom driver data is discovered and migrated into the versioned installed-driver registry after validation. Existing Android compatibility TOML values become explicit compatibility constraints, preserving current boot behavior while allowing the UI to explain them.
+Existing Vulkan preference values referencing bundled drivers migrate to System Vulkan unless a matching separately installed driver exists. Existing imported custom driver data is discovered and migrated into the versioned installed-driver registry after validation. Existing Android compatibility JSON values become explicit compatibility constraints, preserving current boot behavior while allowing the UI to explain them.
 
 No game content or log migration is required.
 
