@@ -14,6 +14,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -24,6 +27,14 @@ import com.bachatas4.android.runtime.session.ManagedSession
 import com.bachatas4.android.runtime.session.ManagedSessionState
 import com.bachatas4.android.runtime.session.RuntimeSurface
 import com.bachatas4.android.feature.session.controller.FixedControllerOverlay
+import com.bachatas4.android.feature.session.controller.TouchLayout
+import com.bachatas4.android.feature.session.controller.TouchLayoutRepository
+import com.bachatas4.android.data.RuntimeProfileStore
+import com.bachatas4.android.runtime.settings.ProfileScope
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
 
 @Composable
 fun SessionScreen(
@@ -31,10 +42,17 @@ fun SessionScreen(
     viewModel: SessionViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
+    val dependencies = remember { EntryPointAccessors.fromApplication(context.applicationContext, TouchLayoutDependencies::class.java) }
+    var touchLayout by remember { mutableStateOf(TouchLayout()) }
     val state by viewModel.state.collectAsState()
     val frames by viewModel.frameTelemetry.collectAsState()
     val device by viewModel.deviceTelemetry.collectAsState()
-    LaunchedEffect(gameId) { viewModel.launch(gameId) }
+    LaunchedEffect(gameId) {
+        val global = dependencies.runtimeProfileStore().load(ProfileScope.Global)
+        val game = dependencies.runtimeProfileStore().load(ProfileScope.Game(gameId))
+        touchLayout = dependencies.touchLayoutRepository().load(game.touchLayoutId ?: global.touchLayoutId)
+        viewModel.launch(gameId)
+    }
     Column(modifier = Modifier.fillMaxSize()) {
         Box(modifier = Modifier.weight(1f)) {
             AndroidView(
@@ -55,7 +73,7 @@ fun SessionScreen(
                     }
                 },
             )
-            FixedControllerOverlay(onSnapshot = ManagedSession::submitController)
+            FixedControllerOverlay(layout = touchLayout, onSnapshot = ManagedSession::submitController)
             Text(
                 text = "FPS %.1f (%.1f ms)  GPU %s  RAM %d/%d MB".format(
                     frames.fps, frames.frameTimeMs, device.gpuLoad, device.ramUsedMb, device.ramTotalMb,
@@ -75,6 +93,13 @@ fun SessionScreen(
             },
         ) { Text("Stop") }
     }
+}
+
+@EntryPoint
+@InstallIn(SingletonComponent::class)
+interface TouchLayoutDependencies {
+    fun runtimeProfileStore(): RuntimeProfileStore
+    fun touchLayoutRepository(): TouchLayoutRepository
 }
 
 private fun ManagedSessionState.label(): String = when (this) {

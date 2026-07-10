@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.compose.compiler)
     alias(libs.plugins.hilt)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -29,6 +30,7 @@ dependencies {
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
+    implementation(libs.kotlinx.serialization.json)
     testImplementation(libs.junit)
     ksp(libs.hilt.compiler)
     ksp(libs.kotlin.metadata.jvm)

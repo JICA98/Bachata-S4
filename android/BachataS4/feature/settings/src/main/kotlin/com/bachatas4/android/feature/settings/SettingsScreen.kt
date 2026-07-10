@@ -31,6 +31,7 @@ import com.bachatas4.android.runtime.settings.ProfileScope
 import com.bachatas4.android.runtime.settings.RuntimeSettingSpec
 import com.bachatas4.android.runtime.settings.SettingKind
 import com.bachatas4.android.feature.settings.input.ControllerMappingScreen
+import com.bachatas4.android.feature.settings.input.TouchLayoutEditorScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -47,12 +48,17 @@ fun SettingsScreen(
     val state by viewModel.state.collectAsState()
     var showRaw by remember { mutableStateOf(false) }
     var showControllers by remember { mutableStateOf(false) }
+    var showTouchLayout by remember { mutableStateOf(false) }
     if (showRaw) {
         RawConfigScreen(scope = state.scope, onBack = { showRaw = false })
         return
     }
     if (showControllers) {
         ControllerMappingScreen(scope = state.scope, onBack = { showControllers = false })
+        return
+    }
+    if (showTouchLayout) {
+        TouchLayoutEditorScreen(scope = state.scope, onBack = { showTouchLayout = false })
         return
     }
     val context = LocalContext.current
@@ -79,6 +85,7 @@ fun SettingsScreen(
         onOpenDrivers = onOpenDrivers,
         onOpenRaw = { showRaw = true },
         onOpenControllers = { showControllers = true },
+        onOpenTouchLayout = { showTouchLayout = true },
         onRuntime = viewModel::selectRuntime,
         onSearch = viewModel::search,
         onScope = viewModel::selectScope,
@@ -98,6 +105,7 @@ private fun SettingsContent(
     onOpenDrivers: () -> Unit,
     onOpenRaw: () -> Unit,
     onOpenControllers: () -> Unit,
+    onOpenTouchLayout: () -> Unit,
     onRuntime: (SettingsRuntime) -> Unit,
     onSearch: (String) -> Unit,
     onScope: (ProfileScope) -> Unit,
@@ -116,6 +124,7 @@ private fun SettingsContent(
             Button(onClick = onOpenDrivers) { Text("Turnip drivers") }
             Button(onClick = onOpenRaw) { Text("Raw") }
             Button(onClick = onOpenControllers) { Text("Controllers") }
+            Button(onClick = onOpenTouchLayout) { Text("Touch layout") }
             Button(onClick = onImport) { Text("Import JSON") }
             Button(onClick = onExport) { Text("Export JSON") }
         }

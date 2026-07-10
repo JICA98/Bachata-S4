@@ -7,8 +7,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -21,17 +21,15 @@ import kotlin.math.min
 @Composable
 fun FixedControllerOverlay(
     modifier: Modifier = Modifier,
+    layout: TouchLayout = TouchLayout(),
     onSnapshot: (ControllerSnapshot) -> Unit,
 ) {
-    val state = remember { TouchControllerState() }
-    DisposableEffect(Unit) {
-        onDispose {
-            state.cancelAll()
-            onSnapshot(ControllerSnapshot.Neutral)
-        }
+    val state = remember(layout) { TouchControllerState(layout) }
+    DisposableEffect(state) {
+        onDispose { state.cancelAll(); onSnapshot(ControllerSnapshot.Neutral) }
     }
     Canvas(
-        modifier = modifier.fillMaxSize().pointerInput(Unit) {
+        modifier = modifier.fillMaxSize().pointerInput(layout) {
             awaitPointerEventScope {
                 while (true) {
                     val event = awaitPointerEvent()
@@ -52,36 +50,21 @@ fun FixedControllerOverlay(
             }
         },
     ) {
-        val sx = size.width / TouchControllerState.LogicalWidth
-        val sy = size.height / TouchControllerState.LogicalHeight
-        val scale = min(sx, sy)
-        val fill = Color.White.copy(alpha = 0.09f)
-        val outline = Color.White.copy(alpha = 0.32f)
+        val densityScale = min(size.width / 1920f, size.height / 1080f)
+        val fill = Color.White.copy(alpha = layout.opacity * 0.3f)
+        val outline = Color.White.copy(alpha = layout.opacity)
         val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = android.graphics.Color.argb(180, 255, 255, 255)
+            color = android.graphics.Color.argb((layout.opacity * 255).toInt(), 255, 255, 255)
             textAlign = Paint.Align.CENTER
-            textSize = 38f * scale
+            textSize = 26f * densityScale
         }
-        fun center(x: Float, y: Float) = Offset(x * sx, y * sy)
-        fun control(x: Float, y: Float, radius: Float, label: String) {
-            drawCircle(fill, radius * scale, center(x, y))
-            drawCircle(outline, radius * scale, center(x, y), style = Stroke(3f * scale))
-            drawContext.canvas.nativeCanvas.drawText(label, x * sx, y * sy + 13f * scale, textPaint)
+        layout.controls.filter(TouchControlPlacement::visible).forEach { control ->
+            val width = control.width * size.width * layout.scale
+            val height = control.height * size.height * layout.scale
+            val topLeft = Offset(control.centerX * size.width - width / 2f, control.centerY * size.height - height / 2f)
+            drawRoundRect(fill, topLeft, Size(width, height), CornerRadius(min(width, height) / 2f))
+            drawRoundRect(outline, topLeft, Size(width, height), CornerRadius(min(width, height) / 2f), style = Stroke(3f * densityScale))
+            drawContext.canvas.nativeCanvas.drawText(control.control, control.centerX * size.width, control.centerY * size.height + 9f * densityScale, textPaint)
         }
-        control(TouchControllerState.LEFT_STICK_X, TouchControllerState.STICK_Y, TouchControllerState.STICK_RADIUS, "L")
-        control(TouchControllerState.RIGHT_STICK_X, TouchControllerState.STICK_Y, TouchControllerState.STICK_RADIUS, "R")
-        TouchControllerState.dpadButtons.forEach { control(it.x, it.y, TouchControllerState.DPAD_RADIUS, it.label) }
-        TouchControllerState.faceButtons.forEach { control(it.x, it.y, TouchControllerState.BUTTON_RADIUS, it.label) }
-        listOf(
-            Triple(40f, "L2", 200f), Triple(260f, "L1", 200f),
-            Triple(1460f, "R1", 200f), Triple(1680f, "R2", 200f),
-        ).forEach { (x, label, width) ->
-            drawRoundRect(fill, center(x, 30f), Size(width * sx, 90f * sy), CornerRadius(18f * scale))
-            drawContext.canvas.nativeCanvas.drawText(label, (x + width / 2f) * sx, 92f * sy, textPaint)
-        }
-        drawRoundRect(fill, center(820f, 30f), Size(280f * sx, 130f * sy), CornerRadius(20f * scale))
-        drawContext.canvas.nativeCanvas.drawText("TOUCH", 960f * sx, 108f * sy, textPaint)
-        drawRoundRect(fill, center(1120f, 170f), Size(140f * sx, 80f * sy), CornerRadius(18f * scale))
-        drawContext.canvas.nativeCanvas.drawText("OPT", 1190f * sx, 224f * sy, textPaint)
     }
 }
