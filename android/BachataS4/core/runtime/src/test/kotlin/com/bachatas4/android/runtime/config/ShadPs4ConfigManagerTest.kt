@@ -39,7 +39,7 @@ class ShadPs4ConfigManagerTest {
         assertTrue(vulkan.getValue("pipeline_cache_enabled").jsonPrimitive.boolean)
         assertFalse(vulkan.getValue("pipeline_cache_archived").jsonPrimitive.boolean)
         assertFalse(vulkan.getValue("vkvalidation_core_enabled").jsonPrimitive.boolean)
-        assertTrue(root.getValue("General").jsonObject.getValue("dev_kit_mode").jsonPrimitive.boolean)
+        assertFalse(root.getValue("General").jsonObject.getValue("dev_kit_mode").jsonPrimitive.boolean)
         assertFalse(root.getValue("Log").jsonObject.getValue("sync").jsonPrimitive.boolean)
     }
 

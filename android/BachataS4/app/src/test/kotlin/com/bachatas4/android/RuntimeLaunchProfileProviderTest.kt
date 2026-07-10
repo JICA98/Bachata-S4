@@ -35,13 +35,14 @@ class RuntimeLaunchProfileProviderTest {
         val provider = RuntimeLaunchProfileProvider(
             store,
             catalog,
-            mapOf(devKit.id to CompatibilityConstraint(JsonPrimitive(true), "Required on Android")),
+            mapOf(devKit.id to CompatibilityConstraint(JsonPrimitive(false), "Retail memory on Android")),
         )
 
         val resolved = provider.resolve("CUSA00001")
 
         assertEquals(ValueSource.GAME, resolved.settings.getValue(boxLog.id).source)
         assertEquals(ValueSource.COMPATIBILITY, resolved.settings.getValue(devKit.id).source)
+        assertEquals(JsonPrimitive(false), resolved.settings.getValue(devKit.id).value)
         assertEquals(
             mapOf("BOX64_LOG" to "2", "BOX64_PROFILE" to "default"),
             provider.box64Environment(resolved),

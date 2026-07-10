@@ -16,6 +16,7 @@ warn()    { echo -e "${YELLOW}[WARN]${NC} $*"; }
 error()   { echo -e "${RED}[ERROR]${NC} $*" >&2; exit 1; }
 
 VARIANT="debug"
+FLAVOR="fdroid"
 UNINSTALL_FIRST=false
 BUNDLE_ONLY=false
 
@@ -29,6 +30,19 @@ while [[ $# -gt 0 ]]; do
         debug|release)
             VARIANT="$1"
             ;;
+        --fdroid)
+            FLAVOR="fdroid"
+            ;;
+        --playstore)
+            FLAVOR="playstore"
+            ;;
+        --flavor)
+            if [[ $# -lt 2 ]]; then
+                error "Missing argument for --flavor"
+            fi
+            FLAVOR="$2"
+            shift
+            ;;
         --uninstall-first)
             UNINSTALL_FIRST=true
             ;;
@@ -36,12 +50,13 @@ while [[ $# -gt 0 ]]; do
             BUNDLE_ONLY=true
             ;;
         *)
-            error "Unknown argument '$1'. Use: [debug|release] [--uninstall-first] [--bundle-only]"
+            error "Unknown argument '$1'. Use: [debug|release] [--fdroid|--playstore] [--uninstall-first] [--bundle-only]"
             ;;
     esac
     shift
 done
 
+FLAVOR_CAP="${FLAVOR^}"
 VARIANT_CAP="${VARIANT^}"
 
 APP_NAME="BachataS4"
@@ -49,22 +64,22 @@ PACKAGE="com.bachatas4.android"
 ACTIVITY=".MainActivity"
 
 if $BUNDLE_ONLY; then
-    GRADLE_TASK="bundle${VARIANT_CAP}"
-    ARTIFACT_DIR="app/build/outputs/bundle/${VARIANT}"
+    GRADLE_TASK="bundle${FLAVOR_CAP}${VARIANT_CAP}"
+    ARTIFACT_DIR="app/build/outputs/bundle/${FLAVOR}${VARIANT_CAP}"
     ARTIFACT_EXT="aab"
 else
     if [[ "$VARIANT" != "debug" ]]; then
         error "Only debug APKs can be installed directly. Release artifacts require external signing."
     fi
-    GRADLE_TASK="assemble${VARIANT_CAP}"
-    ARTIFACT_DIR="app/build/outputs/apk/${VARIANT}"
+    GRADLE_TASK="assemble${FLAVOR_CAP}${VARIANT_CAP}"
+    ARTIFACT_DIR="app/build/outputs/apk/${FLAVOR}/${VARIANT}"
     ARTIFACT_EXT="apk"
 fi
 
 # Clean up Windows Zone.Identifier metadata files to prevent resource merger errors
 find . -name '*Zone.Identifier' -delete 2>/dev/null || true
 
-info "Building ${APP_NAME} ${ARTIFACT_EXT^^} variant: ${VARIANT_CAP}"
+info "Building ${APP_NAME} ${ARTIFACT_EXT^^} flavor: ${FLAVOR_CAP}, variant: ${VARIANT_CAP}"
 ./gradlew "$GRADLE_TASK" --quiet
 
 if $BUNDLE_ONLY; then

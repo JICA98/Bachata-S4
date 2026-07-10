@@ -18,23 +18,44 @@ fun SetupScreen(
     viewModel: SetupViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
-    SetupContent(state = state, onContinue = onContinue)
+    SetupContent(
+        state = state,
+        downloadRuntimeEnabled = viewModel.downloadRuntime,
+        onDownload = viewModel::downloadRuntime,
+        onContinue = onContinue
+    )
 }
 
 @Composable
 fun SetupContent(
     state: SetupUiState,
+    downloadRuntimeEnabled: Boolean,
+    onDownload: () -> Unit,
     onContinue: () -> Unit,
 ) {
     Column(modifier = Modifier.padding(24.dp)) {
         Text("Setup", style = MaterialTheme.typography.headlineMedium)
-        Text(state.legalNotice)
+        Text(state.legalNotice, modifier = Modifier.padding(vertical = 8.dp))
         Text("SoC: ${state.deviceProfile.soc}")
         Text("GPU: ${state.deviceProfile.gpu}")
         Text("Supported: ${state.deviceProfile.supported}")
         Text("Runtime installed: ${state.runtimeInstalled}")
         Text("Integrity verified: ${state.integrityVerified}")
-        Button(enabled = state.canEnterLibrary, onClick = onContinue) {
+        
+        if (downloadRuntimeEnabled && !state.runtimeInstalled) {
+            Button(
+                onClick = onDownload,
+                modifier = Modifier.padding(top = 16.dp)
+            ) {
+                Text("Download Emulation Assets")
+            }
+        }
+        
+        Button(
+            enabled = state.canEnterLibrary,
+            onClick = onContinue,
+            modifier = Modifier.padding(top = 16.dp)
+        ) {
             Text("Continue")
         }
     }

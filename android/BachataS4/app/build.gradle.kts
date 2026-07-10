@@ -49,19 +49,54 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
+            val isSigningConfigured = signingConfigs.getByName("release").storeFile != null
+            if (isSigningConfigured) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
-    buildFeatures { compose = true }
+    buildFeatures {
+        buildConfig = true
+        compose = true
+    }
+
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("playstore") {
+            dimension = "distribution"
+            buildConfigField("Boolean", "DOWNLOAD_RUNTIME", "false")
+        }
+        create("fdroid") {
+            dimension = "distribution"
+            buildConfigField("Boolean", "DOWNLOAD_RUNTIME", "true")
+        }
+    }
     androidResources {
         noCompress += listOf("zip", "json")
     }
     packaging {
         jniLibs.useLegacyPackaging = true
+    }
+}
+
+androidComponents {
+    beforeVariants { variantBuilder ->
+        val startParameterTasks = gradle.startParameter.taskNames
+        val hasPlaystoreExplicitly = startParameterTasks.any { it.contains("playstore", ignoreCase = true) }
+        val hasGenericAssemble = startParameterTasks.any { 
+            it.endsWith("assemble") || 
+            it.endsWith("assembleDebug") || 
+            it.endsWith("assembleRelease") || 
+            it.endsWith("build") 
+        }
+        
+        if (variantBuilder.flavorName == "playstore" && hasGenericAssemble && !hasPlaystoreExplicitly) {
+            variantBuilder.enable = false
+        }
     }
 }
 

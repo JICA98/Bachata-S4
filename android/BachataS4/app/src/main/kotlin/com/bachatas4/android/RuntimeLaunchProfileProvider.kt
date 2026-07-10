@@ -65,7 +65,10 @@ class RuntimeLaunchProfileProvider internal constructor(
 
     private companion object {
         fun androidCompatibilityConstraints() = mapOf(
-            "general.dev_kit_mode" to CompatibilityConstraint(JsonPrimitive(true), "Required by Android runtime"),
+            "general.dev_kit_mode" to CompatibilityConstraint(
+                JsonPrimitive(false),
+                "Retail memory layout; DevKit expands guest direct memory and regressed Bloodborne on constrained devices",
+            ),
             "log.sync" to CompatibilityConstraint(JsonPrimitive(false), "Avoid blocking Android runtime logging"),
             "vulkan.pipeline_cache_enabled" to CompatibilityConstraint(JsonPrimitive(true), "Preserve Android pipeline cache"),
             "vulkan.pipeline_cache_archived" to CompatibilityConstraint(JsonPrimitive(false), "Use live Android pipeline cache"),

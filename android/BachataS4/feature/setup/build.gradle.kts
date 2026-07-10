@@ -17,6 +17,8 @@ android {
 }
 
 dependencies {
+    implementation(libs.kotlinx.serialization.json)
+    implementation(project(":core:runtime"))
     implementation(project(":core:data"))
     implementation(project(":core:model"))
     implementation(project(":core:designsystem"))

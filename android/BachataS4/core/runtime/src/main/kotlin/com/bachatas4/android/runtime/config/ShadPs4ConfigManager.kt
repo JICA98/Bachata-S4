@@ -33,7 +33,7 @@ object ShadPs4ConfigManager {
         }
         val general = buildJsonObject {
             root["General"]?.jsonObject?.forEach(::put)
-            put("dev_kit_mode", true)
+            put("dev_kit_mode", false)
         }
         val log = buildJsonObject {
             root["Log"]?.jsonObject?.forEach(::put)

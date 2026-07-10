@@ -269,17 +269,23 @@ class EmulationService : Service() {
     }
 
     private fun installRuntime(): Path {
-        val manifest = assets.open("runtime/manifest.json").bufferedReader().use {
-            Json { ignoreUnknownKeys = true }.decodeFromString<RuntimeManifest>(it.readText())
-        }
         val installRoot = File(filesDir, "runtime").toPath()
-        val target = installRoot.resolve(manifest.runtimeVersion)
-        if (target.toFile().isDirectory) return target
-        return assets.open("runtime/runtime.zip").use { bundle ->
-            RuntimeInstaller(installRoot).install(bundle, manifest).getOrElse { error ->
-                if (error is FileAlreadyExistsException && target.toFile().isDirectory) target else throw error
+        val installedDir = installRoot.toFile().listFiles()?.firstOrNull { it.isDirectory && it.name.startsWith("box64-") }
+        if (installedDir != null) return installedDir.toPath()
+
+        if (!com.bachatas4.android.BuildConfig.DOWNLOAD_RUNTIME) {
+            val manifest = assets.open("runtime/manifest.json").bufferedReader().use {
+                Json { ignoreUnknownKeys = true }.decodeFromString<RuntimeManifest>(it.readText())
+            }
+            val target = installRoot.resolve(manifest.runtimeVersion)
+            if (target.toFile().isDirectory) return target
+            return assets.open("runtime/runtime.zip").use { bundle ->
+                RuntimeInstaller(installRoot).install(bundle, manifest).getOrElse { error ->
+                    if (error is FileAlreadyExistsException && target.toFile().isDirectory) target else throw error
+                }
             }
         }
+        throw IllegalStateException("Runtime not installed")
     }
 
     private fun runtimeEnvironment(runtimeRoot: Path, runtimeHome: Path, socketRoot: File, display: String) = mapOf(

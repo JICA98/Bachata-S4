@@ -22,18 +22,20 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         lifecycleScope.launch { legacyRuntimeSettingsMigration.migrate() }
+        val runtimeRoot = java.io.File(filesDir, "runtime")
+        val isRuntimeInstalled = runtimeRoot.listFiles()?.any { it.isDirectory && it.name.startsWith("box64-") } == true
         setContent {
             AppTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
-                    BachataNavHost(startDestination = initialRouteForSoc(Build.SOC_MODEL))
+                    BachataNavHost(startDestination = initialRouteForSoc(Build.SOC_MODEL, isRuntimeInstalled))
                 }
             }
         }
     }
 }
 
-internal fun initialRouteForSoc(soc: String): String =
-    if (soc.equals("SM8650", ignoreCase = true) || soc.equals("SM8750", ignoreCase = true)) {
+internal fun initialRouteForSoc(soc: String, isRuntimeInstalled: Boolean): String =
+    if (isRuntimeInstalled) {
         BachataRoutes.Library
     } else {
         BachataRoutes.Setup

@@ -5,14 +5,14 @@ import org.junit.Test
 
 class MainActivityRouteTest {
     @Test
-    fun qualifiedSnapdragonStartsInLibrary() {
-        assertEquals(BachataRoutes.Library, initialRouteForSoc("SM8650"))
-        assertEquals(BachataRoutes.Library, initialRouteForSoc("sm8750"))
+    fun installedRuntimeStartsInLibrary() {
+        assertEquals(BachataRoutes.Library, initialRouteForSoc("SM8650", isRuntimeInstalled = true))
+        assertEquals(BachataRoutes.Library, initialRouteForSoc("sm8750", isRuntimeInstalled = true))
     }
 
     @Test
-    fun unknownHardwareStartsInSetup() {
-        assertEquals(BachataRoutes.Setup, initialRouteForSoc("Tensor G5"))
+    fun missingRuntimeStartsInSetup() {
+        assertEquals(BachataRoutes.Setup, initialRouteForSoc("Tensor G5", isRuntimeInstalled = false))
     }
 
     @Test
