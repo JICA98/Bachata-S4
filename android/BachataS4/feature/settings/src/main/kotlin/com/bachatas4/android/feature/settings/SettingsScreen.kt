@@ -18,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -38,14 +39,18 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
+import com.bachatas4.android.runtime.session.ManagedSession
+import com.bachatas4.android.runtime.session.ManagedSessionState
 
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
     onOpenDrivers: () -> Unit = {},
+    initialGameId: String? = null,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
+    val sessionState by ManagedSession.state.collectAsState()
     var showRaw by remember { mutableStateOf(false) }
     var showControllers by remember { mutableStateOf(false) }
     var showTouchLayout by remember { mutableStateOf(false) }
@@ -62,6 +67,9 @@ fun SettingsScreen(
         return
     }
     val context = LocalContext.current
+    LaunchedEffect(initialGameId) {
+        if (initialGameId != null) viewModel.selectScope(ProfileScope.Game(initialGameId))
+    }
     val scope = rememberCoroutineScope()
     val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri ?: return@rememberLauncherForActivityResult
@@ -95,6 +103,7 @@ fun SettingsScreen(
         onReset = { viewModel.setValue(it, null) },
         onImport = { importer.launch(arrayOf("application/json")) },
         onExport = { exporter.launch("bachata-runtime-profile.json") },
+        appliesNextLaunch = sessionState is ManagedSessionState.Running || sessionState is ManagedSessionState.Preparing,
     )
 }
 
@@ -115,10 +124,12 @@ private fun SettingsContent(
     onReset: (RuntimeSettingSpec) -> Unit,
     onImport: () -> Unit,
     onExport: () -> Unit,
+    appliesNextLaunch: Boolean,
 ) {
     var gameId by remember { mutableStateOf("") }
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Text("Runtime settings", style = MaterialTheme.typography.headlineMedium)
+        if (appliesNextLaunch) Text("Emulation is active; changes apply next launch.")
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Button(onClick = onBack) { Text("Back") }
             Button(onClick = onOpenDrivers) { Text("Turnip drivers") }

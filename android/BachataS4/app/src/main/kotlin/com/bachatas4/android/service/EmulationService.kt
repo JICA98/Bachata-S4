@@ -157,12 +157,12 @@ class EmulationService : Service() {
             }
             serverSocket = LocalServerSocket(boundSocket.fileDescriptor)
             val nativeLibraryDir = Paths.get(applicationInfo.nativeLibraryDir)
-            val driverConfiguration = VulkanDriverConfiguration.resolve(
-                vulkanDriver,
+            val driverConfiguration = launchProfileProvider.vulkanConfiguration(
+                launchProfile,
                 installedRuntime,
-                File(filesDir, "vulkan-drivers/custom").toPath(),
+                filesDir.toPath(),
             )
-            sessionLog.info("Vulkan", "driver=$vulkanDriver box64Mode=${driverConfiguration.box64Mode}")
+            sessionLog.info("Vulkan", "driver=${launchProfile.driverId} box64Mode=${driverConfiguration.box64Mode}")
             val runtimeHome = filesDir.toPath().resolve("runtime-home")
             ShadPs4ConfigManager.write(runtimeHome, launchProfile)
             sessionLog.info("Vulkan", "persistent pipeline cache enabled home=$runtimeHome")

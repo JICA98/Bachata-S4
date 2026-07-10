@@ -39,6 +39,7 @@ import dagger.hilt.components.SingletonComponent
 @Composable
 fun SessionScreen(
     gameId: String,
+    onOpenDrivers: () -> Unit = {},
     viewModel: SessionViewModel = hiltViewModel(),
 ) {
     val context = LocalContext.current
@@ -84,6 +85,9 @@ fun SessionScreen(
             )
         }
         Text(state.label(), modifier = Modifier.padding(12.dp))
+        if (state is ManagedSessionState.Failed && (state as ManagedSessionState.Failed).detail.contains("not installed")) {
+            Button(onClick = onOpenDrivers, modifier = Modifier.padding(horizontal = 12.dp)) { Text("Open Turnip drivers") }
+        }
         Button(
             modifier = Modifier.padding(12.dp),
             onClick = {

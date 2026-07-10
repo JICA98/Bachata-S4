@@ -9,6 +9,10 @@ import com.bachatas4.android.runtime.settings.RuntimeProfileResolver
 import com.bachatas4.android.runtime.settings.RuntimeSettingCatalog
 import com.bachatas4.android.runtime.settings.SettingKind
 import com.bachatas4.android.runtime.settings.ValueSource
+import com.bachatas4.android.runtime.driver.DriverRegistry
+import com.bachatas4.android.runtime.process.RuntimeVulkanDriver
+import com.bachatas4.android.runtime.process.VulkanDriverConfiguration
+import java.nio.file.Path
 import javax.inject.Inject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
@@ -52,6 +56,13 @@ class RuntimeLaunchProfileProvider internal constructor(
     fun explicitSettingIds(profile: ResolvedRuntimeProfile): List<String> =
         profile.settings.values.filter { it.source != ValueSource.DEFAULT }.map { it.spec.id }.sorted()
 
+    fun vulkanConfiguration(profile: ResolvedRuntimeProfile, runtimeRoot: Path, filesDir: Path): VulkanDriverConfiguration {
+        if (profile.driverId == "system") return VulkanDriverConfiguration.resolve(RuntimeVulkanDriver.SYSTEM, runtimeRoot)
+        val driver = DriverRegistry(filesDir.resolve("vulkan-drivers/installed")).resolve(profile.driverId)
+            ?: throw MissingRuntimeDriverException(profile.driverId)
+        return VulkanDriverConfiguration.resolve(driver, runtimeRoot)
+    }
+
     private companion object {
         fun androidCompatibilityConstraints() = mapOf(
             "general.dev_kit_mode" to CompatibilityConstraint(JsonPrimitive(true), "Required by Android runtime"),
@@ -62,3 +73,7 @@ class RuntimeLaunchProfileProvider internal constructor(
         )
     }
 }
+
+class MissingRuntimeDriverException(val driverId: String) : IllegalStateException(
+    "Selected Vulkan driver '$driverId' is not installed; open Turnip drivers and select another driver",
+)

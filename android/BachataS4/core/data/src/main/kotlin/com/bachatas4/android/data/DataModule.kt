@@ -34,4 +34,18 @@ object DataModule {
     @Singleton
     fun runtimeProfileStore(@ApplicationContext context: Context): RuntimeProfileStore =
         RuntimeProfileStore(context.filesDir)
+
+    @Provides
+    @Singleton
+    fun legacyRuntimeSettingsMigration(
+        @ApplicationContext context: Context,
+        store: RuntimeProfileStore,
+    ): LegacyRuntimeSettingsMigration = LegacyRuntimeSettingsMigration(
+        context.filesDir,
+        store,
+        LegacyDriverSettings {
+            context.getSharedPreferences("emulator_settings", Context.MODE_PRIVATE)
+                .getString("vulkan_driver", null)
+        },
+    )
 }

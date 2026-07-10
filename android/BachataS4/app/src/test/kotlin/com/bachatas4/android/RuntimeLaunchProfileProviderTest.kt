@@ -76,6 +76,19 @@ class RuntimeLaunchProfileProviderTest {
         assertFalse(provider.box64Environment(provider.resolve("CUSA00001")).containsKey("BOX64_PROFILE"))
     }
 
+    @Test
+    fun missingSelectedDriverBlocksLaunchWithActionableId() = runTest {
+        val store = RuntimeProfileStore(temporaryFolder.root)
+        store.update(ProfileScope.Global) { it.copy(driverId = "turnip-0123456789abcdef") }
+        val provider = RuntimeLaunchProfileProvider(store, catalog, emptyMap())
+        val resolved = provider.resolve("CUSA00001")
+
+        val error = assertThrows(MissingRuntimeDriverException::class.java) {
+            provider.vulkanConfiguration(resolved, temporaryFolder.root.toPath(), temporaryFolder.root.toPath())
+        }
+        assertEquals("turnip-0123456789abcdef", error.driverId)
+    }
+
     private fun spec(
         id: String,
         nativeKey: String,

@@ -10,11 +10,18 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import com.bachatas4.android.designsystem.theme.AppTheme
 import dagger.hilt.android.AndroidEntryPoint
+import androidx.lifecycle.lifecycleScope
+import com.bachatas4.android.data.LegacyRuntimeSettingsMigration
+import javax.inject.Inject
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    @Inject lateinit var legacyRuntimeSettingsMigration: LegacyRuntimeSettingsMigration
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        lifecycleScope.launch { legacyRuntimeSettingsMigration.migrate() }
         setContent {
             AppTheme {
                 Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {

@@ -14,4 +14,11 @@ class MainActivityRouteTest {
     fun unknownHardwareStartsInSetup() {
         assertEquals(BachataRoutes.Setup, initialRouteForSoc("Tensor G5"))
     }
+
+    @Test
+    fun exposesGlobalGameDriverAndEditorRoutes() {
+        assertEquals("settings", BachataRoutes.Settings)
+        assertEquals("settings/game/CUSA00001", BachataRoutes.gameSettings("CUSA00001"))
+        assertEquals("drivers", BachataRoutes.Drivers)
+    }
 }

@@ -16,7 +16,9 @@ object BachataRoutes {
     const val Game = "game/{id}"
     const val Session = "session/{id}"
     const val Settings = "settings"
+    const val GameSettings = "settings/game/{id}"
     const val Drivers = "drivers"
+    fun gameSettings(id: String) = "settings/game/$id"
 }
 
 @Composable
@@ -29,6 +31,7 @@ fun BachataNavHost(startDestination: String = BachataRoutes.Setup) {
         composable(BachataRoutes.Library) {
             LibraryScreen(
                 onOpenSettings = { navController.navigate(BachataRoutes.Settings) },
+                onOpenGameSettings = { id -> navController.navigate(BachataRoutes.gameSettings(id)) },
                 onLaunch = { id -> navController.navigate("session/$id") },
             )
         }
@@ -41,14 +44,25 @@ fun BachataNavHost(startDestination: String = BachataRoutes.Setup) {
         composable(BachataRoutes.Drivers) {
             DriverManagerScreen(onBack = { navController.popBackStack() })
         }
+        composable(BachataRoutes.GameSettings) { entry ->
+            SettingsScreen(
+                initialGameId = requireNotNull(entry.arguments?.getString("id")),
+                onBack = { navController.popBackStack() },
+                onOpenDrivers = { navController.navigate(BachataRoutes.Drivers) },
+            )
+        }
         composable(BachataRoutes.Game) {
             LibraryScreen(
                 onOpenSettings = { navController.navigate(BachataRoutes.Settings) },
+                onOpenGameSettings = { id -> navController.navigate(BachataRoutes.gameSettings(id)) },
                 onLaunch = { id -> navController.navigate("session/$id") },
             )
         }
         composable(BachataRoutes.Session) { entry ->
-            SessionScreen(gameId = requireNotNull(entry.arguments?.getString("id")))
+            SessionScreen(
+                gameId = requireNotNull(entry.arguments?.getString("id")),
+                onOpenDrivers = { navController.navigate(BachataRoutes.Drivers) },
+            )
         }
     }
 }

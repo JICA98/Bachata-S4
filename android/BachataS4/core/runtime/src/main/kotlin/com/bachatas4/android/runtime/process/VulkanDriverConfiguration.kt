@@ -49,9 +49,9 @@ data class VulkanDriverConfiguration(
         fun resolve(driver: RuntimeVulkanDriver, runtimeRoot: Path, customDriverRoot: Path? = null): VulkanDriverConfiguration =
             when (driver) {
                 RuntimeVulkanDriver.SYSTEM -> VulkanDriverConfiguration(
-                    box64Mode = Box64Mode.HOST_GLIBC,
+                    box64Mode = Box64Mode.APK_NATIVE,
                     environment = mapOf(
-                        "SDL_VULKAN_LIBRARY" to runtimeRoot.resolve("host/libvulkan.so.1").toString(),
+                        "SDL_VULKAN_LIBRARY" to "libvulkan.so.1",
                     ),
                 )
                 RuntimeVulkanDriver.CUSTOM -> VulkanDriverConfiguration(

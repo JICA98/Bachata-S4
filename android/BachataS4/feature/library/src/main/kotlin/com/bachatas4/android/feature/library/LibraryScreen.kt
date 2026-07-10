@@ -38,6 +38,7 @@ import kotlinx.coroutines.withContext
 @Composable
 fun LibraryScreen(
     onOpenSettings: () -> Unit,
+    onOpenGameSettings: (String) -> Unit = {},
     onLaunch: (String) -> Unit,
     viewModel: LibraryViewModel = hiltViewModel(),
 ) {
@@ -84,6 +85,7 @@ fun LibraryScreen(
         error = error,
         importing = importing,
         onOpenSettings = onOpenSettings,
+        onOpenGameSettings = onOpenGameSettings,
         onImport = { picker.launch(null) },
         onLaunch = onLaunch,
     )
@@ -95,6 +97,7 @@ fun LibraryContent(
     error: String?,
     importing: Boolean,
     onOpenSettings: () -> Unit,
+    onOpenGameSettings: (String) -> Unit,
     onImport: () -> Unit,
     onLaunch: (String) -> Unit,
 ) {
@@ -111,6 +114,7 @@ fun LibraryContent(
         state.games.forEach { game ->
             Text("${game.title} (${game.id})")
             Button(onClick = { onLaunch(game.id) }) { Text("Launch") }
+            Button(onClick = { onOpenGameSettings(game.id) }) { Text("Game settings") }
         }
     }
 }
