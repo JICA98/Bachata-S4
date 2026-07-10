@@ -43,7 +43,7 @@ class SetupViewModel @Inject constructor(
     val state: StateFlow<SetupUiState> = mutableState
 
     init {
-        val soc = android.os.Build.SOC_MODEL
+        val soc = android.os.Build.SOC_MODEL.orEmpty()
         val isSupportedSoc = soc.equals("SM8650", ignoreCase = true) || soc.equals("SM8750", ignoreCase = true)
         val profile = DeviceProfile(
             soc = soc,

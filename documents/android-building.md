@@ -10,10 +10,12 @@
 All runtime inputs and upstream revisions are pinned under `runtime/locks`. Runtime packaging never downloads artifacts; fetch inputs separately, verify their lock hashes, then build from the repository root:
 
 ```bash
+git submodule update --init --recursive --jobs 8
 runtime/scripts/build-shadps4-x86_64.sh
 runtime/scripts/build-box64-host.sh
 node runtime/scripts/package-runtime.mjs
 node runtime/tests/verify-runtime.mjs runtime/locks/components.lock.json
+node runtime/tests/verify-no-bundled-turnip.mjs runtime/build/rootfs
 ```
 
 CI uses `--locks-only` because packaged binaries are intentionally excluded from Git. Release/local packaging must run full verification against generated assets as shown above.
@@ -24,8 +26,14 @@ Build APK from scratch:
 cd android/BachataS4
 export JAVA_HOME=/usr/lib/jvm/java-17-openjdk-amd64
 export ANDROID_HOME=$HOME/Android/Sdk
-./gradlew clean test lintDebug assembleDebug
+./gradlew clean test lintDebug assemblePlaystoreDebug
+cd ../..
+node runtime/tests/verify-apk-runtime.mjs android/BachataS4/app/build/outputs/apk/playstore/debug/app-playstore-debug.apk
 ```
+
+The APK verifier requires both `assets/runtime/manifest.json` and `assets/runtime/runtime.zip`, then inspects the nested runtime ZIP. It fails if any Turnip driver, archive, Freedreno ICD, `vulkan.ad07xx.so`, or `libvulkan_freedreno.so` is bundled. Vulkan loader libraries such as `libvulkan.so.1` remain part of the managed runtime.
+
+Turnip drivers are always installed after app installation. The only trusted remote feed is GitHub Releases from `JICA98/bachata-s4-drivers`; users may also import a local emulator-driver ZIP. The APK never packages a Turnip driver.
 
 ## Device Gates
 
