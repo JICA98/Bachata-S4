@@ -2,11 +2,6 @@
   "schemaVersion": 1,
   "inputs": [
     {
-      "name": "Turnip_v25.3.0_R11.zip",
-      "url": "https://github.com/K11MCH1/AdrenoToolsDrivers/releases/download/v25.3.0-rc.11/Turnip_v25.3.0_R11.zip",
-      "sha256": "0452bdd5e966ca94b58ba7c489db3648df6715d862e38cfa939ec62625293b40"
-    },
-    {
       "name": "glibc-2.43+r22+g8362e8ce10b2-2-x86_64.pkg.tar.zst",
       "url": "https://archive.archlinux.org/packages/g/glibc/glibc-2.43%2Br22%2Bg8362e8ce10b2-2-x86_64.pkg.tar.zst",
       "sha256": "2c20828b3a571b272697671c90b1e3a8c426d6a7e7fb99a242099373f2710fe1"

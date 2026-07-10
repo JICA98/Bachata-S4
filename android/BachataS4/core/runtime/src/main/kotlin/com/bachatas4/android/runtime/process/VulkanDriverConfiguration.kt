@@ -5,6 +5,7 @@ import com.bachatas4.android.runtime.driver.InstalledDriver
 import java.nio.file.Path
 
 enum class RuntimeVulkanDriver {
+    SYSTEM,
     CUSTOM,
     TURNIP_25_0_0,
     TURNIP_25_3_0_R11,
@@ -14,10 +15,10 @@ enum class RuntimeVulkanDriver {
 object RuntimeVulkanDriverPreference {
     const val FILE_NAME = "emulator_settings"
     const val KEY = "vulkan_driver"
-    val DEFAULT = RuntimeVulkanDriver.TURNIP_26_1_0
+    val DEFAULT = RuntimeVulkanDriver.SYSTEM
 
     fun decode(value: String?): RuntimeVulkanDriver =
-        RuntimeVulkanDriver.entries.firstOrNull { it.name == value } ?: DEFAULT
+        if (value == RuntimeVulkanDriver.SYSTEM.name) RuntimeVulkanDriver.SYSTEM else DEFAULT
 }
 
 data class VulkanDriverConfiguration(
@@ -47,6 +48,12 @@ data class VulkanDriverConfiguration(
 
         fun resolve(driver: RuntimeVulkanDriver, runtimeRoot: Path, customDriverRoot: Path? = null): VulkanDriverConfiguration =
             when (driver) {
+                RuntimeVulkanDriver.SYSTEM -> VulkanDriverConfiguration(
+                    box64Mode = Box64Mode.HOST_GLIBC,
+                    environment = mapOf(
+                        "SDL_VULKAN_LIBRARY" to runtimeRoot.resolve("host/libvulkan.so.1").toString(),
+                    ),
+                )
                 RuntimeVulkanDriver.CUSTOM -> VulkanDriverConfiguration(
                     box64Mode = Box64Mode.HOST_GLIBC,
                     environment = mapOf(
