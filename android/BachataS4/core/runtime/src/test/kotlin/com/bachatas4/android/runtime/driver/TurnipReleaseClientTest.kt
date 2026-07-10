@@ -66,8 +66,8 @@ class TurnipReleaseClientTest {
               "published_at":"2026-05-30T21:07:14Z",
               "draft":false,
               "assets":[
-                {"name":"Turnip-26-1.1-EMULATOR.zip","size":3067702,"browser_download_url":"https://github.com/v3kt0r-87/Mesa-Turnip-Builder/releases/download/31_may_2026/Turnip.zip"},
-                {"name":"Turnip-26.1.1-MAGISK-KSU.zip","size":3070797,"browser_download_url":"https://github.com/v3kt0r-87/Mesa-Turnip-Builder/releases/download/31_may_2026/Magisk.zip"}
+                {"name":"Turnip-26-1.1-EMULATOR.zip","size":3067702,"browser_download_url":"https://github.com/JICA98/bachata-s4-drivers/releases/download/31_may_2026/Turnip.zip"},
+                {"name":"Turnip-26.1.1-MAGISK-KSU.zip","size":3070797,"browser_download_url":"https://github.com/JICA98/bachata-s4-drivers/releases/download/31_may_2026/Magisk.zip"}
               ]
             }]
         """.trimIndent()

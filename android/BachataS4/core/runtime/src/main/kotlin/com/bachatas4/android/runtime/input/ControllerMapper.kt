@@ -9,6 +9,13 @@ data class ControllerEvent(
     val value: Float,
 )
 
+data class PhysicalControllerEvent(
+    val deviceId: Int,
+    val device: ControllerDeviceKey,
+    val binding: PhysicalBinding,
+    val value: Float,
+)
+
 class ControllerMapper(
     private val deadzone: Float = DEFAULT_DEADZONE,
 ) {
@@ -25,6 +32,12 @@ class ControllerMapper(
         val normalized = if (abs(clamped) < deadzone) 0f else clamped
         return ControllerEvent(deviceId, timestampMs, control, normalized)
     }
+
+    fun physicalButton(deviceId: Int, device: ControllerDeviceKey, keyCode: Int, pressed: Boolean): PhysicalControllerEvent =
+        PhysicalControllerEvent(deviceId, device, PhysicalBinding(PhysicalBindingKind.BUTTON, keyCode), if (pressed) 1f else 0f)
+
+    fun physicalAxis(deviceId: Int, device: ControllerDeviceKey, axis: Int, rawValue: Float): PhysicalControllerEvent =
+        PhysicalControllerEvent(deviceId, device, PhysicalBinding(PhysicalBindingKind.AXIS, axis), rawValue.coerceIn(-1f, 1f))
 
     companion object {
         const val DEFAULT_DEADZONE = 0.08f

@@ -77,12 +77,23 @@ class SettingsViewModel @Inject constructor(
 
     fun importJson(text: String) {
         viewModelScope.launch {
-            runCatching { store.import(mutableState.value.scope, text) }
+            val scope = mutableState.value.scope
+            runCatching {
+                val profile = ProfileTransfer.import(
+                    text,
+                    catalog.shadPs4 + catalog.box64,
+                    (scope as? ProfileScope.Game)?.gameId,
+                )
+                store.update(scope) { profile }
+            }
                 .onFailure { mutableState.value = mutableState.value.copy(error = it.message) }
         }
     }
 
-    suspend fun exportJson(): String = store.export(mutableState.value.scope)
+    suspend fun exportJson(): String = ProfileTransfer.export(
+        store.load(mutableState.value.scope),
+        catalog.shadPs4 + catalog.box64,
+    )
 
     fun setDiagnostics(runtimeRevision: String, vulkanUuid: String, gameIds: List<String>) {
         mutableState.value = mutableState.value.copy(

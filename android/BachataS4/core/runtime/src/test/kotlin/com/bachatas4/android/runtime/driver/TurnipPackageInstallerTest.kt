@@ -16,7 +16,7 @@ class TurnipPackageInstallerTest {
         val installed = installer.install(
             turnipZip(DriverAbi.ANDROID_BIONIC),
             DriverPackageSource(
-                repository = "v3kt0r-87/Mesa-Turnip-Builder",
+                repository = "JICA98/bachata-s4-drivers",
                 releaseTag = "31_may_2026",
                 assetName = "Turnip-26-1.1-EMULATOR.zip",
             ),

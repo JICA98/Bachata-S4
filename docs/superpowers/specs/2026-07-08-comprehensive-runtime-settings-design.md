@@ -133,7 +133,7 @@ Automated verification fails when a managed runtime or APK contains a Turnip-nam
 
 ### Trusted source
 
-The only remote source is `v3kt0r-87/Mesa-Turnip-Builder`. The app queries GitHub Releases and accepts only release assets ending in `-EMULATOR.zip`. Magisk/KSU assets are never offered. No user-defined repository URL is supported in this version.
+The only remote source is `JICA98/bachata-s4-drivers`. The app queries GitHub Releases and accepts only release assets ending in `-EMULATOR.zip`. Magisk/KSU assets are never offered. No user-defined repository URL is supported in this version.
 
 Release metadata is cached with an expiry and conditional refresh. Offline use lists installed drivers. GitHub errors and rate limiting do not remove cached metadata or installed files.
 

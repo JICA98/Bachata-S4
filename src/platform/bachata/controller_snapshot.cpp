@@ -27,7 +27,7 @@ std::optional<ControllerSnapshot> ParseControllerSnapshot(std::string_view line)
     line.remove_suffix(1);
 
     ControllerSnapshot result{};
-    std::array<bool, 11> seen{};
+    std::array<bool, 12> seen{};
     std::size_t count = 0;
     while (!line.empty()) {
         const auto separator = line.find(' ');
@@ -44,11 +44,14 @@ std::optional<ControllerSnapshot> ParseControllerSnapshot(std::string_view line)
         auto value = token.substr(equals + 1);
         std::size_t index = 0;
         bool valid = false;
-        if (key == "seq") {
+        if (key == "slot") {
             index = 0;
+            valid = ParseNumber(value, result.slot) && result.slot >= 0 && result.slot <= 3;
+        } else if (key == "seq") {
+            index = 1;
             valid = ParseNumber(value, result.sequence);
         } else if (key == "buttons") {
-            index = 1;
+            index = 2;
             if (value.starts_with("0x")) {
                 value.remove_prefix(2);
                 valid = !value.empty() && ParseNumber(value, result.buttons, 16);
@@ -58,19 +61,19 @@ std::optional<ControllerSnapshot> ParseControllerSnapshot(std::string_view line)
         } else {
             int* target = nullptr;
             int maximum = 255;
-            if (key == "lx") index = 2, target = &result.left_x;
-            else if (key == "ly") index = 3, target = &result.left_y;
-            else if (key == "rx") index = 4, target = &result.right_x;
-            else if (key == "ry") index = 5, target = &result.right_y;
-            else if (key == "l2") index = 6, target = &result.left_trigger;
-            else if (key == "r2") index = 7, target = &result.right_trigger;
+            if (key == "lx") index = 3, target = &result.left_x;
+            else if (key == "ly") index = 4, target = &result.left_y;
+            else if (key == "rx") index = 5, target = &result.right_x;
+            else if (key == "ry") index = 6, target = &result.right_y;
+            else if (key == "l2") index = 7, target = &result.left_trigger;
+            else if (key == "r2") index = 8, target = &result.right_trigger;
             else if (key == "touch") {
-                index = 8;
+                index = 9;
                 int touch = 0;
                 valid = ParseNumber(value, touch) && touch >= 0 && touch <= 1;
                 result.touch_down = touch == 1;
-            } else if (key == "tx") index = 9, target = &result.touch_x, maximum = 1919;
-            else if (key == "ty") index = 10, target = &result.touch_y, maximum = 1079;
+            } else if (key == "tx") index = 10, target = &result.touch_x, maximum = 1919;
+            else if (key == "ty") index = 11, target = &result.touch_y, maximum = 1079;
             else return std::nullopt;
             if (target != nullptr) {
                 valid = ParseNumber(value, *target) && *target >= 0 && *target <= maximum;
@@ -82,7 +85,7 @@ std::optional<ControllerSnapshot> ParseControllerSnapshot(std::string_view line)
         seen[index] = true;
         ++count;
     }
-    if (count != seen.size()) {
+    if (count != seen.size() && !(count == seen.size() - 1 && !seen[0])) {
         return std::nullopt;
     }
     return result;

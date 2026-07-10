@@ -18,6 +18,15 @@ class ControllerFrameEncoderTest {
         assertEquals(listOf(ControllerSnapshot.Neutral), received)
     }
 
+    @Test fun managedSessionRoutesFourSlots() {
+        val received = mutableListOf<Pair<Int, ControllerSnapshot>>()
+        val sink: (Int, ControllerSnapshot) -> Unit = { slot, snapshot -> received += slot to snapshot }
+        ManagedSession.attachControllerSlotSink(sink)
+        ManagedSession.submitController(3, ControllerSnapshot.Neutral)
+        ManagedSession.detachControllerSlotSink(sink)
+        assertEquals(listOf(3 to ControllerSnapshot.Neutral), received)
+    }
+
     @Test fun encodesNormalizedSnapshotWithMonotonicSequence() {
         val encoder = ControllerFrameEncoder()
         val snapshot = ControllerSnapshot.normalized(
@@ -34,16 +43,24 @@ class ControllerFrameEncoderTest {
         )
 
         assertEquals(
-            "BACHATA/1 INPUT seq=1 buttons=17408 lx=0 ly=128 rx=255 ry=64 l2=0 r2=128 " +
+            "BACHATA/1 INPUT slot=0 seq=1 buttons=17408 lx=0 ly=128 rx=255 ry=64 l2=0 r2=128 " +
                 "touch=1 tx=1919 ty=1079\n",
             encoder.encode(snapshot)?.decodeToString(),
         )
         assertNull(encoder.encode(snapshot))
         assertEquals(
-            "BACHATA/1 INPUT seq=2 buttons=0 lx=128 ly=128 rx=128 ry=128 l2=0 r2=0 " +
+            "BACHATA/1 INPUT slot=0 seq=2 buttons=0 lx=128 ly=128 rx=128 ry=128 l2=0 r2=0 " +
                 "touch=0 tx=0 ty=0\n",
             encoder.encode(ControllerSnapshot.Neutral)?.decodeToString(),
         )
+    }
+
+    @Test fun encodesSlotsWithIndependentSequenceAndSuppression() {
+        val encoder = ControllerFrameEncoder()
+        assertEquals(true, encoder.encode(2, ControllerSnapshot.Neutral)!!.decodeToString().startsWith("BACHATA/1 INPUT slot=2 seq=1 "))
+        assertNull(encoder.encode(2, ControllerSnapshot.Neutral))
+        assertEquals(true, encoder.encode(1, ControllerSnapshot.Neutral)!!.decodeToString().startsWith("BACHATA/1 INPUT slot=1 seq=1 "))
+        org.junit.Assert.assertThrows(IllegalArgumentException::class.java) { encoder.encode(4, ControllerSnapshot.Neutral) }
     }
 
     @Test fun appliesStickDeadzoneButNotTriggerDeadzone() {

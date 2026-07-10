@@ -147,7 +147,7 @@ class TurnipReleaseClient(
     )
 
     companion object {
-        const val REPOSITORY = "v3kt0r-87/Mesa-Turnip-Builder"
+        const val REPOSITORY = "JICA98/bachata-s4-drivers"
         const val API_URL = "https://api.github.com/repos/$REPOSITORY/releases?per_page=30"
         const val CACHE_TTL_MS = 24L * 60L * 60L * 1000L
         const val MAX_ASSET_BYTES = 32L * 1024L * 1024L

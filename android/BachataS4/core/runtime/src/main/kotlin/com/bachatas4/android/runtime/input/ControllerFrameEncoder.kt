@@ -3,16 +3,21 @@ package com.bachatas4.android.runtime.input
 import kotlin.math.roundToInt
 
 class ControllerFrameEncoder {
-    private var sequence = 0L
-    private var previous: ControllerSnapshot? = null
+    private val sequence = LongArray(4)
+    private val previous = arrayOfNulls<ControllerSnapshot>(4)
 
     @Synchronized
-    fun encode(snapshot: ControllerSnapshot): ByteArray? {
-        if (snapshot == previous) return null
-        previous = snapshot
-        sequence += 1
+    fun encode(snapshot: ControllerSnapshot): ByteArray? = encode(0, snapshot)
+
+    @Synchronized
+    fun encode(slot: Int, snapshot: ControllerSnapshot): ByteArray? {
+        require(slot in 0..3) { "Controller slot must be 0..3" }
+        if (snapshot == previous[slot]) return null
+        previous[slot] = snapshot
+        sequence[slot] += 1
         val frame = buildString(144) {
-            append("BACHATA/1 INPUT seq=").append(sequence)
+            append("BACHATA/1 INPUT slot=").append(slot)
+            append(" seq=").append(sequence[slot])
             append(" buttons=").append(snapshot.buttons)
             append(" lx=").append(stickByte(snapshot.leftX))
             append(" ly=").append(stickByte(snapshot.leftY))

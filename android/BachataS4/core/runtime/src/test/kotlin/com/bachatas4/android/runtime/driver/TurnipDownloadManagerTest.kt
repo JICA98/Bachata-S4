@@ -45,6 +45,6 @@ class TurnipDownloadManagerTest {
         publishedAt = "2026-05-30T21:07:14Z",
         name = "Turnip-26-1.1-EMULATOR.zip",
         size = size,
-        downloadUrl = "https://github.com/v3kt0r-87/Mesa-Turnip-Builder/releases/download/tag/Turnip.zip",
+        downloadUrl = "https://github.com/JICA98/bachata-s4-drivers/releases/download/tag/Turnip.zip",
     )
 }

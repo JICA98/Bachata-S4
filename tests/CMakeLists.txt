@@ -302,6 +302,7 @@ set(BACHATA_RUNTIME_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/platform/bachata/controller_snapshot.cpp
     ${CMAKE_SOURCE_DIR}/src/platform/bachata/audio_transport.cpp
     platform/test_bachata_runtime_client.cpp
+    platform/test_bachata_controller_snapshot.cpp
 )
 
 add_executable(shadps4_bachata_runtime_test ${BACHATA_RUNTIME_TEST_SOURCES})

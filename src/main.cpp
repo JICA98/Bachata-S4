@@ -311,7 +311,7 @@ int main(int argc, char* argv[]) {
                 snapshot.left_x,       snapshot.left_y, snapshot.right_x,
                 snapshot.right_y,      snapshot.left_trigger, snapshot.right_trigger,
             };
-            (*controllers)[0]->ApplyRemoteState(
+            (*controllers)[snapshot.slot]->ApplyRemoteState(
                 static_cast<Libraries::Pad::OrbisPadButtonDataOffset>(snapshot.buttons), axes,
                 snapshot.touch_down, snapshot.touch_x / 1920.0f, snapshot.touch_y / 1080.0f);
         })) {

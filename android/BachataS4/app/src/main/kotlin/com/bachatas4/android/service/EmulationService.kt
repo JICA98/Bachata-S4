@@ -100,7 +100,7 @@ class EmulationService : Service() {
         var boundSocket: LocalSocket? = null
         var serverSocket: LocalServerSocket? = null
         var clientSocket: LocalSocket? = null
-        var controllerSink: ((ControllerSnapshot) -> Unit)? = null
+        var controllerSink: ((Int, ControllerSnapshot) -> Unit)? = null
         var runtimeRoot: Path? = null
         val acceptExecutor = Executors.newSingleThreadExecutor()
         val controlFile = File(filesDir, "runtime-control.sock").apply { delete() }
@@ -197,8 +197,8 @@ class EmulationService : Service() {
             val encoder = ControllerFrameEncoder()
             val controllerOutput = clientSocket.outputStream
             val writeLock = Any()
-            val sink: (ControllerSnapshot) -> Unit = { snapshot ->
-                encoder.encode(snapshot)?.let { frame ->
+            val sink: (Int, ControllerSnapshot) -> Unit = { slot, snapshot ->
+                encoder.encode(slot, snapshot)?.let { frame ->
                     runCatching {
                         synchronized(writeLock) {
                             controllerOutput.write(frame)
@@ -208,7 +208,7 @@ class EmulationService : Service() {
                 }
             }
             controllerSink = sink
-            ManagedSession.attachControllerSink(sink)
+            ManagedSession.attachControllerSlotSink(sink)
             sessionLog.info("Input", "controller transport attached")
             clientSocket.inputStream.bufferedReader().forEachLine { frame ->
                 when {
@@ -254,8 +254,8 @@ class EmulationService : Service() {
                 }
             }
             controllerSink?.let { sink ->
-                ManagedSession.submitController(ControllerSnapshot.Neutral)
-                ManagedSession.detachControllerSink(sink)
+                repeat(4) { slot -> ManagedSession.submitController(slot, ControllerSnapshot.Neutral) }
+                ManagedSession.detachControllerSlotSink(sink)
             }
             process?.destroyForcibly()
             process = null

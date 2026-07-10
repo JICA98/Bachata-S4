@@ -222,8 +222,8 @@ bool RuntimeClient::StartInputReader(std::function<void(const ControllerSnapshot
     input_thread_ = std::jthread([input_fd, handler = std::move(handler)](std::stop_token stop) {
         constexpr std::size_t MaxInputFrameBytes = 512;
         std::string line;
-        std::uint64_t last_sequence = 0;
-        bool received = false;
+        std::array<std::uint64_t, 4> last_sequence{};
+        std::array<bool, 4> received{};
         bool overflow = false;
         char value = 0;
         while (!stop.stop_requested()) {
@@ -248,21 +248,24 @@ bool RuntimeClient::StartInputReader(std::function<void(const ControllerSnapshot
             if (!overflow) {
                 line.push_back('\n');
                 const auto snapshot = ParseControllerSnapshot(line);
-                if (snapshot && (!received || snapshot->sequence > last_sequence)) {
+                if (snapshot && (!received[snapshot->slot] || snapshot->sequence > last_sequence[snapshot->slot])) {
                     handler(*snapshot);
-                    last_sequence = snapshot->sequence;
-                    received = true;
+                    last_sequence[snapshot->slot] = snapshot->sequence;
+                    received[snapshot->slot] = true;
                 }
             }
             line.clear();
             overflow = false;
         }
-        if (received) {
-            ControllerSnapshot neutral{};
-            neutral.sequence = last_sequence == std::numeric_limits<std::uint64_t>::max()
-                                   ? last_sequence
-                                   : last_sequence + 1;
-            handler(neutral);
+        for (int slot = 0; slot < 4; ++slot) {
+            if (received[slot]) {
+                ControllerSnapshot neutral{};
+                neutral.slot = slot;
+                neutral.sequence = last_sequence[slot] == std::numeric_limits<std::uint64_t>::max()
+                                       ? last_sequence[slot]
+                                       : last_sequence[slot] + 1;
+                handler(neutral);
+            }
         }
     });
     return true;

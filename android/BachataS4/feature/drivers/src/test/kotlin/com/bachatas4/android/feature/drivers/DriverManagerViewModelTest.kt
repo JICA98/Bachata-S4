@@ -48,7 +48,7 @@ class DriverManagerViewModelTest {
             ),
             Paths.get("/tmp/turnip-0123456789abcdef"),
         )
-        private val asset = TurnipReleaseAsset("v1", "today", "Turnip-EMULATOR.zip", 1, "https://github.com/v3kt0r-87/Mesa-Turnip-Builder/releases/download/v1/Turnip-EMULATOR.zip")
+        private val asset = TurnipReleaseAsset("v1", "today", "Turnip-EMULATOR.zip", 1, "https://github.com/JICA98/bachata-s4-drivers/releases/download/v1/Turnip-EMULATOR.zip")
         override fun installed() = listOf(driver)
         override fun releases(force: Boolean) = listOf(asset)
         override fun download(asset: TurnipReleaseAsset, progress: (Long, Long) -> Unit) = driver

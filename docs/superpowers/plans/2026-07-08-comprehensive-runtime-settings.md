@@ -15,7 +15,7 @@
 - Represent every persisted shadPS4 key and every documented `BOX64_*` variable.
 - Expose upstream Box64 presets `safest`, `safe`, `default`, `fast`, `fastest`, plus Custom flag mode.
 - Keep launch-owned paths, sockets, and library wiring read-only.
-- Trusted remote source is only `v3kt0r-87/Mesa-Turnip-Builder` and only `*-EMULATOR.zip` assets.
+- Trusted remote source is only `JICA98/bachata-s4-drivers` and only `*-EMULATOR.zip` assets.
 - Support local ZIP import; reject unsafe or incompatible archives.
 - Do not package any Turnip shared object, ICD manifest, or archive in runtime assets or APK.
 - Preserve unknown valid shadPS4 JSON keys and unknown `BOX64_*` entries.
@@ -379,7 +379,7 @@ git commit -m "feat(android): manage installed Turnip drivers"
 
 - [ ] **Step 1: Write failing HTTP/cache tests**
 
-Inject a small `HttpTransport` interface. Test filtering to repository `v3kt0r-87/Mesa-Turnip-Builder`, `-EMULATOR.zip`, HTTPS GitHub asset URLs, conditional ETag requests, 304, 403 rate limits, malformed JSON, cancellation, length mismatch, and offline cache fallback.
+Inject a small `HttpTransport` interface. Test filtering to repository `JICA98/bachata-s4-drivers`, `-EMULATOR.zip`, HTTPS GitHub asset URLs, conditional ETag requests, 304, 403 rate limits, malformed JSON, cancellation, length mismatch, and offline cache fallback.
 
 - [ ] **Step 2: Run tests and verify RED**
 

@@ -10,6 +10,7 @@
 namespace Platform::Bachata {
 
 struct ControllerSnapshot {
+    int slot{};
     std::uint64_t sequence{};
     std::uint64_t buttons{};
     int left_x = 128;

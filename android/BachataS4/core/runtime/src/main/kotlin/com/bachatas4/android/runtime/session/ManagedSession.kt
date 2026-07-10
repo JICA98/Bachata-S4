@@ -34,6 +34,7 @@ object ManagedSession {
     private val mutableSurface = MutableStateFlow<RuntimeSurface?>(null)
     private val mutableState = MutableStateFlow<ManagedSessionState>(ManagedSessionState.Idle)
     private val controllerSink = AtomicReference<((ControllerSnapshot) -> Unit)?>(null)
+    private val controllerSlotSink = AtomicReference<((Int, ControllerSnapshot) -> Unit)?>(null)
     private val mutableFrameTelemetry = MutableStateFlow(FrameTelemetry())
     private val frameTimes = ArrayDeque<Long>()
     private var lastFrameNanos: Long? = null
@@ -49,6 +50,13 @@ object ManagedSession {
     fun attachControllerSink(sink: (ControllerSnapshot) -> Unit) { controllerSink.set(sink) }
     fun detachControllerSink(sink: (ControllerSnapshot) -> Unit) { controllerSink.compareAndSet(sink, null) }
     fun submitController(snapshot: ControllerSnapshot) { controllerSink.get()?.invoke(snapshot) }
+    fun attachControllerSlotSink(sink: (Int, ControllerSnapshot) -> Unit) { controllerSlotSink.set(sink) }
+    fun detachControllerSlotSink(sink: (Int, ControllerSnapshot) -> Unit) { controllerSlotSink.compareAndSet(sink, null) }
+    fun submitController(slot: Int, snapshot: ControllerSnapshot) {
+        require(slot in 0..3) { "Controller slot must be 0..3" }
+        controllerSlotSink.get()?.invoke(slot, snapshot)
+        if (slot == 0) controllerSink.get()?.invoke(snapshot)
+    }
     @Synchronized
     fun recordPresentedFrame(nowNanos: Long = System.nanoTime()) {
         if (lastFrameNanos?.let { nowNanos <= it } == true) frameTimes.clear()
