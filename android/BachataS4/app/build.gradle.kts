@@ -39,8 +39,10 @@ android {
         applicationId = "com.bachatas4.android"
         minSdk = 31
         targetSdk = 37
-        versionCode = SimpleDateFormat("yyMMddHH").format(Date()).toInt()
-        versionName = "0.1.0-dev-" + SimpleDateFormat("yyyyMMdd-HHmm").format(Date())
+        versionCode = (findProperty("VERSION_CODE") as String?)?.toIntOrNull()
+            ?: SimpleDateFormat("yyMMddHH").format(Date()).toInt()
+        versionName = (findProperty("VERSION_NAME") as String?)
+            ?: ("0.1.0-dev-" + SimpleDateFormat("yyyyMMdd-HHmm").format(Date()))
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             abiFilters += listOf("arm64-v8a")
