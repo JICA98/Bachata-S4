@@ -44,7 +44,9 @@ class RuntimeLaunchProfileProvider internal constructor(
                     else -> primitive.content
                 }
             }
-        return Box64EnvironmentCodec.decode(Box64EnvironmentCodec.encode(environment))
+        val validated = Box64EnvironmentCodec.decode(Box64EnvironmentCodec.encode(environment)).toMutableMap()
+        profile.box64Preset.environmentValue?.let { validated["BOX64_PROFILE"] = it }
+        return validated
     }
 
     fun explicitSettingIds(profile: ResolvedRuntimeProfile): List<String> =

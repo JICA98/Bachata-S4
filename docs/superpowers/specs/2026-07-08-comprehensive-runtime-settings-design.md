@@ -14,6 +14,7 @@ This design includes:
 - Every persisted key read or written by the repository's current shadPS4 `EmulatorSettingsImpl`, including Settings/GUI values and the General, Log, Debug, Input, Audio, GPU, and Vulkan groups.
 - Android-specific runtime settings and launch diagnostics.
 - Every documented `BOX64_*` behavior variable in `runtime/sources/box64/docs/USAGE.md`.
+- Upstream `BOX64_PROFILE` presets (`safest`, `safe`, `default`, `fast`, `fastest`) plus a Custom mode for individual flags.
 - Global settings and per-game overrides.
 - Typed settings screens and validated raw `config.json` and Box64 environment editors.
 - Turnip release discovery from one trusted repository, ZIP import, installed-driver management, and global/per-game driver selection.
@@ -60,6 +61,7 @@ A profile contains:
 - sparse typed setting values keyed by stable ID;
 - unknown shadPS4 JSON fields;
 - unknown Box64 environment entries;
+- selected Box64 preset, inherited globally or overridden per game;
 - selected driver ID;
 - four controller-slot profiles;
 - touch-layout reference.
@@ -78,6 +80,8 @@ Profile writes use a temporary file and atomic move. Migrations make a backup be
 ## shadPS4 and Box64 serialization
 
 At launch, the resolver creates one immutable `ResolvedRuntimeProfile`. `ShadPs4ConfigManager` writes its shadPS4 portion to runtime-home `.local/share/shadPS4/config.json` without discarding unknown JSON fields. The Box64 serializer adds documented user behavior variables to the app-owned base environment. User values cannot replace launch-owned paths or sockets.
+
+The Box64 preset selector maps directly to upstream `BOX64_PROFILE` values. Custom omits `BOX64_PROFILE` and applies individual flags. No app-invented preset bundles are used.
 
 Typed values are validated before persistence and again during resolution. Invalid profiles block launch and report the exact native key, value, and constraint. Values are never silently clamped.
 
@@ -211,6 +215,7 @@ No game content or log migration is required.
 ## Acceptance criteria
 
 - Every current shadPS4 exported setting and documented Box64 behavior variable is discoverable by UI search.
+- Users can select every upstream Box64 preset or Custom globally and per game; Custom exposes every documented flag.
 - Global values and per-game overrides resolve predictably and reset independently.
 - Raw editors round-trip unknown valid values without corrupting typed settings.
 - Users can browse the trusted repository, download an emulator ZIP, import a ZIP, select installed drivers globally/per game, and recover safely from invalid packages.

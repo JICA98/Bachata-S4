@@ -2,6 +2,7 @@ package com.bachatas4.android
 
 import com.bachatas4.android.data.RuntimeProfileStore
 import com.bachatas4.android.runtime.settings.CompatibilityConstraint
+import com.bachatas4.android.runtime.settings.Box64Preset
 import com.bachatas4.android.runtime.settings.ProfileScope
 import com.bachatas4.android.runtime.settings.RuntimeSettingCatalog
 import com.bachatas4.android.runtime.settings.RuntimeSettingSpec
@@ -41,7 +42,10 @@ class RuntimeLaunchProfileProviderTest {
 
         assertEquals(ValueSource.GAME, resolved.settings.getValue(boxLog.id).source)
         assertEquals(ValueSource.COMPATIBILITY, resolved.settings.getValue(devKit.id).source)
-        assertEquals(mapOf("BOX64_LOG" to "2"), provider.box64Environment(resolved))
+        assertEquals(
+            mapOf("BOX64_LOG" to "2", "BOX64_PROFILE" to "default"),
+            provider.box64Environment(resolved),
+        )
     }
 
     @Test
@@ -58,6 +62,18 @@ class RuntimeLaunchProfileProviderTest {
         }
 
         assertFalse(error.message.isNullOrBlank())
+    }
+
+    @Test
+    fun officialPresetUsesBox64ProfileAndCustomOmitsIt() = runTest {
+        val store = RuntimeProfileStore(temporaryFolder.root)
+        val provider = RuntimeLaunchProfileProvider(store, catalog, emptyMap())
+        store.update(ProfileScope.Global) { it.copy(box64Preset = Box64Preset.FAST) }
+
+        assertEquals("fast", provider.box64Environment(provider.resolve("CUSA00001"))["BOX64_PROFILE"])
+
+        store.update(ProfileScope.Global) { it.copy(box64Preset = Box64Preset.CUSTOM) }
+        assertFalse(provider.box64Environment(provider.resolve("CUSA00001")).containsKey("BOX64_PROFILE"))
     }
 
     private fun spec(

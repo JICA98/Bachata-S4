@@ -7,6 +7,7 @@ object Box64EnvironmentCodec {
         "BOX64_LD_LIBRARY_PATH",
         "BOX64_EMULATED_LIBS",
         "BOX64_LOAD_ADDR",
+        "BOX64_PROFILE",
     )
 
     fun decode(text: String): Map<String, String> {

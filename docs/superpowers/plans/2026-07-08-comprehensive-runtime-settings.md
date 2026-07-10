@@ -13,6 +13,7 @@
 - Android `minSdk = 31`, `targetSdk = 37`, Java 17, arm64-v8a only.
 - Support global defaults plus sparse per-game overrides.
 - Represent every persisted shadPS4 key and every documented `BOX64_*` variable.
+- Expose upstream Box64 presets `safest`, `safe`, `default`, `fast`, `fastest`, plus Custom flag mode.
 - Keep launch-owned paths, sockets, and library wiring read-only.
 - Trusted remote source is only `v3kt0r-87/Mesa-Turnip-Builder` and only `*-EMULATOR.zip` assets.
 - Support local ZIP import; reject unsafe or incompatible archives.
@@ -169,6 +170,7 @@ data class RuntimeProfile(
     val values: Map<String, JsonElement> = emptyMap(),
     val unknownShadPs4: Map<String, JsonElement> = emptyMap(),
     val unknownBox64: Map<String, String> = emptyMap(),
+    val box64Preset: Box64Preset? = null,
     val driverId: String? = null,
     val controllerSlots: List<ControllerProfile> = emptyList(),
     val touchLayoutId: String? = null,
@@ -284,6 +286,8 @@ Expected: FAIL because provider is absent.
 - [ ] **Step 3: Implement provider and service integration**
 
 Resolve before display/process startup. Write JSON, verify selected driver, build Box64 env, then construct `RuntimeProcessRequest`. Throw a typed configuration error before process launch on any invalid state.
+
+Emit the selected upstream value through `BOX64_PROFILE`; Custom emits no `BOX64_PROFILE` and uses individual `BOX64_*` values. Global/per-game preset inheritance follows normal profile precedence.
 
 - [ ] **Step 4: Run tests and verify GREEN**
 
@@ -533,6 +537,8 @@ Expected: FAIL on missing schema-driven state/events.
 - [ ] **Step 3: Implement ViewModel and generated controls**
 
 Render category cards: General, Log, Debug, Input, Audio, GPU, Vulkan, Android, Box64, Drivers, Raw Config. Use switches, enum dialogs, slider plus numeric entry, text/path controls, and list editors from `SettingKind`. Each card exposes native key/default/range/help/source/risk/restart information.
+
+Box64 starts with a preset selector for `safest`, `safe`, `default`, `fast`, `fastest`, and Custom. Custom reveals the complete searchable flag catalog for fine tuning.
 
 - [ ] **Step 4: Verify accessibility semantics**
 

@@ -38,6 +38,9 @@ class RuntimeSettingCatalogTest {
         )
         assertTrue(catalog.box64.size >= 100)
         assertTrue((catalog.shadPs4 + catalog.box64).all { it.title.isNotBlank() && it.help.isNotBlank() })
+        val profile = catalog.box64.single { it.nativeKey == "BOX64_PROFILE" }
+        assertEquals(SettingKind.ENUM, profile.kind)
+        assertEquals(listOf("safest", "safe", "default", "fast", "fastest"), profile.choices)
     }
 
     @Test

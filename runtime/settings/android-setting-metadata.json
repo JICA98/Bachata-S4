@@ -1965,15 +1965,21 @@
       "category": "Compatibility",
       "title": "Profile",
       "help": "Predefined sets of environment variables with compatibility or performance in mind. Available in WowBox64.",
-      "kind": "STRING",
+      "kind": "ENUM",
       "defaultValue": "default",
       "minimum": null,
       "maximum": null,
-      "choices": [],
+      "choices": [
+        "safest",
+        "safe",
+        "default",
+        "fast",
+        "fastest"
+      ],
       "scope": "GLOBAL_AND_GAME",
       "restartRequired": true,
       "risk": "NORMAL",
-      "readOnlyReason": null
+      "readOnlyReason": "Managed by BachataS4 runtime launch wiring."
     },
     "BOX64_PYTHON3": {
       "id": "box64.python3",

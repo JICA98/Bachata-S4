@@ -65,9 +65,10 @@ class RuntimeProfileStore(private val filesDir: File) {
 
     private fun writeUnlocked(scope: ProfileScope, profile: RuntimeProfile) {
         val destination = profileFile(scope)
-        destination.parentFile.mkdirs()
-        val temporary = File(destination.parentFile, "${destination.name}.tmp")
-        val backup = File(destination.parentFile, "${destination.name}.bak")
+        val parent = requireNotNull(destination.parentFile) { "Profile path has no parent: $destination" }
+        parent.mkdirs()
+        val temporary = File(parent, "${destination.name}.tmp")
+        val backup = File(parent, "${destination.name}.bak")
         FileOutputStream(temporary).use { output ->
             output.write(json.encodeToString(profile).toByteArray(Charsets.UTF_8))
             output.fd.sync()

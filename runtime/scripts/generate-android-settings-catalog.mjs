@@ -16,6 +16,7 @@ const launchOwnedBox64 = new Set([
   "BOX64_LD_LIBRARY_PATH",
   "BOX64_EMULATED_LIBS",
   "BOX64_LOAD_ADDR",
+  "BOX64_PROFILE",
 ]);
 
 const shadOverrides = {
@@ -150,6 +151,11 @@ function discoverBox64() {
       index += 1;
     }
     const value = box64ValueDetails(body);
+    if (nativeKey === "BOX64_PROFILE") {
+      value.kind = "ENUM";
+      value.defaultValue = "default";
+      value.choices = ["safest", "safe", "default", "fast", "fastest"];
+    }
     const readOnly = launchOwnedBox64.has(nativeKey);
     specs.push({
       id: `box64.${nativeKey.toLowerCase().replace(/^box64_/, "").replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "")}`,

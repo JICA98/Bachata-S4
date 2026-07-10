@@ -60,5 +60,17 @@ class RuntimeProfileResolverTest {
         assertTrue(error.message.orEmpty().contains(nullGpu.id))
     }
 
+    @Test
+    fun box64PresetSupportsGlobalAndGameOverride() {
+        val resolver = RuntimeProfileResolver(listOf(nullGpu))
+        val global = RuntimeProfile(box64Preset = Box64Preset.FAST)
+
+        assertEquals(Box64Preset.FAST, resolver.resolve(global, RuntimeProfile()).box64Preset)
+        assertEquals(
+            Box64Preset.CUSTOM,
+            resolver.resolve(global, RuntimeProfile(box64Preset = Box64Preset.CUSTOM)).box64Preset,
+        )
+    }
+
     private fun JsonPrimitive.jsonPrimitiveBoolean(): Boolean = content.toBooleanStrict()
 }

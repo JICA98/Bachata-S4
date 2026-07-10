@@ -39,5 +39,8 @@ class Box64EnvironmentCodecTest {
             Box64EnvironmentCodec.decode("BOX64_PATH=/tmp")
         }
         assertTrue(error.message.orEmpty().contains("launch-owned"))
+        assertThrows(IllegalArgumentException::class.java) {
+            Box64EnvironmentCodec.decode("BOX64_PROFILE=fast")
+        }
     }
 }
