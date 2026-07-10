@@ -1,5 +1,10 @@
 package com.bachatas4.android.runtime.process
 
+import com.bachatas4.android.runtime.driver.DriverAbi
+import com.bachatas4.android.runtime.driver.DriverPackageSource
+import com.bachatas4.android.runtime.driver.TurnipPackageInstaller
+import com.bachatas4.android.runtime.driver.turnipZip
+import java.nio.file.Files
 import java.nio.file.Paths
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -65,5 +70,19 @@ class VulkanDriverSelectionTest {
         assertEquals("vulkan.ad07xx.so", configuration.environment["BACHATA_VULKAN_DRIVER_NAME"])
         assertEquals(runtimeRoot.resolve("tmp").toString(), configuration.environment["BACHATA_VULKAN_TMPDIR"])
         assertFalse(configuration.environment.containsKey("VK_ICD_FILENAMES"))
+    }
+
+    @Test
+    fun selectsDownloadedBionicDriverThroughApkNativeBridge() {
+        val installed = TurnipPackageInstaller(Files.createTempDirectory("downloaded-turnip"), 37).install(
+            turnipZip(DriverAbi.ANDROID_BIONIC),
+            DriverPackageSource(assetName = "Turnip-26-1.1-EMULATOR.zip"),
+        )
+
+        val configuration = VulkanDriverConfiguration.resolve(installed, runtimeRoot)
+
+        assertEquals(Box64Mode.APK_NATIVE, configuration.box64Mode)
+        assertEquals(installed.root.toString() + "/", configuration.environment["BACHATA_VULKAN_DRIVER_DIR"])
+        assertEquals(installed.library.fileName.toString(), configuration.environment["BACHATA_VULKAN_DRIVER_NAME"])
     }
 }

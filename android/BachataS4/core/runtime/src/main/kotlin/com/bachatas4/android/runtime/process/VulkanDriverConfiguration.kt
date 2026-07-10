@@ -1,5 +1,7 @@
 package com.bachatas4.android.runtime.process
 
+import com.bachatas4.android.runtime.driver.DriverAbi
+import com.bachatas4.android.runtime.driver.InstalledDriver
 import java.nio.file.Path
 
 enum class RuntimeVulkanDriver {
@@ -23,6 +25,26 @@ data class VulkanDriverConfiguration(
     val environment: Map<String, String>,
 ) {
     companion object {
+        fun resolve(driver: InstalledDriver, runtimeRoot: Path): VulkanDriverConfiguration =
+            when (driver.metadata.abi) {
+                DriverAbi.LINUX_GLIBC -> VulkanDriverConfiguration(
+                    box64Mode = Box64Mode.HOST_GLIBC,
+                    environment = mapOf(
+                        "SDL_VULKAN_LIBRARY" to runtimeRoot.resolve("host/libvulkan.so.1").toString(),
+                        "VK_ICD_FILENAMES" to requireNotNull(driver.icdManifest).toString(),
+                    ),
+                )
+                DriverAbi.ANDROID_BIONIC -> VulkanDriverConfiguration(
+                    box64Mode = Box64Mode.APK_NATIVE,
+                    environment = mapOf(
+                        "SDL_VULKAN_LIBRARY" to "libvulkan.so.1",
+                        "BACHATA_VULKAN_DRIVER_DIR" to driver.root.toString() + "/",
+                        "BACHATA_VULKAN_DRIVER_NAME" to driver.library.fileName.toString(),
+                        "BACHATA_VULKAN_TMPDIR" to runtimeRoot.resolve("tmp").toString(),
+                    ),
+                )
+            }
+
         fun resolve(driver: RuntimeVulkanDriver, runtimeRoot: Path, customDriverRoot: Path? = null): VulkanDriverConfiguration =
             when (driver) {
                 RuntimeVulkanDriver.CUSTOM -> VulkanDriverConfiguration(
