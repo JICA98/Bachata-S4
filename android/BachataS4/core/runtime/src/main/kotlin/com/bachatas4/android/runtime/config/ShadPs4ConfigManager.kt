@@ -59,7 +59,7 @@ object ShadPs4ConfigManager {
         val config = runtimeRoot.resolve(".local/share/shadPS4/config.json")
         Files.createDirectories(config.parent)
         var document = if (Files.isRegularFile(config)) {
-            ShadPs4JsonCodec.parse(Files.readString(config))
+            ShadPs4JsonCodec.parse(Files.readAllBytes(config).decodeToString())
         } else {
             ShadPs4JsonCodec.empty()
         }

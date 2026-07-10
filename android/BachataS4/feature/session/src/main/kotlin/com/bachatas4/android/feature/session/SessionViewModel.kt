@@ -58,7 +58,7 @@ class SessionViewModel @Inject constructor(
                 ManagedSession.update(ManagedSessionState.Failed(RuntimeErrorCode.CONTENT_INVALID, "Game not found"))
                 return@launch
             }
-            context.startForegroundService(
+            context.startService(
                 // Read once: changing Settings cannot mutate an active session.
                 Intent(ManagedSession.ACTION_START).setClassName(context.packageName, ManagedSession.SERVICE_CLASS)
                     .putExtra(ManagedSession.EXTRA_GAME_ID, game.id)

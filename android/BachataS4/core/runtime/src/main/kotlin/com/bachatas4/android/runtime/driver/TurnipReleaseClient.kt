@@ -3,6 +3,8 @@ package com.bachatas4.android.runtime.driver
 import java.net.HttpURLConnection
 import java.net.URI
 import java.net.URL
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.nio.file.AtomicMoveNotSupportedException
 import java.nio.file.Files
 import java.nio.file.Path
@@ -11,6 +13,17 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
+
+private fun InputStream.readLimited(limit: Int): ByteArray {
+    val output = ByteArrayOutputStream()
+    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+    while (output.size() < limit) {
+        val count = read(buffer, 0, minOf(buffer.size, limit - output.size()))
+        if (count < 0) break
+        output.write(buffer, 0, count)
+    }
+    return output.toByteArray()
+}
 
 data class HttpRequest(val url: String, val headers: Map<String, String> = emptyMap())
 data class HttpResponse(val status: Int, val headers: Map<String, String>, val body: ByteArray)
@@ -27,7 +40,7 @@ class UrlConnectionHttpTransport : HttpTransport {
             request.headers.forEach(connection::setRequestProperty)
             val status = connection.responseCode
             val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-            val body = stream?.use { it.readNBytes(MAX_METADATA_BYTES + 1) } ?: byteArrayOf()
+            val body = stream?.use { it.readLimited(MAX_METADATA_BYTES + 1) } ?: byteArrayOf()
             require(body.size <= MAX_METADATA_BYTES) { "GitHub release metadata exceeds 4 MiB" }
             HttpResponse(
                 status,
@@ -105,13 +118,13 @@ class TurnipReleaseClient(
 
     private fun loadCache(): CachedReleaseFeed? {
         if (!Files.isRegularFile(cacheFile)) return null
-        return runCatching { json.decodeFromString<CachedReleaseFeed>(Files.readString(cacheFile)) }.getOrNull()
+        return runCatching { json.decodeFromString<CachedReleaseFeed>(Files.readAllBytes(cacheFile).decodeToString()) }.getOrNull()
     }
 
     private fun writeCache(cache: CachedReleaseFeed) {
         Files.createDirectories(requireNotNull(cacheFile.parent) { "Release cache path has no parent" })
         val temporary = cacheFile.resolveSibling("${cacheFile.fileName}.tmp")
-        Files.writeString(temporary, json.encodeToString(cache))
+        Files.write(temporary, json.encodeToString(cache).encodeToByteArray())
         try {
             Files.move(temporary, cacheFile, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE)
         } catch (_: AtomicMoveNotSupportedException) {

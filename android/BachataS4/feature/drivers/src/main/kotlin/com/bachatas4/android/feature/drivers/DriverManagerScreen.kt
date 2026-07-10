@@ -30,6 +30,8 @@ import com.bachatas4.android.runtime.settings.ProfileScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
 
 @Composable
 fun DriverManagerScreen(
@@ -45,7 +47,7 @@ fun DriverManagerScreen(
             runCatching {
                 withContext(Dispatchers.IO) {
                     context.contentResolver.openInputStream(uri)?.use {
-                        val bytes = it.readNBytes(TurnipReleaseClient.MAX_ASSET_BYTES.toInt() + 1)
+                        val bytes = it.readLimited(TurnipReleaseClient.MAX_ASSET_BYTES.toInt() + 1)
                         require(bytes.size <= TurnipReleaseClient.MAX_ASSET_BYTES) { "Driver ZIP exceeds 32 MiB" }
                         bytes
                     }
@@ -95,4 +97,15 @@ fun DriverManagerScreen(
             }
         }
     }
+}
+
+private fun InputStream.readLimited(limit: Int): ByteArray {
+    val output = ByteArrayOutputStream()
+    val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+    while (output.size() < limit) {
+        val count = read(buffer, 0, minOf(buffer.size, limit - output.size()))
+        if (count < 0) break
+        output.write(buffer, 0, count)
+    }
+    return output.toByteArray()
 }

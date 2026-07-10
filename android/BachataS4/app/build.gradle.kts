@@ -1,3 +1,8 @@
+import java.util.Properties
+import java.io.File
+import java.text.SimpleDateFormat
+import java.util.Date
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.compose.compiler)
@@ -8,12 +13,34 @@ plugins {
 android {
     namespace = "com.bachatas4.android"
     compileSdk = 37
+
+    val localProperties = Properties()
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        localPropertiesFile.inputStream().use {
+            localProperties.load(it)
+        }
+    }
+
+    signingConfigs {
+        create("release") {
+            val keystoreFileName = localProperties.getProperty("signing.storeFile")
+            val keystoreFile: File? = if (keystoreFileName != null) rootProject.file(keystoreFileName) else null
+            if (keystoreFile != null && keystoreFile.exists()) {
+                storeFile = keystoreFile
+                storePassword = localProperties.getProperty("signing.storePassword")
+                keyAlias = localProperties.getProperty("signing.keyAlias")
+                keyPassword = localProperties.getProperty("signing.keyPassword")
+            }
+        }
+    }
+
     defaultConfig {
         applicationId = "com.bachatas4.android"
         minSdk = 31
         targetSdk = 37
-        versionCode = 1
-        versionName = "0.1.0-dev"
+        versionCode = SimpleDateFormat("yyMMddHH").format(Date()).toInt()
+        versionName = "0.1.0-dev-" + SimpleDateFormat("yyyyMMdd-HHmm").format(Date())
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
             abiFilters += listOf("arm64-v8a")
@@ -22,6 +49,7 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
         }
     }
     compileOptions {

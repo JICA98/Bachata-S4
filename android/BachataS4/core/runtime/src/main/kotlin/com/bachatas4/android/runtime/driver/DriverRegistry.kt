@@ -37,11 +37,12 @@ class DriverRegistry(private val root: Path) {
             emptyList()
         } else {
             Files.list(root).use { paths ->
-                paths.filter { Files.isDirectory(it) && ID_PATTERN.matches(it.fileName.toString()) }
+                paths.iterator().asSequence()
+                    .filter { Files.isDirectory(it) && ID_PATTERN.matches(it.fileName.toString()) }
                     .map(::load)
                     .filter { it != null }
                     .map { requireNotNull(it) }
-                    .sorted(Comparator.comparing { it.metadata.displayName.lowercase() })
+                    .sortedBy { it.metadata.displayName.lowercase() }
                     .toList()
             }
         }
@@ -53,7 +54,7 @@ class DriverRegistry(private val root: Path) {
         val metadataFile = directory.resolve(METADATA_FILE)
         if (!Files.isRegularFile(metadataFile)) return null
         val metadata = runCatching {
-            json.decodeFromString<InstalledDriverMetadata>(Files.readString(metadataFile))
+            json.decodeFromString<InstalledDriverMetadata>(Files.readAllBytes(metadataFile).decodeToString())
         }.getOrNull() ?: return null
         if (metadata.schemaVersion != 1 || metadata.id != directory.fileName.toString()) return null
         if (!metadata.sha256.matches(Regex("[0-9a-f]{64}"))) return null

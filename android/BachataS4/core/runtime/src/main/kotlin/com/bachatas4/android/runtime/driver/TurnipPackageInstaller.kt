@@ -71,8 +71,8 @@ class TurnipPackageInstaller(
         )
         try {
             Files.write(staging.resolve(metadata.libraryName), libraryBytes)
-            Files.writeString(staging.resolve(DriverRegistry.METADATA_FILE), json.encodeToString(installedMetadata))
-            if (icdName != null) Files.writeString(staging.resolve(icdName), icdJson(finalLibrary))
+            Files.write(staging.resolve(DriverRegistry.METADATA_FILE), json.encodeToString(installedMetadata).encodeToByteArray())
+            if (icdName != null) Files.write(staging.resolve(icdName), icdJson(finalLibrary).encodeToByteArray())
             try {
                 Files.move(staging, finalRoot, StandardCopyOption.ATOMIC_MOVE)
             } catch (_: AtomicMoveNotSupportedException) {

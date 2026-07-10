@@ -19,6 +19,11 @@ VARIANT="debug"
 UNINSTALL_FIRST=false
 BUNDLE_ONLY=false
 
+ADB="adb"
+if command -v adb.exe &>/dev/null; then
+    ADB="adb.exe"
+fi
+
 while [[ $# -gt 0 ]]; do
     case "$1" in
         debug|release)
@@ -56,6 +61,9 @@ else
     ARTIFACT_EXT="apk"
 fi
 
+# Clean up Windows Zone.Identifier metadata files to prevent resource merger errors
+find . -name '*Zone.Identifier' -delete 2>/dev/null || true
+
 info "Building ${APP_NAME} ${ARTIFACT_EXT^^} variant: ${VARIANT_CAP}"
 ./gradlew "$GRADLE_TASK" --quiet
 
@@ -76,7 +84,7 @@ if $BUNDLE_ONLY; then
     exit 0
 fi
 
-DEVICE_LIST=$(adb devices | awk 'NR > 1 && $2 == "device" { print $1 }')
+DEVICE_LIST=$("$ADB" devices | tr -d '\r' | awk 'NR > 1 && $2 == "device" { print $1 }')
 if [[ -z "$DEVICE_LIST" ]]; then
     error "No Android device connected"
 fi
@@ -84,9 +92,9 @@ fi
 for DEVICE in $DEVICE_LIST; do
     info "Installing on device: $DEVICE"
     if $UNINSTALL_FIRST; then
-        adb -s "$DEVICE" uninstall "$PACKAGE" >/dev/null 2>&1 || true
+        "$ADB" -s "$DEVICE" uninstall "$PACKAGE" >/dev/null 2>&1 || true
     fi
-    adb -s "$DEVICE" install -r "$ARTIFACT_PATH"
+    "$ADB" -s "$DEVICE" install -r "$ARTIFACT_PATH"
     info "Launching ${PACKAGE}${ACTIVITY} on $DEVICE"
-    adb -s "$DEVICE" shell am start -n "${PACKAGE}/${PACKAGE}${ACTIVITY}" && success "App launched!"
+    "$ADB" -s "$DEVICE" shell am start -n "${PACKAGE}/${PACKAGE}${ACTIVITY}" && success "App launched!"
 done

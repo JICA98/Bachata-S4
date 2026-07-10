@@ -65,14 +65,12 @@ class EmulationService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        createNotificationChannel()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         when (intent?.action) {
             ManagedSession.ACTION_STOP -> stopSession()
             ManagedSession.ACTION_START -> {
-                startForeground(NOTIFICATION_ID, notification(), ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
                 if (sessionJob?.isActive == true) {
                     return START_NOT_STICKY
                 } else {
@@ -266,7 +264,6 @@ class EmulationService : Service() {
             runCatching { xServer?.let { runBlocking { it.stop() } } }
             controlFile.delete()
             sessionLog.info("Session", "cleanup complete")
-            stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         }
     }
