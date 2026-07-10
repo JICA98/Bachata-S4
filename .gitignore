@@ -437,3 +437,5 @@ result
 /android/BachataS4/*.keystore
 /runtime/build/
 /runtime/sources/
+
+.cxx
