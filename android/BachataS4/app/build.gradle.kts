@@ -45,6 +45,7 @@ dependencies {
     implementation(project(":feature:library"))
     implementation(project(":feature:session"))
     implementation(project(":feature:settings"))
+    implementation(project(":feature:drivers"))
 
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)

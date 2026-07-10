@@ -6,7 +6,7 @@ plugins {
 }
 
 android {
-    namespace = "com.bachatas4.android.feature.settings"
+    namespace = "com.bachatas4.android.feature.drivers"
     compileSdk = 37
     defaultConfig { minSdk = 31 }
     buildFeatures { compose = true }
@@ -18,7 +18,6 @@ android {
 
 dependencies {
     implementation(project(":core:data"))
-    implementation(project(":core:model"))
     implementation(project(":core:runtime"))
     implementation(project(":core:designsystem"))
     implementation(platform(libs.compose.bom))
@@ -26,10 +25,8 @@ dependencies {
     implementation(libs.compose.material3)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
-    implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.hilt.navigation.compose)
     implementation(libs.hilt.android)
-    implementation(libs.kotlinx.serialization.json)
     ksp(libs.hilt.compiler)
     ksp(libs.kotlin.metadata.jvm)
     testImplementation(libs.junit)

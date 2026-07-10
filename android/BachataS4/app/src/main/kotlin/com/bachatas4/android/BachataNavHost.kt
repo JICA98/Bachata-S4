@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.bachatas4.android.feature.drivers.DriverManagerScreen
 import com.bachatas4.android.feature.library.LibraryScreen
 import com.bachatas4.android.feature.settings.SettingsScreen
 import com.bachatas4.android.feature.setup.SetupScreen
@@ -15,6 +16,7 @@ object BachataRoutes {
     const val Game = "game/{id}"
     const val Session = "session/{id}"
     const val Settings = "settings"
+    const val Drivers = "drivers"
 }
 
 @Composable
@@ -31,7 +33,13 @@ fun BachataNavHost(startDestination: String = BachataRoutes.Setup) {
             )
         }
         composable(BachataRoutes.Settings) {
-            SettingsScreen(onBack = { navController.popBackStack() })
+            SettingsScreen(
+                onBack = { navController.popBackStack() },
+                onOpenDrivers = { navController.navigate(BachataRoutes.Drivers) },
+            )
+        }
+        composable(BachataRoutes.Drivers) {
+            DriverManagerScreen(onBack = { navController.popBackStack() })
         }
         composable(BachataRoutes.Game) {
             LibraryScreen(
