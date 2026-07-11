@@ -7,6 +7,7 @@
 #include <magic_enum/magic_enum.hpp>
 #include "common/error.h"
 #include "common/singleton.h"
+#include "core/emulator_settings.h"
 #include "core/file_sys/fs.h"
 #include "net_error.h"
 #include "sockets.h"
@@ -199,6 +200,13 @@ int PS4_SYSV_ABI sys_socketex(const char* name, int family, int type, int protoc
              magic_enum::enum_name((OrbisNetFamily)family),
              magic_enum::enum_name((OrbisNetSocketType)type), protocol);
     SocketPtr socket;
+#ifdef ENABLE_BACHATA_RUNTIME
+    // Android's app sandbox can terminate the glibc host process when an offline title creates
+    // an AF_INET socket. Keep PS4 offline services functional without entering the host network.
+    if (!EmulatorSettings.IsConnectedToNetwork() && family != ORBIS_NET_AF_UNIX) {
+        socket = std::make_shared<P2PSocket>(family, type, protocol);
+    } else
+#endif
     switch (type) {
     case ORBIS_NET_SOCK_STREAM:
     case ORBIS_NET_SOCK_DGRAM:

@@ -60,7 +60,6 @@ int P2PSocket::ReceivePacket(void* buf, u32 len, int flags, OrbisNetSockaddr* fr
 }
 
 SocketPtr P2PSocket::Accept(OrbisNetSockaddr* addr, u32* addrlen) {
-    LOG_ERROR(Lib_Net, "(STUBBED) called");
     *Libraries::Kernel::__Error() = ORBIS_NET_EAGAIN;
     return nullptr;
 }

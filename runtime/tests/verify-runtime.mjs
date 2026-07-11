@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -211,6 +211,11 @@ const box64EntrypointPatchPath = resolve(projectRoot, "runtime/patches/box64-win
 const box64QuickExitPatchPath = resolve(projectRoot, "runtime/patches/box64-cxa-quick-exit.patch");
 const nativeHostLoaderPath = resolve(projectRoot, "android/BachataS4/core/runtime/src/main/jniLibs/arm64-v8a/libbachata_host_loader.so");
 const nativeHostBox64Path = resolve(projectRoot, "android/BachataS4/core/runtime/src/main/jniLibs/arm64-v8a/libbachata_host_box64.so");
+const playStoreRuntimeDir = resolve(projectRoot, "android/BachataS4/app/src/playstore/assets/runtime");
+
+if (existsSync(playStoreRuntimeDir)) {
+  fail("Play Store flavor must use the generated main runtime assets, not a stale flavor override");
+}
 
 const lock = JSON.parse(readFileSync(lockPath, "utf8"));
 if (readFileSync(xServerOverridePath, "utf8").includes("GLXExtension")) {

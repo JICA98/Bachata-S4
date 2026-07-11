@@ -431,6 +431,7 @@ result
 /android/BachataS4/local.properties
 /android/BachataS4/.idea/
 /android/BachataS4/app/src/main/assets/runtime/
+/android/BachataS4/app/src/playstore/assets/runtime/
 /android/BachataS4/core/runtime/src/main/jniLibs/
 /android/BachataS4/keystore/
 /android/BachataS4/*.jks

@@ -270,9 +270,6 @@ class EmulationService : Service() {
 
     private fun installRuntime(): Path {
         val installRoot = File(filesDir, "runtime").toPath()
-        val installedDir = installRoot.toFile().listFiles()?.firstOrNull { it.isDirectory && it.name.startsWith("box64-") }
-        if (installedDir != null) return installedDir.toPath()
-
         if (!com.bachatas4.android.BuildConfig.DOWNLOAD_RUNTIME) {
             val manifest = assets.open("runtime/manifest.json").bufferedReader().use {
                 Json { ignoreUnknownKeys = true }.decodeFromString<RuntimeManifest>(it.readText())
@@ -285,6 +282,8 @@ class EmulationService : Service() {
                 }
             }
         }
+        val installedDir = installRoot.toFile().listFiles()?.firstOrNull { it.isDirectory && it.name.startsWith("box64-") }
+        if (installedDir != null) return installedDir.toPath()
         throw IllegalStateException("Runtime not installed")
     }
 
