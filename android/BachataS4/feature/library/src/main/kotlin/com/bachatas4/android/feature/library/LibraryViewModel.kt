@@ -18,7 +18,11 @@ class LibraryViewModel @Inject constructor() : ViewModel() {
     val state: StateFlow<LibraryUiState> = mutableState
 
     fun setGames(games: List<Game>) {
-        mutableState.value = mutableState.value.copy(games = sortGames(games))
+        val sorted = sortGames(games)
+        val selected = mutableState.value.selectedGameId
+            ?.takeIf { id -> sorted.any { it.id == id } }
+            ?: sorted.firstOrNull()?.id
+        mutableState.value = mutableState.value.copy(games = sorted, selectedGameId = selected)
     }
 
     fun selectGame(id: String) {

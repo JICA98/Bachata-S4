@@ -19,4 +19,18 @@ class LibraryViewModelTest {
 
         assertEquals(listOf("CUSA1", "CUSA2", "CUSA3"), viewModel.state.value.games.map { it.id })
     }
+
+    @Test
+    fun keepsSelectionWhenPresentOtherwiseSelectsFirstSortedGame() {
+        val viewModel = LibraryViewModel()
+
+        viewModel.setGames(listOf(game("B", "Beta"), game("A", "Alpha")))
+        assertEquals("A", viewModel.state.value.selectedGameId)
+
+        viewModel.selectGame("B")
+        viewModel.setGames(listOf(game("B", "Beta"), game("A", "Alpha")))
+        assertEquals("B", viewModel.state.value.selectedGameId)
+    }
+
+    private fun game(id: String, title: String) = Game(id, title, "games/$id")
 }
