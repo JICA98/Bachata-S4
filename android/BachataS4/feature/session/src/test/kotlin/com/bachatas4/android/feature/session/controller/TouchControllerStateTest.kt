@@ -55,4 +55,16 @@ class TouchControllerStateTest {
             assertEquals(control.button, state.snapshot().buttons)
         }
     }
+
+    @Test fun touchpadAndOptionsRemainMappedAfterTheVisualRedesign() {
+        val state = TouchControllerState()
+        TouchLayout.defaultControls()
+            .filter { it.control in setOf("touchpad", "options") }
+            .forEachIndexed { index, placement ->
+                state.pointerDown(index.toLong(), placement.centerX * 1920f, placement.centerY * 1080f)
+            }
+
+        assertTrue(state.snapshot().buttons and Ps4Button.TOUCH_PAD != 0L)
+        assertTrue(state.snapshot().buttons and Ps4Button.OPTIONS != 0L)
+    }
 }
