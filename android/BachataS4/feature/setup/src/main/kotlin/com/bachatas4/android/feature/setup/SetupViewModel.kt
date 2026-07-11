@@ -24,6 +24,21 @@ data class SetupUiState(
 ) {
     val canEnterLibrary: Boolean
         get() = deviceProfile.supported && runtimeInstalled && integrityVerified
+
+    val readiness: SetupReadiness
+        get() = when {
+            !deviceProfile.supported -> SetupReadiness.UnsupportedDevice
+            !runtimeInstalled -> SetupReadiness.RuntimeRequired
+            !integrityVerified -> SetupReadiness.IntegrityRequired
+            else -> SetupReadiness.Ready
+        }
+}
+
+enum class SetupReadiness {
+    Ready,
+    UnsupportedDevice,
+    RuntimeRequired,
+    IntegrityRequired,
 }
 
 @HiltViewModel

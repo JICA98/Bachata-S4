@@ -26,4 +26,17 @@ class SetupViewModelTest {
         assertEquals("Adreno 642L", state.deviceProfile.gpu)
         assertFalse(state.canEnterLibrary)
     }
+
+    @Test
+    fun reportsMissingRuntimeBeforeTheContinueGateOpens() {
+        val state = SetupUiState(
+            deviceProfile = DeviceProfile("SM8650", "Adreno", supported = true),
+            runtimeInstalled = false,
+            integrityVerified = false,
+            legalNotice = "notice",
+        )
+
+        assertEquals(SetupReadiness.RuntimeRequired, state.readiness)
+        assertFalse(state.canEnterLibrary)
+    }
 }
