@@ -42,6 +42,7 @@ fun SessionScreen(
     onOpenDrivers: () -> Unit = {},
     viewModel: SessionViewModel = hiltViewModel(),
 ) {
+    SessionWindowModeEffect()
     val context = LocalContext.current
     val dependencies = remember { EntryPointAccessors.fromApplication(context.applicationContext, TouchLayoutDependencies::class.java) }
     var touchLayout by remember { mutableStateOf(TouchLayout()) }
@@ -54,48 +55,54 @@ fun SessionScreen(
         touchLayout = dependencies.touchLayoutRepository().load(game.touchLayoutId ?: global.touchLayoutId)
         viewModel.launch(gameId)
     }
-    Column(modifier = Modifier.fillMaxSize()) {
-        Box(modifier = Modifier.weight(1f)) {
-            AndroidView(
-                modifier = Modifier.fillMaxSize(),
-                factory = { currentContext ->
-                    SurfaceView(currentContext).also { view ->
-                        view.holder.addCallback(object : SurfaceHolder.Callback {
-                            override fun surfaceCreated(holder: SurfaceHolder) = Unit
-                            override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
-                                if (width > 0 && height > 0) {
-                                    ManagedSession.attachSurface(RuntimeSurface(holder.surface, width, height))
-                                }
+    Box(modifier = Modifier.fillMaxSize()) {
+        AndroidView(
+            modifier = Modifier.fillMaxSize(),
+            factory = { currentContext ->
+                SurfaceView(currentContext).also { view ->
+                    view.holder.addCallback(object : SurfaceHolder.Callback {
+                        override fun surfaceCreated(holder: SurfaceHolder) = Unit
+                        override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+                            if (width > 0 && height > 0) {
+                                ManagedSession.attachSurface(RuntimeSurface(holder.surface, width, height))
                             }
-                            override fun surfaceDestroyed(holder: SurfaceHolder) {
-                                ManagedSession.detachSurface(holder.surface)
-                            }
-                        })
-                    }
-                },
-            )
-            FixedControllerOverlay(layout = touchLayout, onSnapshot = ManagedSession::submitController)
-            Text(
-                text = "FPS %.1f (%.1f ms)  GPU %s  RAM %d/%d MB".format(
-                    frames.fps, frames.frameTimeMs, device.gpuLoad, device.ramUsedMb, device.ramTotalMb,
-                ),
-                color = Color.White,
-                modifier = Modifier.align(androidx.compose.ui.Alignment.TopStart)
-                    .padding(8.dp).background(Color.Black.copy(alpha = 0.65f)).padding(6.dp),
-            )
-        }
-        Text(state.label(), modifier = Modifier.padding(12.dp))
-        if (state is ManagedSessionState.Failed && (state as ManagedSessionState.Failed).detail.contains("not installed")) {
-            Button(onClick = onOpenDrivers, modifier = Modifier.padding(horizontal = 12.dp)) { Text("Open Turnip drivers") }
-        }
-        Button(
-            modifier = Modifier.padding(12.dp),
-            onClick = {
-                context.startService(
-                    Intent(ManagedSession.ACTION_STOP).setClassName(context.packageName, ManagedSession.SERVICE_CLASS),
-                )
+                        }
+                        override fun surfaceDestroyed(holder: SurfaceHolder) {
+                            ManagedSession.detachSurface(holder.surface)
+                        }
+                    })
+                }
             },
-        ) { Text("Stop") }
+        )
+        FixedControllerOverlay(layout = touchLayout, onSnapshot = ManagedSession::submitController)
+        Text(
+            text = "FPS %.1f (%.1f ms)  GPU %s  RAM %d/%d MB".format(
+                frames.fps, frames.frameTimeMs, device.gpuLoad, device.ramUsedMb, device.ramTotalMb,
+            ),
+            color = Color.White,
+            modifier = Modifier.align(androidx.compose.ui.Alignment.TopStart)
+                .padding(8.dp).background(Color.Black.copy(alpha = 0.65f)).padding(6.dp),
+        )
+        Column(
+            modifier = Modifier.align(androidx.compose.ui.Alignment.BottomEnd).padding(12.dp),
+            horizontalAlignment = androidx.compose.ui.Alignment.End,
+        ) {
+            Text(
+                text = state.label(),
+                color = Color.White,
+                modifier = Modifier.background(Color.Black.copy(alpha = 0.65f)).padding(8.dp),
+            )
+            if ((state as? ManagedSessionState.Failed)?.detail?.contains("not installed") == true) {
+                Button(onClick = onOpenDrivers) { Text("Open Turnip drivers") }
+            }
+            Button(
+                onClick = {
+                    context.startService(
+                        Intent(ManagedSession.ACTION_STOP).setClassName(context.packageName, ManagedSession.SERVICE_CLASS),
+                    )
+                },
+            ) { Text("Stop") }
+        }
     }
 }
 

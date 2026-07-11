@@ -10,7 +10,10 @@
         android:roundIcon="@mipmap/ic_launcher"
         android:theme="@style/Theme.BachataS4"
         android:supportsRtl="true">
-        <activity android:name=".MainActivity" android:exported="true">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:screenOrientation="sensorPortrait">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
