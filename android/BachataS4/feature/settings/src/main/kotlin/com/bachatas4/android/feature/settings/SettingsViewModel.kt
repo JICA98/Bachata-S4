@@ -29,6 +29,8 @@ data class SettingsUiState(
     val scope: ProfileScope = ProfileScope.Global,
     val runtime: SettingsRuntime = SettingsRuntime.SHADPS4,
     val query: String = "",
+    val selectedCategory: String? = null,
+    val categories: List<String> = emptyList(),
     val profile: RuntimeProfile = RuntimeProfile(),
     val settings: List<RuntimeSettingSpec> = emptyList(),
     val error: String? = null,
@@ -39,18 +41,35 @@ class SettingsViewModel @Inject constructor(
     private val store: RuntimeProfileStore,
 ) : ViewModel() {
     private val catalog = RuntimeSettingCatalog.loadFromResources()
-    private val mutableState = MutableStateFlow(SettingsUiState(settings = catalog.shadPs4))
+    private val mutableState = MutableStateFlow(
+        SettingsUiState(settings = catalog.shadPs4, categories = categoriesFor(SettingsRuntime.SHADPS4)),
+    )
     val state: StateFlow<SettingsUiState> = mutableState
     private var profileJob: Job? = null
 
     init { selectScope(ProfileScope.Global) }
 
     fun selectRuntime(runtime: SettingsRuntime) {
-        mutableState.value = mutableState.value.copy(runtime = runtime, settings = visible(runtime, mutableState.value.query))
+        mutableState.value = mutableState.value.copy(
+            runtime = runtime,
+            selectedCategory = null,
+            categories = categoriesFor(runtime),
+            settings = visible(runtime, mutableState.value.query, null),
+        )
     }
 
     fun search(query: String) {
-        mutableState.value = mutableState.value.copy(query = query, settings = visible(mutableState.value.runtime, query))
+        mutableState.value = mutableState.value.copy(
+            query = query,
+            settings = visible(mutableState.value.runtime, query, mutableState.value.selectedCategory),
+        )
+    }
+
+    fun selectCategory(category: String?) {
+        mutableState.value = mutableState.value.copy(
+            selectedCategory = category,
+            settings = visible(mutableState.value.runtime, mutableState.value.query, category),
+        )
     }
 
     fun selectScope(scope: ProfileScope) {
@@ -109,14 +128,22 @@ class SettingsViewModel @Inject constructor(
         append("gameIds=${mutableState.value.gameIds.joinToString(",")}")
     }
 
-    internal fun visible(runtime: SettingsRuntime, query: String): List<RuntimeSettingSpec> {
+    internal fun visible(runtime: SettingsRuntime, query: String, category: String? = null): List<RuntimeSettingSpec> {
         val source = if (runtime == SettingsRuntime.SHADPS4) catalog.shadPs4 else catalog.box64
         val needle = query.trim()
         return source.filter { spec ->
-            needle.isEmpty() || listOf(spec.title, spec.help, spec.nativeKey, spec.category, spec.section)
-                .any { it.contains(needle, ignoreCase = true) }
+            (category == null || spec.category == category) &&
+                (needle.isEmpty() || listOf(spec.title, spec.help, spec.nativeKey, spec.category, spec.section)
+                    .any { it.contains(needle, ignoreCase = true) })
         }
     }
+
+    private fun categoriesFor(runtime: SettingsRuntime): List<String> =
+        (if (runtime == SettingsRuntime.SHADPS4) catalog.shadPs4 else catalog.box64)
+            .map { it.category }
+            .filter(String::isNotBlank)
+            .distinct()
+            .sorted()
 
     private fun mutate(block: (RuntimeProfile) -> RuntimeProfile) {
         viewModelScope.launch {

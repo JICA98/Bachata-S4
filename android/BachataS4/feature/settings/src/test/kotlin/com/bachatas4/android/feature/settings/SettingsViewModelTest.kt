@@ -1,6 +1,7 @@
 package com.bachatas4.android.feature.settings
 
 import com.bachatas4.android.data.RuntimeProfileStore
+import com.bachatas4.android.runtime.settings.ProfileScope
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -32,5 +33,16 @@ class SettingsViewModelTest {
         assertTrue(export.contains("vulkanUuid=vk-uuid"))
         assertTrue(export.contains("gameIds=CUSA00001,CUSA00002"))
         assertFalse(export.contains("/"))
+    }
+
+    @Test
+    fun selectedCategoryFiltersTheActiveRuntimeWithoutChangingScope() {
+        val viewModel = viewModel()
+
+        viewModel.selectCategory("Audio")
+
+        assertTrue(viewModel.state.value.settings.isNotEmpty())
+        assertTrue(viewModel.state.value.settings.all { it.category == "Audio" })
+        assertEquals(ProfileScope.Global, viewModel.state.value.scope)
     }
 }
