@@ -27,6 +27,21 @@ class ControllerFrameEncoderTest {
         assertEquals(listOf(3 to ControllerSnapshot.Neutral), received)
     }
 
+    @Test fun legacySubmissionRoutesToSlotZero() {
+        val received = mutableListOf<Pair<Int, ControllerSnapshot>>()
+        val sink: (Int, ControllerSnapshot) -> Unit = { slot, snapshot -> received += slot to snapshot }
+        val snapshot = ControllerSnapshot.normalized(buttons = Ps4Button.CROSS)
+        ManagedSession.attachControllerSlotSink(sink)
+
+        try {
+            ManagedSession.submitController(snapshot)
+        } finally {
+            ManagedSession.detachControllerSlotSink(sink)
+        }
+
+        assertEquals(listOf(0 to snapshot), received)
+    }
+
     @Test fun encodesNormalizedSnapshotWithMonotonicSequence() {
         val encoder = ControllerFrameEncoder()
         val snapshot = ControllerSnapshot.normalized(

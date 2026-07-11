@@ -49,7 +49,7 @@ object ManagedSession {
     fun update(value: ManagedSessionState) { mutableState.value = value }
     fun attachControllerSink(sink: (ControllerSnapshot) -> Unit) { controllerSink.set(sink) }
     fun detachControllerSink(sink: (ControllerSnapshot) -> Unit) { controllerSink.compareAndSet(sink, null) }
-    fun submitController(snapshot: ControllerSnapshot) { controllerSink.get()?.invoke(snapshot) }
+    fun submitController(snapshot: ControllerSnapshot) { submitController(0, snapshot) }
     fun attachControllerSlotSink(sink: (Int, ControllerSnapshot) -> Unit) { controllerSlotSink.set(sink) }
     fun detachControllerSlotSink(sink: (Int, ControllerSnapshot) -> Unit) { controllerSlotSink.compareAndSet(sink, null) }
     fun submitController(slot: Int, snapshot: ControllerSnapshot) {
