@@ -209,6 +209,7 @@ const box64BuildScriptPath = resolve(projectRoot, "runtime/scripts/build-box64.s
 const box64HostBuildScriptPath = resolve(projectRoot, "runtime/scripts/build-box64-host.sh");
 const box64EntrypointPatchPath = resolve(projectRoot, "runtime/patches/box64-winlator-glibc-entrypoint.patch");
 const box64QuickExitPatchPath = resolve(projectRoot, "runtime/patches/box64-cxa-quick-exit.patch");
+const box64NativeWriteOpcodePatchPath = resolve(projectRoot, "runtime/patches/box64-native-write-opcode.patch");
 const nativeHostLoaderPath = resolve(projectRoot, "android/BachataS4/core/runtime/src/main/jniLibs/arm64-v8a/libbachata_host_loader.so");
 const nativeHostBox64Path = resolve(projectRoot, "android/BachataS4/core/runtime/src/main/jniLibs/arm64-v8a/libbachata_host_box64.so");
 const playStoreRuntimeDir = resolve(projectRoot, "android/BachataS4/app/src/playstore/assets/runtime");
@@ -235,6 +236,18 @@ if (!readFileSync(box64QuickExitPatchPath, "utf8").includes("GOM(__cxa_at_quick_
 }
 if (!readFileSync(box64EntrypointPatchPath, "utf8").includes("!defined(WINLATOR_GLIBC)")) {
   fail("Box64 Android entrypoint patch does not select glibc startup");
+}
+const nativeWriteOpcodePatch = readFileSync(box64NativeWriteOpcodePatchPath, "utf8");
+for (const marker of [
+  "0xd50b7a20u",
+  "0xd50b7e20u",
+  '"dc cvac, x7"',
+  '"dc civac, x19"',
+  '"dc isw, x0"',
+]) {
+  if (!nativeWriteOpcodePatch.includes(marker)) {
+    fail(`Box64 native write classifier patch is missing ${marker}`);
+  }
 }
 if (lock.schemaVersion !== 1) fail("Lock schemaVersion must be 1");
 if (JSON.stringify(lock.components) !== JSON.stringify(EXPECTED_COMPONENTS)) fail("Locked components differ from approved upstreams");

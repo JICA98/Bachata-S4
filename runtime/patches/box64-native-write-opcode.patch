@@ -37,7 +37,7 @@ diff --git a/src/libtools/decopcode_native.c b/src/libtools/decopcode_native.c
 new file mode 100644
 --- /dev/null
 +++ b/src/libtools/decopcode_native.c
-@@ -0,0 +1,20 @@
+@@ -0,0 +1,27 @@
 +#include "decopcode_native.h"
 +
 +int is_native_write_opcode(uint32_t opcode)
@@ -51,6 +51,13 @@ new file mode 100644
 +    const uint32_t single_class = opcode & 0x3b000000u;
 +    if (single_class == 0x38000000u || single_class == 0x39000000u)
 +        return (opcode & 0x00400000u) == 0;
++
++    // Cache clean/invalidate by virtual address must take shadPS4's write-side
++    // invalidation path when Turnip touches a protected GPU-tracked page.
++    const uint32_t cache_maintenance = opcode & 0xffffffe0u;
++    if (cache_maintenance == 0xd50b7a20u || // DC CVAC, Xt
++        cache_maintenance == 0xd50b7e20u)   // DC CIVAC, Xt
++        return 1;
 +
 +    // DC ZVA zeroes the cache block containing Xt and therefore writes memory.
 +    if ((opcode & 0xffffffe0u) == 0xd50b7420u)
@@ -75,7 +82,7 @@ diff --git a/tests/test_native_write_opcode.c b/tests/test_native_write_opcode.c
 new file mode 100644
 --- /dev/null
 +++ b/tests/test_native_write_opcode.c
-@@ -0,0 +1,33 @@
+@@ -0,0 +1,38 @@
 +#include <stdint.h>
 +#include <stdio.h>
 +
@@ -95,6 +102,11 @@ new file mode 100644
 +        {0xad428420, 0, "ldp q0, q1, [x1, #0x50]"},
 +        {0x3dc00023, 0, "ldr q3, [x1]"},
 +        {0xd50b7423, 1, "dc zva, x3"},
++        {0xd50b7a20, 1, "dc cvac, x0"},
++        {0xd50b7a27, 1, "dc cvac, x7"},
++        {0xd50b7e20, 1, "dc civac, x0"},
++        {0xd50b7e33, 1, "dc civac, x19"},
++        {0xd5087640, 0, "dc isw, x0"},
 +        {0xd65f03c0, 0, "ret"},
 +    };
 +
