@@ -4,6 +4,11 @@
 #include "platform/bachata/runtime_client.h"
 #include "platform/bachata/controller_snapshot.h"
 #include "platform/bachata/audio_transport.h"
+#include "platform/bachata/ffmpeg_cpu_policy.h"
+
+extern "C" {
+#include <libavutil/cpu.h>
+}
 
 #include <array>
 #include <condition_variable>
@@ -228,6 +233,19 @@ TEST(BachataAudioTransport, ConvertsGuestPcmToStereoS16) {
     const std::array<std::int16_t, 8> surround{100, 200, 300, 400, 500, 600, 700, 800};
     EXPECT_EQ(ConvertPcmToStereo(surround.data(), 1, 8, false, 0.5f),
               (std::vector<std::int16_t>{50, 100}));
+}
+
+TEST(BachataFfmpegCpuPolicy, DisablesCpuSpecificOptimizations) {
+    av_force_cpu_flags(-1);
+    const int detected_flags = av_get_cpu_flags();
+    ASSERT_NE(detected_flags, 0);
+
+    {
+        ScopedBox64CompatibleFfmpegCpuPolicy policy;
+        EXPECT_EQ(av_get_cpu_flags(), 0);
+    }
+
+    EXPECT_EQ(av_get_cpu_flags(), detected_flags);
 }
 #endif
 

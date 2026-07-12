@@ -10,6 +10,10 @@
 #include "core/libraries/avplayer/avplayer_source.h"
 #include "core/memory.h"
 
+#ifdef ENABLE_BACHATA_RUNTIME
+#include "platform/bachata/ffmpeg_cpu_policy.h"
+#endif
+
 #include <magic_enum/magic_enum.hpp>
 
 extern "C" {
@@ -264,7 +268,13 @@ bool AvPlayerSource::Start() {
                       m_audio_stream_index.value());
             return false;
         }
-        if (avcodec_open2(m_audio_codec_context.get(), decoder, nullptr) < 0) {
+        const auto open_audio_codec = [&] {
+#ifdef ENABLE_BACHATA_RUNTIME
+            const Platform::Bachata::ScopedBox64CompatibleFfmpegCpuPolicy cpu_policy;
+#endif
+            return avcodec_open2(m_audio_codec_context.get(), decoder, nullptr);
+        };
+        if (open_audio_codec() < 0) {
             LOG_ERROR(Lib_AvPlayer, "Could not open avcodec for audio stream {}.",
                       m_audio_stream_index.value());
             return false;
@@ -786,6 +796,9 @@ AvPlayerSource::AVFramePtr AvPlayerSource::ConvertAudioFrame(const AVFrame& fram
                             &in_ch_layout, AVSampleFormat(frame.format), frame.sample_rate, 0,
                             nullptr);
         m_swr_context = SWRContextPtr(swr_context, &ReleaseSWRContext);
+#ifdef ENABLE_BACHATA_RUNTIME
+        const Platform::Bachata::ScopedBox64CompatibleFfmpegCpuPolicy cpu_policy;
+#endif
         swr_init(m_swr_context.get());
     }
     const auto res = swr_convert_frame(m_swr_context.get(), pcm16_frame.get(), &frame);

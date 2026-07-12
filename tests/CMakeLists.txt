@@ -301,6 +301,7 @@ set(BACHATA_RUNTIME_TEST_SOURCES
     ${CMAKE_SOURCE_DIR}/src/platform/bachata/runtime_client.cpp
     ${CMAKE_SOURCE_DIR}/src/platform/bachata/controller_snapshot.cpp
     ${CMAKE_SOURCE_DIR}/src/platform/bachata/audio_transport.cpp
+    ${CMAKE_SOURCE_DIR}/src/platform/bachata/ffmpeg_cpu_policy.cpp
     platform/test_bachata_runtime_client.cpp
     platform/test_bachata_controller_snapshot.cpp
 )
@@ -314,6 +315,7 @@ target_include_directories(shadps4_bachata_runtime_test PRIVATE
 target_compile_features(shadps4_bachata_runtime_test PRIVATE cxx_std_23)
 
 target_link_libraries(shadps4_bachata_runtime_test PRIVATE
+    FFmpeg::ffmpeg
     GTest::gtest_main
 )
 

@@ -1206,6 +1206,7 @@ if (ENABLE_BACHATA_RUNTIME)
         src/platform/bachata/runtime_client.cpp
         src/platform/bachata/controller_snapshot.cpp
         src/platform/bachata/audio_transport.cpp
+        src/platform/bachata/ffmpeg_cpu_policy.cpp
         src/platform/bachata/runtime_client.h
     )
 endif()
