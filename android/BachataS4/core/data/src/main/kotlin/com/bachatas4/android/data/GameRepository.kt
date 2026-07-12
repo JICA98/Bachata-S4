@@ -34,6 +34,25 @@ class GameRepository @Inject constructor(
         )
     }
 
+    /**
+     * Re-read TITLE from on-disk param.sfo for games that were imported under folder names.
+     * Does not rename game ids or directories.
+     */
+    suspend fun backfillTitlesFromSfo() {
+        val entities = gameDao.getAll()
+        val byId = entities.associateBy { it.id }
+        val updates = titlesToUpdate(
+            games = entities.map { it.id to it.title },
+            sfoTitleFor = { id ->
+                val entity = byId[id] ?: return@titlesToUpdate null
+                val file = GameIconPaths.paramSfo(context.filesDir, entity.relativePath)
+                if (!file.isFile) return@titlesToUpdate null
+                runCatching { ParamSfoReader.parse(file.readBytes()).title }.getOrNull()
+            },
+        )
+        updates.forEach { (id, title) -> gameDao.updateTitle(id, title) }
+    }
+
     suspend fun deleteGame(id: String): Boolean {
         val game = gameDao.getById(id) ?: return false
         val gamesRoot = context.filesDir.resolve("games").canonicalFile

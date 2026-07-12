@@ -25,8 +25,14 @@ interface GameDao {
     @Query("SELECT * FROM games ORDER BY title COLLATE NOCASE")
     fun observeAll(): Flow<List<GameEntity>>
 
+    @Query("SELECT * FROM games")
+    suspend fun getAll(): List<GameEntity>
+
     @Query("SELECT * FROM games WHERE id = :id")
     suspend fun getById(id: String): GameEntity?
+
+    @Query("UPDATE games SET title = :title WHERE id = :id")
+    suspend fun updateTitle(id: String, title: String): Int
 
     @Query("DELETE FROM games WHERE id = :id")
     suspend fun deleteById(id: String): Int

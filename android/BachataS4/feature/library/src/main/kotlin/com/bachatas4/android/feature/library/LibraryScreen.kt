@@ -1,8 +1,11 @@
 package com.bachatas4.android.feature.library
 
 import android.content.Intent
+import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -14,6 +17,7 @@ import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -24,43 +28,43 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.Image
-import androidx.compose.ui.res.painterResource
-import androidx.compose.foundation.layout.size
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.documentfile.provider.DocumentFile
+import androidx.hilt.navigation.compose.hiltViewModel
 import com.bachatas4.android.data.ContentImportRequest
 import com.bachatas4.android.data.ContentImporter
 import com.bachatas4.android.data.ContentTreeEntry
+import com.bachatas4.android.data.GameIconPaths
+import com.bachatas4.android.data.GameMetadataResolver
 import com.bachatas4.android.data.GameRepository
+import com.bachatas4.android.data.ParamSfoReader
+import com.bachatas4.android.designsystem.BachataActionBar
+import com.bachatas4.android.designsystem.BachataPanel
+import com.bachatas4.android.designsystem.BachataPrimaryButton
+import com.bachatas4.android.designsystem.theme.BachataPalette
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
-import java.util.UUID
-import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import com.bachatas4.android.designsystem.BachataActionBar
-import com.bachatas4.android.designsystem.BachataPanel
-import com.bachatas4.android.designsystem.BachataPrimaryButton
-import com.bachatas4.android.designsystem.BachataScreenHeader
-import com.bachatas4.android.designsystem.theme.BachataPalette
 
 @Composable
 fun LibraryScreen(
@@ -77,6 +81,7 @@ fun LibraryScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var importing by remember { mutableStateOf(false) }
     LaunchedEffect(dependencies) {
+        runCatching { dependencies.gameRepository().backfillTitlesFromSfo() }
         dependencies.gameRepository().observeGames().collectLatest(viewModel::setGames)
     }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
@@ -86,16 +91,29 @@ fun LibraryScreen(
             error = null
             try {
                 context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                val (title, entries) = withContext(Dispatchers.IO) {
+                val (folderName, entries) = withContext(Dispatchers.IO) {
                     val root = requireNotNull(DocumentFile.fromTreeUri(context, uri)) {
                         "Cannot read selected folder"
                     }
                     (root.name?.ifBlank { null } ?: "Imported game") to root.toImportEntries()
                 }
-                val id = Regex("CUSA\\d{5}", RegexOption.IGNORE_CASE)
-                    .find(title)?.value?.uppercase() ?: "GAME-${UUID.randomUUID()}"
+                val sfoEntry = entries.firstOrNull { it.relativePath == "sce_sys/param.sfo" }
+                val sfoBytes = sfoEntry?.let { entry ->
+                    withContext(Dispatchers.IO) {
+                        runCatching {
+                            context.contentResolver.openInputStream(Uri.parse(entry.sourceUri))
+                                ?.use { it.readBytes() }
+                        }.getOrNull()
+                    }
+                }
+                val sfo = sfoBytes?.let { ParamSfoReader.parse(it) }
+                val resolved = GameMetadataResolver.resolve(folderName = folderName, sfo = sfo)
                 val result = dependencies.contentImporter().importGameTree(
-                    ContentImportRequest(id = id, title = title, sourceUri = uri.toString()),
+                    ContentImportRequest(
+                        id = resolved.id,
+                        title = resolved.title,
+                        sourceUri = uri.toString(),
+                    ),
                     entries,
                 )
                 dependencies.gameRepository().addImportedGame(result, uri.toString(), System.currentTimeMillis())
@@ -198,21 +216,31 @@ fun LibraryContent(
                         modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
                         color = BachataPalette.RaisedSurface,
                     ) {
-                        Column(
+                        Row(
                             modifier = Modifier.fillMaxWidth().padding(24.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalAlignment = Alignment.Top,
                         ) {
-                            Text("SELECTED GAME", style = MaterialTheme.typography.labelMedium, color = BachataPalette.Accent)
-                            Text(
-                                selected.title,
-                                style = MaterialTheme.typography.displaySmall,
-                                fontWeight = FontWeight.Bold,
-                                color = BachataPalette.Primary,
+                            GameCover(
+                                relativePath = selected.relativePath,
+                                modifier = Modifier.width(120.dp).aspectRatio(0.75f),
                             )
-                            Text("${selected.id}  •  Ready to play", color = BachataPalette.Secondary)
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                BachataPrimaryButton(onClick = { onLaunch(selected.id) }) { Text("▶  Resume") }
-                                TextButton(onClick = { onOpenGameSettings(selected.id) }) { Text("Options") }
+                            Column(
+                                modifier = Modifier.weight(1f),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                            ) {
+                                Text("SELECTED GAME", style = MaterialTheme.typography.labelMedium, color = BachataPalette.Accent)
+                                Text(
+                                    selected.title,
+                                    style = MaterialTheme.typography.displaySmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = BachataPalette.Primary,
+                                )
+                                Text("${selected.id}  •  Ready to play", color = BachataPalette.Secondary)
+                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    BachataPrimaryButton(onClick = { onLaunch(selected.id) }) { Text("▶  Resume") }
+                                    TextButton(onClick = { onOpenGameSettings(selected.id) }) { Text("Options") }
+                                }
                             }
                         }
                     }
@@ -300,19 +328,49 @@ private fun LibraryGameCard(
         color = if (selected) BachataPalette.RaisedSurface else BachataPalette.Surface,
     ) {
         Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Box(
-                modifier = Modifier.fillMaxWidth().aspectRatio(0.75f)
-                    .clip(RoundedCornerShape(8.dp)).background(BachataPalette.Canvas),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text("GAME", color = BachataPalette.Secondary, style = MaterialTheme.typography.labelSmall)
-            }
+            GameCover(
+                relativePath = game.relativePath,
+                modifier = Modifier.fillMaxWidth().aspectRatio(0.75f),
+            )
             Text(game.title, maxLines = 2, color = BachataPalette.Primary, fontWeight = FontWeight.SemiBold)
             Text(game.id, maxLines = 1, color = BachataPalette.Secondary, style = MaterialTheme.typography.labelSmall)
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 TextButton(onClick = { onLaunch(game.id) }) { Text("Launch") }
                 TextButton(onClick = { onOpenGameSettings(game.id) }) { Text("⋮") }
             }
+        }
+    }
+}
+
+@Composable
+private fun GameCover(
+    relativePath: String,
+    modifier: Modifier = Modifier,
+) {
+    val context = LocalContext.current
+    val bitmap = remember(relativePath) {
+        val file = GameIconPaths.icon0(context.filesDir, relativePath)
+        if (!file.isFile) {
+            null
+        } else {
+            runCatching { BitmapFactory.decodeFile(file.absolutePath) }.getOrNull()
+        }
+    }
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(BachataPalette.Canvas),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (bitmap != null) {
+            Image(
+                bitmap = bitmap.asImageBitmap(),
+                contentDescription = null,
+                modifier = Modifier.fillMaxSize(),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Text("GAME", color = BachataPalette.Secondary, style = MaterialTheme.typography.labelSmall)
         }
     }
 }
