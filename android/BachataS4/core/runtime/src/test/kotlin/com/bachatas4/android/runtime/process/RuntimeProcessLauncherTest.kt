@@ -162,27 +162,10 @@ class RuntimeProcessLauncherTest {
     }
 
     @Test
-    fun fallsBackToRuntimeHostBinariesWhenApkJniLibsMissing() {
+    fun requiresApkHostJniLibsForHostGlibcMode() {
         val request = validRequest(includeApkHostLibs = false)
-        val host = request.runtimeRoot.resolve("host")
         val launcher = RuntimeProcessLauncher { FakeProcessHandle() }
-
-        assertEquals(
-            listOf(
-                host.resolve("ld-linux-aarch64.so.1").toRealPath().toString(),
-                "--library-path",
-                host.toRealPath().toString(),
-                host.resolve("box64").toRealPath().toString(),
-                request.shadPs4Executable.toRealPath().toString(),
-                "--override-root",
-                request.overrideRoot.toRealPath().toString(),
-                "--bachata-storage-root",
-                request.storageRoot.toRealPath().toString(),
-                "--bachata-socket",
-                request.socketPath,
-            ),
-            launcher.command(request),
-        )
+        assertThrows(Exception::class.java) { launcher.command(request) }
     }
 
     private fun validRequest(
@@ -197,9 +180,7 @@ class RuntimeProcessLauncherTest {
         }
         Files.write(nativeLibraryDir.resolve("libbox64.so"), byteArrayOf(1)).toFile().setExecutable(true)
         val runtimeRoot = Files.createDirectories(base.resolve("runtime"))
-        val host = Files.createDirectories(runtimeRoot.resolve("host"))
-        Files.write(host.resolve("ld-linux-aarch64.so.1"), byteArrayOf(3))
-        Files.write(host.resolve("box64"), byteArrayOf(4)).toFile().setExecutable(true)
+        Files.createDirectories(runtimeRoot.resolve("host"))
         val shadPs4 = Files.write(runtimeRoot.resolve("bin/shadps4").also {
             Files.createDirectories(it.parent)
         }, byteArrayOf(2))

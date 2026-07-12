@@ -73,23 +73,16 @@ class RuntimeProcessLauncher(
                 listOf(box64.toString())
             }
             Box64Mode.HOST_GLIBC -> {
-                // Prefer APK jniLibs (playstore / local packaged runtime). Fall back to the
-                // downloaded/extracted runtime host/ tree (F-Droid / DOWNLOAD_RUNTIME builds),
-                // which ships the same binaries as host/ld-linux-aarch64.so.1 and host/box64.
-                val loader = resolveHostGlibcBinary(
-                    apkPath = request.nativeLibraryDir.resolve(HOST_LOADER_LIBRARY),
-                    runtimePath = hostDirectory.resolve(HOST_LOADER_RUNTIME),
-                    nativeLibraryDir = nativeLibraryDir,
-                    hostDirectory = hostDirectory,
-                    label = "Host glibc loader",
-                )
-                val box64 = resolveHostGlibcBinary(
-                    apkPath = request.nativeLibraryDir.resolve(HOST_BOX64_LIBRARY),
-                    runtimePath = hostDirectory.resolve(HOST_BOX64_RUNTIME),
-                    nativeLibraryDir = nativeLibraryDir,
-                    hostDirectory = hostDirectory,
-                    label = "Host Box64",
-                )
+                // Host loader/Box64 must live in the APK nativeLibraryDir. Android denies
+                // execve (EACCES) for binaries under filesDir even with +x (see 0.1.3 logs).
+                // package-runtime / install-host-jnilibs.mjs installs:
+                //   libbachata_host_loader.so  (ld-linux-aarch64.so.1)
+                //   libbachata_host_box64.so   (box64)
+                // The runtime host/ tree still provides glibc + X11 libraries via --library-path.
+                val loader = request.nativeLibraryDir.resolve(HOST_LOADER_LIBRARY).toRealPath()
+                val box64 = request.nativeLibraryDir.resolve(HOST_BOX64_LIBRARY).toRealPath()
+                validateNativeFile(nativeLibraryDir, loader, "Host glibc loader")
+                validateNativeFile(nativeLibraryDir, box64, "Host Box64")
                 listOf(loader.toString(), "--library-path", hostDirectory.toString(), box64.toString())
             }
         }
@@ -102,29 +95,6 @@ class RuntimeProcessLauncher(
             "--bachata-socket",
             socketPath.toString(),
         ) + request.arguments
-    }
-
-    private fun resolveHostGlibcBinary(
-        apkPath: Path,
-        runtimePath: Path,
-        nativeLibraryDir: Path,
-        hostDirectory: Path,
-        label: String,
-    ): Path {
-        if (Files.isRegularFile(apkPath)) {
-            val resolved = apkPath.toRealPath()
-            validateNativeFile(nativeLibraryDir, resolved, label)
-            return resolved
-        }
-        require(Files.isRegularFile(runtimePath)) {
-            "$label is missing from APK native libs ($apkPath) and runtime host ($runtimePath)"
-        }
-        val resolved = runtimePath.toRealPath()
-        if (!resolved.startsWith(hostDirectory)) {
-            throw SecurityException("$label escapes runtime host directory: $resolved")
-        }
-        require(Files.isReadable(resolved)) { "$label is not readable: $resolved" }
-        return resolved
     }
 
     private fun validateNativeFile(nativeLibraryDir: Path, path: Path, label: String) {
@@ -176,9 +146,6 @@ class RuntimeProcessLauncher(
         const val HOST_DIRECTORY = "host"
         const val HOST_LOADER_LIBRARY = "libbachata_host_loader.so"
         const val HOST_BOX64_LIBRARY = "libbachata_host_box64.so"
-        /** Names inside the packaged/downloaded runtime rootfs host/ directory. */
-        const val HOST_LOADER_RUNTIME = "ld-linux-aarch64.so.1"
-        const val HOST_BOX64_RUNTIME = "box64"
         const val BOX64_LIBRARY = "libbox64.so"
         val NULL_DEVICE = File("/dev/null")
         val ALLOWED_ENVIRONMENT = setOf(
