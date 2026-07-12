@@ -11,7 +11,7 @@ vulkan_qcom_patch="$project_root/runtime/patches/box64-vulkan-dispatch-tile-qcom
 vex_write_opcode_patch="$project_root/runtime/patches/box64-vex-write-opcode.patch"
 native_write_opcode_patch="$project_root/runtime/patches/box64-native-write-opcode.patch"
 
-for tool in cmake ninja aarch64-linux-gnu-gcc aarch64-linux-gnu-g++ readelf; do
+for tool in cc cmake ninja aarch64-linux-gnu-gcc aarch64-linux-gnu-g++ readelf; do
   command -v "$tool" >/dev/null || { echo "$tool is required" >&2; exit 1; }
 done
 test "$(git -C "$source_dir" rev-parse HEAD)" = "$expected_revision"
@@ -31,6 +31,8 @@ if ! git -C "$source_dir" apply --reverse --check "$native_write_opcode_patch" 2
   git -C "$source_dir" apply --check "$native_write_opcode_patch"
   git -C "$source_dir" apply "$native_write_opcode_patch"
 fi
+
+mkdir -p "$build_dir"
 
 cmake -S "$source_dir" -B "$build_dir" -G Ninja \
   -DCMAKE_SYSTEM_NAME=Linux \

@@ -31,6 +31,7 @@ cmake -S "$project_root" -B "$build_dir" -G Ninja \
   -DCMAKE_CXX_COMPILER_AR="$llvm_ar" \
   -DCMAKE_CXX_COMPILER_RANLIB="$llvm_ranlib" \
   -DENABLE_BACHATA_RUNTIME=ON \
+  -DENABLE_USERFAULTFD=OFF \
   -DENABLE_DISCORD_RPC=OFF \
   -DENABLE_UPDATER=OFF \
   -DENABLE_TESTS=OFF \

@@ -207,6 +207,7 @@ const manifestPath = resolve(process.argv[4] ?? resolve(projectRoot, "android/Ba
 const xServerOverridePath = resolve(projectRoot, "runtime/vendor-overrides/com/winlator/xserver/XServer.java");
 const box64BuildScriptPath = resolve(projectRoot, "runtime/scripts/build-box64.sh");
 const box64HostBuildScriptPath = resolve(projectRoot, "runtime/scripts/build-box64-host.sh");
+const shadPs4BuildScriptPath = resolve(projectRoot, "runtime/scripts/build-shadps4-x86_64.sh");
 const box64EntrypointPatchPath = resolve(projectRoot, "runtime/patches/box64-winlator-glibc-entrypoint.patch");
 const box64QuickExitPatchPath = resolve(projectRoot, "runtime/patches/box64-cxa-quick-exit.patch");
 const box64NativeWriteOpcodePatchPath = resolve(projectRoot, "runtime/patches/box64-native-write-opcode.patch");
@@ -225,11 +226,20 @@ if (readFileSync(xServerOverridePath, "utf8").includes("GLXExtension")) {
 if (!readFileSync(box64BuildScriptPath, "utf8").includes("-DWINLATOR_GLIBC=ON")) {
   fail("Box64 must be built with Winlator glibc ABI wrappers");
 }
+if (readFileSync(shadPs4BuildScriptPath, "utf8").includes("-DENABLE_USERFAULTFD=ON")) {
+  fail("shadPS4 managed runtime must keep mprotect write tracking");
+}
+if (!readFileSync(shadPs4BuildScriptPath, "utf8").includes("-DENABLE_USERFAULTFD=OFF")) {
+  fail("shadPS4 build must override cached userfaultfd mode with OFF");
+}
 if (!readFileSync(box64HostBuildScriptPath, "utf8").includes("aarch64-linux-gnu-gcc")) {
   fail("Host Box64 must use the pinned AArch64 glibc cross-build path");
 }
 if (!readFileSync(box64HostBuildScriptPath, "utf8").includes("box64-cxa-quick-exit.patch")) {
   fail("Host Box64 build does not apply the quick-exit compatibility patch");
+}
+if (readFileSync(box64HostBuildScriptPath, "utf8").includes("box64-backing-dmem-clean-code.patch")) {
+  fail("Host Box64 build must preserve shared-mapping invalidation semantics");
 }
 if (!readFileSync(box64QuickExitPatchPath, "utf8").includes("GOM(__cxa_at_quick_exit, iFEpp)")) {
   fail("Box64 quick-exit compatibility patch is invalid");
