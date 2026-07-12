@@ -49,11 +49,14 @@ android {
         applicationId = "com.bachatas4.android"
         minSdk = 31
         targetSdk = 37
-        // Priority: -P override > version.properties > date-based dev defaults
-        versionCode = (findProperty("VERSION_CODE") as String?)?.toIntOrNull()
+        // Priority: CLI -P only > version.properties > date-based dev defaults
+        // (do not read VERSION_* from gradle.properties — that fights AutoUpdate)
+        val cliVersionCode = gradle.startParameter.projectProperties["VERSION_CODE"]
+        val cliVersionName = gradle.startParameter.projectProperties["VERSION_NAME"]
+        versionCode = cliVersionCode?.toIntOrNull()
             ?: versionProperties.getProperty("VERSION_CODE")?.toIntOrNull()
             ?: SimpleDateFormat("yyMMddHH").format(Date()).toInt()
-        versionName = (findProperty("VERSION_NAME") as String?)
+        versionName = cliVersionName
             ?: versionProperties.getProperty("VERSION_NAME")
             ?: ("0.1.0-dev-" + SimpleDateFormat("yyyyMMdd-HHmm").format(Date()))
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
