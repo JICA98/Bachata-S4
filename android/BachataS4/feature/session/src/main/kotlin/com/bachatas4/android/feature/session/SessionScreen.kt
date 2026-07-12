@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.activity.compose.BackHandler
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.bachatas4.android.runtime.session.ManagedSession
 import com.bachatas4.android.runtime.session.ManagedSessionState
@@ -89,6 +90,10 @@ fun SessionScreen(
             delay(5000)
             notificationVisible = false
         }
+    }
+
+    BackHandler(enabled = state is ManagedSessionState.Running) {
+        showStopOverlay = !showStopOverlay
     }
 
     BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
