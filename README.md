@@ -136,4 +136,4 @@ Additional third-party licenses for the Android runtime are listed in [NOTICE.an
 
 - **shadPS4** team and contributors — emulator core  
 - **box64**, **Winlator**, and other runtime dependencies — see locks and NOTICE  
-- Logo / store graphics under `assets/` and `fastlane/`
+- Logo: `android/BachataS4/app/src/main/play_store_512.png` (also Fastlane icon / `assets/logo.png`)
