@@ -45,10 +45,10 @@ import androidx.compose.ui.viewinterop.AndroidView
 fun FixedControllerOverlay(
     modifier: Modifier = Modifier,
     layout: TouchLayout = TouchLayout(),
+    faded: Boolean = false,
     onSnapshot: (ControllerSnapshot) -> Unit,
 ) {
     val state = remember(layout) { TouchControllerState(layout) }
-    var faded by remember { mutableStateOf(false) }
     var snapshot by remember { mutableStateOf(ControllerSnapshot.Neutral) }
     DisposableEffect(state) {
         onDispose { state.cancelAll(); onSnapshot(ControllerSnapshot.Neutral) }
@@ -90,16 +90,6 @@ fun FixedControllerOverlay(
                 view.faded = faded
                 view.invalidate()
             }
-        )
-        Text(
-            text = if (faded) "SHOW" else "FADE",
-            modifier = Modifier.align(Alignment.TopEnd)
-                .padding(12.dp)
-                .clip(RoundedCornerShape(999.dp))
-                .background(Color.Black.copy(alpha = 0.55f))
-                .clickable { faded = !faded }
-                .padding(horizontal = 12.dp, vertical = 7.dp),
-            color = BachataPalette.Primary,
         )
     }
 }
