@@ -5,7 +5,7 @@ SPDX-License-Identifier: GPL-2.0-or-later
 
 <h1 align="center">
   <br>
-  <img src="assets/logo.png" alt="BachataS4" width="180">
+  <img src="android/BachataS4/app/src/main/play_store_512.png" alt="BachataS4" width="180">
   <br>
   <b>BachataS4</b>
   <br>
