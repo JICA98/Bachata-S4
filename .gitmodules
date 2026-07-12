@@ -155,3 +155,7 @@
 	path = externals/vulkan-loader
 	url = https://github.com/KhronosGroup/Vulkan-Loader
 	shallow = true
+[submodule "externals/winlator-app"]
+	path = externals/winlator-app
+	url = https://github.com/brunodev85/winlator-app.git
+	shallow = true
