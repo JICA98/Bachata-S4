@@ -161,14 +161,45 @@ class RuntimeProcessLauncherTest {
         }
     }
 
-    private fun validRequest(environment: Map<String, String> = emptyMap()): RuntimeProcessRequest {
+    @Test
+    fun fallsBackToRuntimeHostBinariesWhenApkJniLibsMissing() {
+        val request = validRequest(includeApkHostLibs = false)
+        val host = request.runtimeRoot.resolve("host")
+        val launcher = RuntimeProcessLauncher { FakeProcessHandle() }
+
+        assertEquals(
+            listOf(
+                host.resolve("ld-linux-aarch64.so.1").toRealPath().toString(),
+                "--library-path",
+                host.toRealPath().toString(),
+                host.resolve("box64").toRealPath().toString(),
+                request.shadPs4Executable.toRealPath().toString(),
+                "--override-root",
+                request.overrideRoot.toRealPath().toString(),
+                "--bachata-storage-root",
+                request.storageRoot.toRealPath().toString(),
+                "--bachata-socket",
+                request.socketPath,
+            ),
+            launcher.command(request),
+        )
+    }
+
+    private fun validRequest(
+        environment: Map<String, String> = emptyMap(),
+        includeApkHostLibs: Boolean = true,
+    ): RuntimeProcessRequest {
         val base = temporaryFolder.newFolder().toPath()
         val nativeLibraryDir = Files.createDirectories(base.resolve("apk/lib"))
-        Files.write(nativeLibraryDir.resolve("libbachata_host_loader.so"), byteArrayOf(1))
-        Files.write(nativeLibraryDir.resolve("libbachata_host_box64.so"), byteArrayOf(1))
+        if (includeApkHostLibs) {
+            Files.write(nativeLibraryDir.resolve("libbachata_host_loader.so"), byteArrayOf(1))
+            Files.write(nativeLibraryDir.resolve("libbachata_host_box64.so"), byteArrayOf(1))
+        }
         Files.write(nativeLibraryDir.resolve("libbox64.so"), byteArrayOf(1)).toFile().setExecutable(true)
         val runtimeRoot = Files.createDirectories(base.resolve("runtime"))
-        Files.createDirectories(runtimeRoot.resolve("host"))
+        val host = Files.createDirectories(runtimeRoot.resolve("host"))
+        Files.write(host.resolve("ld-linux-aarch64.so.1"), byteArrayOf(3))
+        Files.write(host.resolve("box64"), byteArrayOf(4)).toFile().setExecutable(true)
         val shadPs4 = Files.write(runtimeRoot.resolve("bin/shadps4").also {
             Files.createDirectories(it.parent)
         }, byteArrayOf(2))

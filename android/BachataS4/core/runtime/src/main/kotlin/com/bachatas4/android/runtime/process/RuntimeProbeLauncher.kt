@@ -65,12 +65,22 @@ class RuntimeProbeLauncher {
 
     private fun hostGlibcCommand(request: RuntimeProbeRequest, runtimeRoot: Path, executable: Path): List<String> {
         val nativeLibraryDir = request.nativeLibraryDir.toRealPath()
-        val loader = request.nativeLibraryDir.resolve(HOST_LOADER_LIBRARY).toRealPath()
-        val box64 = request.nativeLibraryDir.resolve(HOST_BOX64_LIBRARY).toRealPath()
         val hostDirectory = runtimeRoot.resolve(HOST_DIRECTORY).toRealPath()
-        validateNativeFile(nativeLibraryDir, loader, "Host glibc loader")
-        validateNativeFile(nativeLibraryDir, box64, "Host Box64")
         validateContainedDirectory(runtimeRoot, hostDirectory, "Host runtime directory")
+        val loader = resolveHostGlibcBinary(
+            apkPath = request.nativeLibraryDir.resolve(HOST_LOADER_LIBRARY),
+            runtimePath = hostDirectory.resolve(HOST_LOADER_RUNTIME),
+            nativeLibraryDir = nativeLibraryDir,
+            hostDirectory = hostDirectory,
+            label = "Host glibc loader",
+        )
+        val box64 = resolveHostGlibcBinary(
+            apkPath = request.nativeLibraryDir.resolve(HOST_BOX64_LIBRARY),
+            runtimePath = hostDirectory.resolve(HOST_BOX64_RUNTIME),
+            nativeLibraryDir = nativeLibraryDir,
+            hostDirectory = hostDirectory,
+            label = "Host Box64",
+        )
         return listOf(
             loader.toString(),
             "--library-path",
@@ -106,12 +116,51 @@ class RuntimeProbeLauncher {
         val probe = request.executable.toRealPath()
         return when (request.box64Mode) {
             Box64Mode.APK_NATIVE -> listOf(probe)
-            Box64Mode.HOST_GLIBC -> listOf(
-                request.nativeLibraryDir.resolve(HOST_LOADER_LIBRARY).toRealPath(),
-                request.nativeLibraryDir.resolve(HOST_BOX64_LIBRARY).toRealPath(),
-                probe,
-            )
+            Box64Mode.HOST_GLIBC -> {
+                val hostDirectory = runtimeRoot.resolve(HOST_DIRECTORY).toRealPath()
+                val nativeLibraryDir = request.nativeLibraryDir.toRealPath()
+                listOf(
+                    resolveHostGlibcBinary(
+                        apkPath = request.nativeLibraryDir.resolve(HOST_LOADER_LIBRARY),
+                        runtimePath = hostDirectory.resolve(HOST_LOADER_RUNTIME),
+                        nativeLibraryDir = nativeLibraryDir,
+                        hostDirectory = hostDirectory,
+                        label = "Host glibc loader",
+                    ),
+                    resolveHostGlibcBinary(
+                        apkPath = request.nativeLibraryDir.resolve(HOST_BOX64_LIBRARY),
+                        runtimePath = hostDirectory.resolve(HOST_BOX64_RUNTIME),
+                        nativeLibraryDir = nativeLibraryDir,
+                        hostDirectory = hostDirectory,
+                        label = "Host Box64",
+                    ),
+                    probe,
+                )
+            }
         }
+    }
+
+    private fun resolveHostGlibcBinary(
+        apkPath: Path,
+        runtimePath: Path,
+        nativeLibraryDir: Path,
+        hostDirectory: Path,
+        label: String,
+    ): Path {
+        if (Files.isRegularFile(apkPath)) {
+            val resolved = apkPath.toRealPath()
+            validateNativeFile(nativeLibraryDir, resolved, label)
+            return resolved
+        }
+        require(Files.isRegularFile(runtimePath)) {
+            "$label is missing from APK native libs ($apkPath) and runtime host ($runtimePath)"
+        }
+        val resolved = runtimePath.toRealPath()
+        if (!resolved.startsWith(hostDirectory)) {
+            throw SecurityException("$label escapes runtime host directory: $resolved")
+        }
+        require(Files.isReadable(resolved)) { "$label is not readable: $resolved" }
+        return resolved
     }
 
     private fun validateNativeFile(nativeLibraryDir: Path, path: Path, label: String) {
@@ -168,6 +217,8 @@ class RuntimeProbeLauncher {
         const val HOST_DIRECTORY = "host"
         const val HOST_LOADER_LIBRARY = "libbachata_host_loader.so"
         const val HOST_BOX64_LIBRARY = "libbachata_host_box64.so"
+        const val HOST_LOADER_RUNTIME = "ld-linux-aarch64.so.1"
+        const val HOST_BOX64_RUNTIME = "box64"
         const val DEFAULT_TIMEOUT_SECONDS = 15L
         const val KILL_GRACE_SECONDS = 2L
         const val READER_JOIN_MILLIS = 1_000L
