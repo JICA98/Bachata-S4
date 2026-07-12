@@ -140,7 +140,7 @@ private class SurfaceWindowRenderer(
     private fun renderFrame() {
         var canvas: Canvas? = null
         try {
-            canvas = surface.lockHardwareCanvas()
+            canvas = surface.lockHardwareCanvas() ?: return
             canvas.drawColor(Color.BLACK)
             xServer.windowManager.rootWindow.children.forEach { window ->
                 val bounds = aspectFitBounds(

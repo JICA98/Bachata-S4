@@ -112,8 +112,13 @@ public class DRI3Extension extends Extension {
         final Texture texture = content.getTexture();
 
         if (!(texture instanceof GPUImage)) {
-            texture.destroy();
-            content.setTexture(new GPUImage(content, false));
+            GPUImage gpuImage = new GPUImage(content);
+            if (gpuImage.getHardwareBufferPtr() != 0 && gpuImage.getVirtualData() != null) {
+                texture.destroy();
+                content.setTexture(gpuImage);
+            } else {
+                gpuImage.destroy();
+            }
         }
 
         GPUImage gpuImage = (GPUImage)content.getTexture();

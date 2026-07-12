@@ -144,8 +144,13 @@ public class PresentExtension extends Extension {
         final Texture texture = content.getTexture();
 
         if (!(texture instanceof GPUImage)) {
-            texture.destroy();
-            content.setTexture(new GPUImage(content));
+            GPUImage gpuImage = new GPUImage(content);
+            if (gpuImage.getHardwareBufferPtr() != 0 && gpuImage.getVirtualData() != null) {
+                texture.destroy();
+                content.setTexture(gpuImage);
+            } else {
+                gpuImage.destroy();
+            }
         }
 
         if (eventId > 0) {
