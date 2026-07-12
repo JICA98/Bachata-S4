@@ -1,0 +1,37 @@
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index 1d848401c..392a1deb6 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -9,2 +9,4 @@ option(BUILD_THUNKS "Build thunks" FALSE)
+ option(BUILD_FEXCONFIG "Build FEXConfig" TRUE)
++option(BUILD_FEXCORE_ONLY "Build only FEXCore and an embedding smoke executable" OFF)
++set(FEXCORE_SMOKE_SOURCE "" CACHE FILEPATH "Embedding smoke executable source")
+ option(ENABLE_CLANG_THUNKS "Build thunks with clang" TRUE)
+@@ -601,4 +603,25 @@ add_subdirectory(FEXHeaderUtils/)
+ add_subdirectory(CodeEmitter/)
+-add_subdirectory(FEXCore/)
+-
++if (BUILD_FEXCORE_ONLY)
++  add_subdirectory(FEXCore/ EXCLUDE_FROM_ALL)
++else()
++  add_subdirectory(FEXCore/)
++endif()
++
++if (BUILD_FEXCORE_ONLY)
++  if (NOT IS_ABSOLUTE "${FEXCORE_SMOKE_SOURCE}")
++    message(FATAL_ERROR "FEXCORE_SMOKE_SOURCE must be an absolute path")
++  endif()
++  add_subdirectory(Source/Common/ EXCLUDE_FROM_ALL)
++  add_subdirectory(Source/Tools/CommonTools/ EXCLUDE_FROM_ALL)
++  add_executable(fexcore-smoke "${FEXCORE_SMOKE_SOURCE}")
++  target_compile_features(fexcore-smoke PRIVATE cxx_std_20)
++  target_include_directories(fexcore-smoke PRIVATE
++    "${CMAKE_BINARY_DIR}/generated"
++    "${CMAKE_SOURCE_DIR}/Source/Tools/CommonTools")
++  target_link_libraries(fexcore-smoke PRIVATE
++    FEXCore Common CommonTools JemallocLibs ${PTHREAD_LIB})
++  install(TARGETS fexcore-smoke RUNTIME DESTINATION bin)
++  return()
++endif()
++
+ if (ARCHITECTURE_arm64 AND NOT MINGW AND NOT BUILD_STEAM_SUPPORT)

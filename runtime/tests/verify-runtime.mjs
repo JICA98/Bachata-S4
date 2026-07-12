@@ -217,6 +217,7 @@ const shadPs4BuildScriptPath = resolve(projectRoot, "runtime/scripts/build-shadp
 const box64EntrypointPatchPath = resolve(projectRoot, "runtime/patches/box64-winlator-glibc-entrypoint.patch");
 const box64QuickExitPatchPath = resolve(projectRoot, "runtime/patches/box64-cxa-quick-exit.patch");
 const box64NativeWriteOpcodePatchPath = resolve(projectRoot, "runtime/patches/box64-native-write-opcode.patch");
+const fexCoreOnlyPatchPath = resolve(projectRoot, "runtime/patches/fex-fexcore-only.patch");
 const nativeHostLoaderPath = resolve(projectRoot, "android/BachataS4/core/runtime/src/main/jniLibs/arm64-v8a/libbachata_host_loader.so");
 const nativeHostBox64Path = resolve(projectRoot, "android/BachataS4/core/runtime/src/main/jniLibs/arm64-v8a/libbachata_host_box64.so");
 const playStoreRuntimeDir = resolve(projectRoot, "android/BachataS4/app/src/playstore/assets/runtime");
@@ -252,6 +253,22 @@ if (!readFileSync(box64QuickExitPatchPath, "utf8").includes("GOM(__cxa_at_quick_
 }
 if (!readFileSync(box64EntrypointPatchPath, "utf8").includes("!defined(WINLATOR_GLIBC)")) {
   fail("Box64 Android entrypoint patch does not select glibc startup");
+}
+if (!existsSync(fexCoreOnlyPatchPath)) {
+  fail("FEXCore-only patch is missing");
+}
+const fexCoreOnlyPatch = readFileSync(fexCoreOnlyPatchPath, "utf8");
+for (const marker of [
+  "BUILD_FEXCORE_ONLY",
+  "FEXCORE_SMOKE_SOURCE",
+  "add_executable(fexcore-smoke",
+  "FEXCore",
+  "CommonTools",
+  "install(TARGETS fexcore-smoke",
+]) {
+  if (!fexCoreOnlyPatch.includes(marker)) {
+    fail(`FEXCore-only patch is missing ${marker}`);
+  }
 }
 const nativeWriteOpcodePatch = readFileSync(box64NativeWriteOpcodePatchPath, "utf8");
 for (const marker of [
