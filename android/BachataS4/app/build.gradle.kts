@@ -22,12 +22,14 @@ android {
         }
     }
 
-    signingConfigs {
-        create("release") {
-            val keystoreFileName = localProperties.getProperty("signing.storeFile")
-            val keystoreFile: File? = if (keystoreFileName != null) rootProject.file(keystoreFileName) else null
-            if (keystoreFile != null && keystoreFile.exists()) {
-                storeFile = keystoreFile
+    val releaseKeystoreName = localProperties.getProperty("signing.storeFile")
+    val releaseKeystoreFile =
+        if (releaseKeystoreName != null) rootProject.file(releaseKeystoreName) else null
+    val hasReleaseKeystore = releaseKeystoreFile != null && releaseKeystoreFile.exists()
+    if (hasReleaseKeystore) {
+        signingConfigs {
+            create("release") {
+                storeFile = releaseKeystoreFile
                 storePassword = localProperties.getProperty("signing.storePassword")
                 keyAlias = localProperties.getProperty("signing.keyAlias")
                 keyPassword = localProperties.getProperty("signing.keyPassword")
@@ -51,10 +53,9 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
-            val isSigningConfigured = signingConfigs.getByName("release").storeFile != null
-            if (isSigningConfigured) {
-                signingConfig = signingConfigs.getByName("release")
-            }
+            // Only attach signing when a local release keystore is configured.
+            // F-Droid builds strip signing config and must remain unsigned here.
+            signingConfigs.findByName("release")?.let { signingConfig = it }
         }
     }
     compileOptions {
