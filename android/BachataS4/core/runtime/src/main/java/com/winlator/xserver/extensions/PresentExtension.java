@@ -6,6 +6,7 @@ import android.util.SparseArray;
 
 import com.winlator.renderer.GPUImage;
 import com.winlator.renderer.Texture;
+import com.winlator.sysvshm.SysVSharedMemory;
 import com.winlator.xconnector.XInputStream;
 import com.winlator.xconnector.XOutputStream;
 import com.winlator.xconnector.XStreamLock;
@@ -124,7 +125,14 @@ public class PresentExtension extends Extension {
 
         synchronized (content.renderLock) {
             if (pixmap != null) {
+                int srcFd = pixmap.drawable.getDmaBufFd();
+                if (srcFd != -1) {
+                    SysVSharedMemory.dmaBufSyncStart(srcFd, true);
+                }
                 content.copyArea((short)0, (short)0, xOff, yOff, pixmap.drawable.width, pixmap.drawable.height, pixmap.drawable);
+                if (srcFd != -1) {
+                    SysVSharedMemory.dmaBufSyncEnd(srcFd, true);
+                }
                 sendIdleNotify(window, pixmap, serial, idleFence);
             }
             else content.forceUpdate();

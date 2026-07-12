@@ -24,6 +24,8 @@ data class ContentImportRequest(
     val sourceUri: String,
     val expectedBytes: Long? = null,
     val expectedSha256: String? = null,
+    val subtitle: String? = null,
+    val detail: String? = null,
 )
 
 data class ContentImportResult(
@@ -112,7 +114,13 @@ class ContentImporter(
             moveAtomically(staging, destination)
             completed = true
             ContentImportResult(
-                Game(request.id, request.title, "games/${request.id}"),
+                Game(
+                    id = request.id,
+                    title = request.title,
+                    relativePath = "games/${request.id}",
+                    subtitle = request.subtitle,
+                    detail = request.detail,
+                ),
                 bytesCopied,
                 sha256,
             )
@@ -161,6 +169,8 @@ class ContentImporter(
                         id = request.id,
                         title = request.title,
                         relativePath = "games/${request.id}",
+                        subtitle = request.subtitle,
+                        detail = request.detail,
                     ),
                     bytesCopied = bytesCopied,
                     sha256 = sha256,

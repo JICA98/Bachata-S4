@@ -18,7 +18,9 @@ object DataModule {
     @Provides
     @Singleton
     fun database(@ApplicationContext context: Context): BachataDatabase =
-        Room.databaseBuilder(context, BachataDatabase::class.java, "bachata.db").build()
+        Room.databaseBuilder(context, BachataDatabase::class.java, "bachata.db")
+            .fallbackToDestructiveMigration()
+            .build()
 
     @Provides
     fun gameDao(database: BachataDatabase): GameDao = database.gameDao()

@@ -30,8 +30,47 @@ class GameRepository @Inject constructor(
                 relativePath = result.game.relativePath,
                 sourceUri = sourceUri,
                 importedAtMs = importedAtMs,
+                subtitle = result.game.subtitle,
+                detail = result.game.detail,
+                lastLaunchedAtMs = 0L,
             ),
         )
+    }
+
+    /**
+     * Scan the app-owned games directory for folders that are not in the database,
+     * and automatically re-register them using their ParamSfo metadata.
+     */
+    suspend fun syncOrphanedFolders() {
+        val gamesRoot = context.filesDir.resolve("games")
+        if (!gamesRoot.isDirectory) return
+
+        val dbGames = gameDao.getAll().map { it.id }.toSet()
+        val folders = gamesRoot.listFiles()?.filter { it.isDirectory } ?: return
+
+        folders.forEach { folder ->
+            val id = folder.name
+            if (id !in dbGames) {
+                val sfoFile = GameIconPaths.paramSfo(context.filesDir, "games/$id")
+                val sfo = if (sfoFile.isFile) {
+                    runCatching { ParamSfoReader.parse(sfoFile.readBytes()) }.getOrNull()
+                } else null
+
+                val resolved = GameMetadataResolver.resolve(folderName = id, sfo = sfo)
+                gameDao.insert(
+                    GameEntity(
+                        id = resolved.id,
+                        title = resolved.title,
+                        relativePath = "games/$id",
+                        sourceUri = "",
+                        importedAtMs = System.currentTimeMillis(),
+                        subtitle = resolved.subtitle,
+                        detail = resolved.detail,
+                        lastLaunchedAtMs = 0L,
+                    ),
+                )
+            }
+        }
     }
 
     /**
@@ -53,6 +92,10 @@ class GameRepository @Inject constructor(
         updates.forEach { (id, title) -> gameDao.updateTitle(id, title) }
     }
 
+    suspend fun updateLastLaunched(id: String) {
+        gameDao.updateLastLaunched(id, System.currentTimeMillis())
+    }
+
     suspend fun deleteGame(id: String): Boolean {
         val game = gameDao.getById(id) ?: return false
         val gamesRoot = context.filesDir.resolve("games").canonicalFile
@@ -68,4 +111,7 @@ private fun GameEntity.toModel(): Game =
         id = id,
         title = title,
         relativePath = relativePath,
+        subtitle = subtitle,
+        detail = detail,
+        lastLaunchedAtMs = lastLaunchedAtMs,
     )

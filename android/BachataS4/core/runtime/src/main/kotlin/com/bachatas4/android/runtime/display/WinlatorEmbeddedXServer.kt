@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
+import android.util.Log
 import android.view.Surface
 import com.winlator.alsaserver.ALSAClient
 import com.winlator.alsaserver.ALSAClientConnectionHandler
@@ -116,6 +117,7 @@ private class SurfaceWindowRenderer(
     private var renderJob: Job? = null
     private var targetWidth = xServer.screenInfo.width.toInt()
     private var targetHeight = xServer.screenInfo.height.toInt()
+    private var frameCount = 0
 
     fun start() {
         check(renderJob == null) { "Surface renderer already started" }
@@ -142,7 +144,17 @@ private class SurfaceWindowRenderer(
         try {
             canvas = surface.lockHardwareCanvas() ?: return
             canvas.drawColor(Color.BLACK)
-            xServer.windowManager.rootWindow.children.forEach { window ->
+            val children = xServer.windowManager.rootWindow.children
+            frameCount++
+            if (frameCount % 60 == 0) {
+                Log.d("SurfaceRenderer", "frame=$frameCount children=${children.size}")
+            }
+            children.forEach { window ->
+                val drawable = window.content
+                val data = drawable?.data
+                if (frameCount % 60 == 0) {
+                    Log.d("SurfaceRenderer", "  window id=${window.id} renderable=${window.isRenderable} w=${window.width} h=${window.height} hasContent=${drawable != null} hasData=${data != null} dataCap=${data?.capacity() ?: 0}")
+                }
                 val bounds = aspectFitBounds(
                     window.width.toInt(), window.height.toInt(), canvas.width, canvas.height,
                 )
@@ -156,6 +168,8 @@ private class SurfaceWindowRenderer(
                 drawWindow(canvas, window)
                 canvas.restore()
             }
+        } catch (e: Exception) {
+            Log.e("SurfaceRenderer", "renderFrame crash", e)
         } catch (_: IllegalArgumentException) {
             // Surface was replaced between isValid and lockHardwareCanvas.
         } finally {

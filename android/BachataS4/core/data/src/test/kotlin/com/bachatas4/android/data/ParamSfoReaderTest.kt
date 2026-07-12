@@ -76,9 +76,9 @@ internal fun buildMinimalSfo(strings: Map<String, String>): ByteArray {
     out.putInt(entries.size)
     entries.forEachIndexed { i, _ ->
         out.putShort(keyOffsets[i].toShort())
-        // param_fmt as big-endian u16 0x0204 (Text)
-        out.put(0x02.toByte())
+        // param_fmt as big-endian u16 0x0204 (Text) stored as bytes 04 02 in memory
         out.put(0x04.toByte())
+        out.put(0x02.toByte())
         out.putInt(lengths[i])
         out.putInt(lengths[i])
         out.putInt(dataOffsets[i])

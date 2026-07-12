@@ -46,6 +46,9 @@ data class Game(
     val id: String,
     val title: String,
     val relativePath: String,
+    val subtitle: String? = null,
+    val detail: String? = null,
+    val lastLaunchedAtMs: Long = 0L,
 )
 
 @Serializable

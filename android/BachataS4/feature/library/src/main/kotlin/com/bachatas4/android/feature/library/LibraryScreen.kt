@@ -27,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -44,6 +45,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.documentfile.provider.DocumentFile
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.bachatas4.android.data.ContentImportRequest
@@ -81,6 +87,7 @@ fun LibraryScreen(
     var error by remember { mutableStateOf<String?>(null) }
     var importing by remember { mutableStateOf(false) }
     LaunchedEffect(dependencies) {
+        runCatching { dependencies.gameRepository().syncOrphanedFolders() }
         runCatching { dependencies.gameRepository().backfillTitlesFromSfo() }
         dependencies.gameRepository().observeGames().collectLatest(viewModel::setGames)
     }
@@ -113,6 +120,8 @@ fun LibraryScreen(
                         id = resolved.id,
                         title = resolved.title,
                         sourceUri = uri.toString(),
+                        subtitle = resolved.subtitle,
+                        detail = resolved.detail,
                     ),
                     entries,
                 )
@@ -124,6 +133,12 @@ fun LibraryScreen(
             }
         }
     }
+    val onLaunchWithTracking: (String) -> Unit = { id ->
+        scope.launch {
+            runCatching { dependencies.gameRepository().updateLastLaunched(id) }
+            onLaunch(id)
+        }
+    }
     val state by viewModel.state.collectAsState()
     LibraryContent(
         state = state,
@@ -133,7 +148,7 @@ fun LibraryScreen(
         onOpenGameSettings = onOpenGameSettings,
         onSelectGame = viewModel::selectGame,
         onImport = { picker.launch(null) },
-        onLaunch = onLaunch,
+        onLaunch = onLaunchWithTracking,
     )
 }
 
@@ -149,6 +164,15 @@ fun LibraryContent(
     onLaunch: (String) -> Unit,
 ) {
     val selected = state.games.firstOrNull { it.id == state.selectedGameId } ?: state.games.firstOrNull()
+    val context = LocalContext.current
+    val selectedCoverBitmap = remember(selected?.relativePath) {
+        if (selected == null) null else {
+            val file = GameIconPaths.icon0(context.filesDir, selected.relativePath)
+            if (!file.isFile) null else {
+                runCatching { BitmapFactory.decodeFile(file.absolutePath) }.getOrNull()
+            }
+        }
+    }
     Scaffold(
         containerColor = BachataPalette.Canvas,
         bottomBar = {
@@ -159,8 +183,37 @@ fun LibraryContent(
             )
         },
     ) { contentPadding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(contentPadding),
+        Box(modifier = Modifier.fillMaxSize()) {
+            if (selectedCoverBitmap != null) {
+                Image(
+                    bitmap = selectedCoverBitmap.asImageBitmap(),
+                    contentDescription = null,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .drawWithContent {
+                            drawContent()
+                            drawRect(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        BachataPalette.Canvas
+                                    ),
+                                    startY = size.height * 0.30f,
+                                    endY = size.height * 0.65f
+                                )
+                            )
+                            drawRect(
+                                color = BachataPalette.Canvas,
+                                topLeft = Offset(0f, size.height * 0.65f),
+                                size = Size(size.width, size.height * 0.35f)
+                            )
+                        },
+                    alpha = 0.22f,
+                    contentScale = ContentScale.Crop,
+                )
+            }
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(contentPadding),
             contentPadding = PaddingValues(bottom = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -183,7 +236,7 @@ fun LibraryContent(
                         }
                     )
                     Text(
-                        text = "BACHATA S4",
+                        text = "Library",
                         modifier = Modifier.weight(1f),
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold,
@@ -196,7 +249,7 @@ fun LibraryContent(
             }
             item {
                 if (selected == null) {
-                    BachataPanel(modifier = Modifier.padding(horizontal = 16.dp)) {
+                    GlassMorphicPanel(modifier = Modifier.padding(horizontal = 16.dp)) {
                         Column(
                             modifier = Modifier.fillMaxWidth().padding(24.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp),
@@ -212,9 +265,9 @@ fun LibraryContent(
                         }
                     }
                 } else {
-                    BachataPanel(
+                    GlassMorphicPanel(
                         modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
-                        color = BachataPalette.RaisedSurface,
+                        selected = true,
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth().padding(24.dp),
@@ -236,7 +289,23 @@ fun LibraryContent(
                                     fontWeight = FontWeight.Bold,
                                     color = BachataPalette.Primary,
                                 )
-                                Text("${selected.id}  •  Ready to play", color = BachataPalette.Secondary)
+                                val subtitle = selected.subtitle
+                                if (!subtitle.isNullOrBlank()) {
+                                    Text(
+                                        subtitle,
+                                        style = MaterialTheme.typography.titleMedium,
+                                        color = BachataPalette.Primary.copy(alpha = 0.8f),
+                                    )
+                                }
+                                val detail = selected.detail
+                                if (!detail.isNullOrBlank()) {
+                                    Text(
+                                        detail,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = BachataPalette.Secondary,
+                                    )
+                                }
+                                Text("Ready to play", color = BachataPalette.Secondary, style = MaterialTheme.typography.labelMedium)
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     BachataPrimaryButton(onClick = { onLaunch(selected.id) }) { Text("▶  Resume") }
                                     TextButton(onClick = { onOpenGameSettings(selected.id) }) { Text("Options") }
@@ -257,9 +326,11 @@ fun LibraryContent(
             }
             error?.let { message ->
                 item {
-                    BachataPanel(
+                    Surface(
                         modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
-                        color = Color(0xFF3A1E21),
+                        color = Color(0xFF3A1E21).copy(alpha = 0.5f),
+                        shape = RoundedCornerShape(12.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFB4AB).copy(alpha = 0.3f)),
                     ) {
                         Text("Import failed: $message", modifier = Modifier.padding(16.dp), color = Color(0xFFFFB4AB))
                     }
@@ -276,11 +347,14 @@ fun LibraryContent(
                     )
                 }
                 item {
+                    val continuePlayingGames = remember(state.games) {
+                        state.games.sortedByDescending { it.lastLaunchedAtMs }
+                    }
                     LazyRow(
                         contentPadding = PaddingValues(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        items(state.games.take(5), key = { it.id }) { game ->
+                        items(continuePlayingGames.take(5), key = { it.id }) { game ->
                             LibraryGameCard(game, game.id == selected?.id, onSelectGame, onLaunch, onOpenGameSettings)
                         }
                     }
@@ -314,6 +388,7 @@ fun LibraryContent(
         }
     }
 }
+}
 
 @Composable
 private fun LibraryGameCard(
@@ -323,9 +398,9 @@ private fun LibraryGameCard(
     onLaunch: (String) -> Unit,
     onOpenGameSettings: (String) -> Unit,
 ) {
-    BachataPanel(
+    GlassMorphicPanel(
         modifier = Modifier.width(148.dp).clickable { onSelectGame(game.id) },
-        color = if (selected) BachataPalette.RaisedSurface else BachataPalette.Surface,
+        selected = selected,
     ) {
         Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             GameCover(
@@ -333,13 +408,48 @@ private fun LibraryGameCard(
                 modifier = Modifier.fillMaxWidth().aspectRatio(0.75f),
             )
             Text(game.title, maxLines = 2, color = BachataPalette.Primary, fontWeight = FontWeight.SemiBold)
-            Text(game.id, maxLines = 1, color = BachataPalette.Secondary, style = MaterialTheme.typography.labelSmall)
+            val subtitle = game.subtitle
+            if (!subtitle.isNullOrBlank()) {
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(4.dp))
+                        .background(BachataPalette.Accent.copy(alpha = 0.15f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = subtitle,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        color = BachataPalette.Accent,
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 TextButton(onClick = { onLaunch(game.id) }) { Text("Launch") }
                 TextButton(onClick = { onOpenGameSettings(game.id) }) { Text("⋮") }
             }
         }
     }
+}
+
+@Composable
+private fun GlassMorphicPanel(
+    modifier: Modifier = Modifier,
+    selected: Boolean = false,
+    content: @Composable () -> Unit,
+) {
+    Surface(
+        modifier = modifier,
+        color = if (selected) BachataPalette.RaisedSurface.copy(alpha = 0.65f) else BachataPalette.Surface.copy(alpha = 0.40f),
+        shape = RoundedCornerShape(12.dp),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            Color.White.copy(alpha = if (selected) 0.30f else 0.12f)
+        ),
+        content = content,
+    )
 }
 
 @Composable

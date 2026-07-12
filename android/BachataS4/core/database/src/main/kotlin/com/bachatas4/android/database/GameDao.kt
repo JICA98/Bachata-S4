@@ -15,6 +15,9 @@ data class GameEntity(
     val relativePath: String,
     val sourceUri: String,
     val importedAtMs: Long,
+    val subtitle: String? = null,
+    val detail: String? = null,
+    val lastLaunchedAtMs: Long = 0L,
 )
 
 @Dao
@@ -33,6 +36,9 @@ interface GameDao {
 
     @Query("UPDATE games SET title = :title WHERE id = :id")
     suspend fun updateTitle(id: String, title: String): Int
+
+    @Query("UPDATE games SET lastLaunchedAtMs = :timestamp WHERE id = :id")
+    suspend fun updateLastLaunched(id: String, timestamp: Long): Int
 
     @Query("DELETE FROM games WHERE id = :id")
     suspend fun deleteById(id: String): Int

@@ -26,7 +26,7 @@ data class TouchLayout(
     val id: String = "default",
     val name: String = "Default",
     val controls: List<TouchControlPlacement> = defaultControls(),
-    val opacity: Float = 0.85f,
+    val opacity: Float = 0.5f,
     val scale: Float = 1f,
     val vibrationEnabled: Boolean = true,
     val analogCentering: Boolean = true,

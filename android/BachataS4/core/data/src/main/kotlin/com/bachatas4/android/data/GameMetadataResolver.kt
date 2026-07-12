@@ -5,6 +5,8 @@ import java.util.UUID
 data class ResolvedGameMetadata(
     val id: String,
     val title: String,
+    val subtitle: String?,
+    val detail: String?,
 )
 
 object GameMetadataResolver {
@@ -22,6 +24,11 @@ object GameMetadataResolver {
         val id = sfo?.titleId?.trim()?.takeIf { it.isNotEmpty() && safeId.matches(it) }
             ?: folderName?.let { cusa.find(it)?.value?.uppercase() }
             ?: "GAME-${randomId()}"
-        return ResolvedGameMetadata(id = id, title = title)
+        return ResolvedGameMetadata(
+            id = id,
+            title = title,
+            subtitle = sfo?.subtitle?.trim()?.takeIf { it.isNotEmpty() },
+            detail = sfo?.detail?.trim()?.takeIf { it.isNotEmpty() },
+        )
     }
 }

@@ -6,6 +6,8 @@ import java.nio.ByteOrder
 data class ParamSfoMetadata(
     val title: String?,
     val titleId: String?,
+    val subtitle: String? = null,
+    val detail: String? = null,
 )
 
 /**
@@ -44,15 +46,15 @@ object ParamSfoReader {
 
         var title: String? = null
         var titleId: String? = null
+        var subtitle: String? = null
+        var detail: String? = null
         for (i in 0 until count) {
             val entryPos = HEADER_SIZE + i * INDEX_ENTRY_SIZE
             if (entryPos + INDEX_ENTRY_SIZE > bytes.size) return ParamSfoMetadata(null, null)
             buf.position(entryPos)
             buf.order(ByteOrder.LITTLE_ENDIAN)
             val keyOffset = buf.short.toInt() and 0xFFFF
-            buf.order(ByteOrder.BIG_ENDIAN)
             val fmt = buf.short.toInt() and 0xFFFF
-            buf.order(ByteOrder.LITTLE_ENDIAN)
             val len = buf.int
             buf.int // maxLen
             val dataOffset = buf.int
@@ -62,9 +64,11 @@ object ParamSfoReader {
             when (key) {
                 "TITLE" -> title = value.ifBlank { null }
                 "TITLE_ID" -> titleId = value.ifBlank { null }
+                "SUBTITLE" -> subtitle = value.ifBlank { null }
+                "DETAIL" -> detail = value.ifBlank { null }
             }
         }
-        return ParamSfoMetadata(title = title, titleId = titleId)
+        return ParamSfoMetadata(title = title, titleId = titleId, subtitle = subtitle, detail = detail)
     }
 
     private fun readCString(bytes: ByteArray, start: Int, maxLen: Int = Int.MAX_VALUE): String? {
