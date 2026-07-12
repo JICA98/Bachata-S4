@@ -22,6 +22,14 @@ android {
         }
     }
 
+    val versionProperties = Properties()
+    val versionPropertiesFile = rootProject.file("version.properties")
+    if (versionPropertiesFile.exists()) {
+        versionPropertiesFile.inputStream().use {
+            versionProperties.load(it)
+        }
+    }
+
     val releaseKeystoreName = localProperties.getProperty("signing.storeFile")
     val releaseKeystoreFile =
         if (releaseKeystoreName != null) rootProject.file(releaseKeystoreName) else null
@@ -41,9 +49,12 @@ android {
         applicationId = "com.bachatas4.android"
         minSdk = 31
         targetSdk = 37
+        // Priority: -P override > version.properties > date-based dev defaults
         versionCode = (findProperty("VERSION_CODE") as String?)?.toIntOrNull()
+            ?: versionProperties.getProperty("VERSION_CODE")?.toIntOrNull()
             ?: SimpleDateFormat("yyMMddHH").format(Date()).toInt()
         versionName = (findProperty("VERSION_NAME") as String?)
+            ?: versionProperties.getProperty("VERSION_NAME")
             ?: ("0.1.0-dev-" + SimpleDateFormat("yyyyMMdd-HHmm").format(Date()))
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         ndk {
