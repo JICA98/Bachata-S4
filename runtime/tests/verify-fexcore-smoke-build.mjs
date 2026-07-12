@@ -66,7 +66,8 @@ function findForbiddenExecutables(directory) {
     const path = resolve(directory, entry.name);
     if (entry.isDirectory()) {
       forbidden.push(...findForbiddenExecutables(path));
-    } else if (entry.isFile() && (statSync(path).mode & 0o111) !== 0 && /FEXInterpreter|LinuxEmulation|RootFS|thunk/i.test(path)) {
+    } else if ((entry.isFile() || entry.isSymbolicLink()) && (statSync(path).mode & 0o111) !== 0 &&
+               /FEXInterpreter|LinuxEmulation|RootFS|thunk/i.test(path)) {
       forbidden.push(path);
     }
   }
