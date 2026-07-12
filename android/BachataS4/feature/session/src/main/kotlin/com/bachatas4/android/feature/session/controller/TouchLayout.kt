@@ -26,7 +26,7 @@ data class TouchLayout(
     val id: String = "default",
     val name: String = "Default",
     val controls: List<TouchControlPlacement> = defaultControls(),
-    val opacity: Float = 0.32f,
+    val opacity: Float = 0.85f,
     val scale: Float = 1f,
     val vibrationEnabled: Boolean = true,
     val analogCentering: Boolean = true,
@@ -41,12 +41,13 @@ data class TouchLayout(
 
     companion object {
         fun defaultControls(): List<TouchControlPlacement> = listOf(
-            p("left_stick", 250f, 830f, 290f, 290f), p("right_stick", 1250f, 830f, 290f, 290f),
-            p("triangle", 1660f, 590f), p("circle", 1770f, 700f), p("cross", 1660f, 810f), p("square", 1550f, 700f),
-            p("dpad_up", 600f, 690f), p("dpad_right", 710f, 800f), p("dpad_down", 600f, 910f), p("dpad_left", 490f, 800f),
-            p("l2", 140f, 75f, 200f, 90f), p("l1", 360f, 75f, 200f, 90f),
-            p("r1", 1560f, 75f, 200f, 90f), p("r2", 1780f, 75f, 200f, 90f),
-            p("touchpad", 960f, 95f, 280f, 130f), p("options", 1190f, 210f, 140f, 80f),
+            p("left_stick", 410f, 880f, 200f, 200f), p("right_stick", 1510f, 880f, 200f, 200f),
+            p("triangle", 1700f, 570f, 130f, 130f), p("circle", 1820f, 690f, 130f, 130f), p("cross", 1700f, 810f, 130f, 130f), p("square", 1580f, 690f, 130f, 130f),
+            p("dpad_up", 220f, 580f, 110f, 110f), p("dpad_right", 330f, 690f, 110f, 110f), p("dpad_down", 220f, 800f, 110f, 110f), p("dpad_left", 110f, 690f, 110f, 110f),
+            p("l1", 140f, 75f, 200f, 90f), p("l2", 140f, 185f, 200f, 90f),
+            p("r1", 1780f, 75f, 200f, 90f), p("r2", 1780f, 185f, 200f, 90f),
+            p("touchpad", 960f, 175f, 320f, 120f), 
+            p("share", 870f, 45f, 90f, 90f), p("ps", 960f, 45f, 90f, 90f), p("options", 1050f, 45f, 90f, 90f),
         )
 
         private fun p(control: String, x: Float, y: Float, width: Float = 140f, height: Float = 140f) =

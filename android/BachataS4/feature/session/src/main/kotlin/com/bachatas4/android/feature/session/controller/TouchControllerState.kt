@@ -79,25 +79,26 @@ class TouchControllerState(private val layout: TouchLayout = TouchLayout()) {
     companion object {
         const val LogicalWidth = 1920f
         const val LogicalHeight = 1080f
-        const val LEFT_STICK_X = 250f
-        const val RIGHT_STICK_X = 1250f
-        const val STICK_Y = 830f
-        const val STICK_RADIUS = 145f
-        const val BUTTON_RADIUS = 70f
-        const val DPAD_RADIUS = 62f
+        const val LEFT_STICK_X = 410f
+        const val RIGHT_STICK_X = 1510f
+        const val STICK_Y = 880f
+        const val STICK_RADIUS = 100f
+        const val BUTTON_RADIUS = 55f
+        const val DPAD_RADIUS = 55f
         private val BUTTONS = mapOf(
             "triangle" to Ps4Button.TRIANGLE, "circle" to Ps4Button.CIRCLE, "cross" to Ps4Button.CROSS, "square" to Ps4Button.SQUARE,
             "dpad_up" to Ps4Button.UP, "dpad_right" to Ps4Button.RIGHT, "dpad_down" to Ps4Button.DOWN, "dpad_left" to Ps4Button.LEFT,
             "l1" to Ps4Button.L1, "l2" to Ps4Button.L2, "r1" to Ps4Button.R1, "r2" to Ps4Button.R2,
             "touchpad" to Ps4Button.TOUCH_PAD, "options" to Ps4Button.OPTIONS,
+            "share" to Ps4Button.SHARE, "ps" to Ps4Button.PS,
         )
         val faceButtons = listOf(
-            ButtonControl(1660f, 590f, Ps4Button.TRIANGLE, "TRI"), ButtonControl(1770f, 700f, Ps4Button.CIRCLE, "CIR"),
-            ButtonControl(1660f, 810f, Ps4Button.CROSS, "X"), ButtonControl(1550f, 700f, Ps4Button.SQUARE, "SQ"),
+            ButtonControl(1700f, 570f, Ps4Button.TRIANGLE, "TRI"), ButtonControl(1820f, 690f, Ps4Button.CIRCLE, "CIR"),
+            ButtonControl(1700f, 810f, Ps4Button.CROSS, "X"), ButtonControl(1580f, 690f, Ps4Button.SQUARE, "SQ"),
         )
         val dpadButtons = listOf(
-            ButtonControl(600f, 690f, Ps4Button.UP, "UP"), ButtonControl(710f, 800f, Ps4Button.RIGHT, "R"),
-            ButtonControl(600f, 910f, Ps4Button.DOWN, "DN"), ButtonControl(490f, 800f, Ps4Button.LEFT, "L"),
+            ButtonControl(220f, 580f, Ps4Button.UP, "UP"), ButtonControl(330f, 690f, Ps4Button.RIGHT, "R"),
+            ButtonControl(220f, 800f, Ps4Button.DOWN, "DN"), ButtonControl(110f, 690f, Ps4Button.LEFT, "L"),
         )
     }
 }

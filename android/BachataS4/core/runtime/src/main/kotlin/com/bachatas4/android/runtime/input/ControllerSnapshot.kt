@@ -19,6 +19,8 @@ object Ps4Button {
     const val CROSS = 0x4000L
     const val SQUARE = 0x8000L
     const val TOUCH_PAD = 0x100000L
+    const val SHARE = 0x1L
+    const val PS = 0x10000L
 }
 
 @ConsistentCopyVisibility

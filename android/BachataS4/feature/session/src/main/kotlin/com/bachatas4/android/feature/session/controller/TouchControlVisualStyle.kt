@@ -19,7 +19,7 @@ enum class TouchControlVisualStyle {
             "l1", "r1" -> Shoulder
             "l2", "r2" -> Trigger
             "touchpad" -> Touchpad
-            "options" -> Center
+            "options", "share", "ps" -> Center
             else -> Unknown
         }
     }
