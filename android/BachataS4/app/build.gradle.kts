@@ -67,6 +67,9 @@ android {
     buildTypes {
         release {
             isMinifyEnabled = false
+            // Monorepo subdir builds do not embed VCS consistently; omit so local
+            // and F-Droid APKs both lack version-control-info rather than diverge.
+            vcsInfo.include = false
             // Only attach signing when a local release keystore is configured.
             // F-Droid builds strip signing config and must remain unsigned here.
             signingConfigs.findByName("release")?.let { signingConfig = it }
@@ -96,7 +99,19 @@ android {
         noCompress += listOf("zip", "json")
     }
     packaging {
-        jniLibs.useLegacyPackaging = true
+        jniLibs {
+            useLegacyPackaging = true
+            // Keep unstripped .so files so F-Droid vs developer strip steps cannot diverge.
+            keepDebugSymbols += "**/*.so"
+        }
+    }
+}
+
+// F-Droid reproducible builds: baseline.prof / baseline.profm are often non-deterministic.
+// https://f-droid.org/docs/Reproducible_Builds/#bug-baselineprof-not-deterministic
+tasks.whenTaskAdded {
+    if (name.contains("ArtProfile")) {
+        enabled = false
     }
 }
 
