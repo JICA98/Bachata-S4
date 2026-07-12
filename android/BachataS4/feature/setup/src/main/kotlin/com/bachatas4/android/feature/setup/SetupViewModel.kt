@@ -21,6 +21,7 @@ data class SetupUiState(
     val runtimeInstalled: Boolean,
     val integrityVerified: Boolean,
     val legalNotice: String,
+    val isDownloading: Boolean = false,
 ) {
     val canEnterLibrary: Boolean
         get() = deviceProfile.supported && runtimeInstalled && integrityVerified
@@ -121,9 +122,11 @@ class SetupViewModel @Inject constructor(
     }
 
     fun downloadRuntime() {
+        if (mutableState.value.isDownloading) return
         viewModelScope.launch(Dispatchers.IO) {
             try {
                 mutableState.value = mutableState.value.copy(
+                    isDownloading = true,
                     legalNotice = "Downloading runtime manifest..."
                 )
                 
@@ -177,12 +180,14 @@ class SetupViewModel @Inject constructor(
                 zipConnection.disconnect()
                 
                 mutableState.value = mutableState.value.copy(
+                    isDownloading = false,
                     runtimeInstalled = true,
                     integrityVerified = true,
                     legalNotice = "Runtime installed successfully!"
                 )
             } catch (e: Exception) {
                 mutableState.value = mutableState.value.copy(
+                    isDownloading = false,
                     legalNotice = "Download failed: ${e.message}"
                 )
             }

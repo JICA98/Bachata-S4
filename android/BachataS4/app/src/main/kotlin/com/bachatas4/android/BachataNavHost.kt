@@ -12,6 +12,7 @@ import com.bachatas4.android.feature.session.SessionScreen
 
 object BachataRoutes {
     const val Setup = "setup"
+    const val SetupDrivers = "setup/drivers"
     const val Library = "library"
     const val Game = "game/{id}"
     const val Session = "session/{id}"
@@ -26,7 +27,17 @@ fun BachataNavHost(startDestination: String = BachataRoutes.Setup) {
     val navController = rememberNavController()
     NavHost(navController = navController, startDestination = startDestination) {
         composable(BachataRoutes.Setup) {
-            SetupScreen(onContinue = { navController.navigate(BachataRoutes.Library) })
+            SetupScreen(onContinue = { navController.navigate(BachataRoutes.SetupDrivers) })
+        }
+        composable(BachataRoutes.SetupDrivers) {
+            DriverManagerScreen(
+                onBack = { navController.popBackStack() },
+                onContinue = {
+                    navController.navigate(BachataRoutes.Library) {
+                        popUpTo(BachataRoutes.Setup) { inclusive = true }
+                    }
+                },
+            )
         }
         composable(BachataRoutes.Library) {
             LibraryScreen(

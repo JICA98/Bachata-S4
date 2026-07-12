@@ -1,5 +1,6 @@
 package com.bachatas4.android.feature.setup
 
+import android.widget.ImageView
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -16,11 +17,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
-import android.widget.ImageView
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.bachatas4.android.designsystem.BachataActionBar
 import com.bachatas4.android.designsystem.BachataPanel
 import com.bachatas4.android.designsystem.BachataPrimaryButton
+import com.bachatas4.android.designsystem.ForwardFab
 import com.bachatas4.android.designsystem.theme.BachataPalette
 
 @Composable
@@ -53,6 +54,11 @@ fun SetupContent(
     Scaffold(
         containerColor = BachataPalette.Canvas,
         bottomBar = { BachataActionBar("A  CONTINUE", "B  EXIT") },
+        floatingActionButton = {
+            if (state.canEnterLibrary) {
+                ForwardFab(onClick = onContinue)
+            }
+        },
     ) { contentPadding ->
         Column(
             modifier = Modifier.fillMaxSize().padding(contentPadding).padding(24.dp),
@@ -90,16 +96,13 @@ fun SetupContent(
                 }
             }
             if (downloadRuntimeEnabled && !state.runtimeInstalled) {
-                BachataPrimaryButton(onClick = onDownload, modifier = Modifier.padding(top = 16.dp)) {
-                    Text("Download emulation assets")
+                BachataPrimaryButton(
+                    onClick = onDownload,
+                    enabled = !state.isDownloading,
+                    modifier = Modifier.padding(top = 16.dp),
+                ) {
+                    Text(if (state.isDownloading) "Downloading…" else "Download emulation assets")
                 }
-            }
-            BachataPrimaryButton(
-                enabled = state.canEnterLibrary,
-                onClick = onContinue,
-                modifier = Modifier.padding(top = 10.dp),
-            ) {
-                Text("Continue")
             }
         }
     }

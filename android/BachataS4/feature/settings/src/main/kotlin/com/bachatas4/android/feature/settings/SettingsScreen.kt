@@ -343,7 +343,8 @@ private fun SettingsContent(
                         "Drivers" -> {
                             DriverManagerScreen(
                                 scope = state.scope,
-                                onBack = { onTabSelected("Runtime") }
+                                onBack = { onTabSelected("Runtime") },
+                                standalone = false,
                             )
                         }
                         "RAW" -> {

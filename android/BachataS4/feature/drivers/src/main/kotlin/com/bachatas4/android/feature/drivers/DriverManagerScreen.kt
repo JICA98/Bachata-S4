@@ -12,9 +12,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -29,8 +31,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.bachatas4.android.designsystem.BachataActionBar
 import com.bachatas4.android.designsystem.BachataPanel
 import com.bachatas4.android.designsystem.BachataPrimaryButton
+import com.bachatas4.android.designsystem.BachataScreenHeader
+import com.bachatas4.android.designsystem.ForwardFab
 import com.bachatas4.android.designsystem.theme.BachataPalette
 import com.bachatas4.android.runtime.driver.TurnipReleaseClient
 import com.bachatas4.android.runtime.settings.ProfileScope
@@ -44,12 +49,14 @@ import java.io.InputStream
 fun DriverManagerScreen(
     scope: ProfileScope = ProfileScope.Global,
     onBack: () -> Unit,
+    onContinue: (() -> Unit)? = null,
+    standalone: Boolean = true,
     viewModel: DriverManagerViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsState()
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    
+
     LaunchedEffect(scope) {
         viewModel.selectScope(scope)
     }
@@ -65,89 +72,94 @@ fun DriverManagerScreen(
                         bytes
                     }
                 }
-            }.onSuccess { bytes -> 
-                if (bytes != null) viewModel.importZip(bytes, uri.lastPathSegment ?: "imported.zip") 
+            }.onSuccess { bytes ->
+                if (bytes != null) viewModel.importZip(bytes, uri.lastPathSegment ?: "imported.zip")
             }
         }
     }
 
-    LazyColumn(
-        modifier = Modifier.fillMaxSize(),
-        contentPadding = PaddingValues(bottom = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        item {
-            BachataPanel(
-                modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
-                color = BachataPalette.RaisedSurface
-            ) {
-                Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Text(
-                        text = "Turnip Drivers",
-                        style = MaterialTheme.typography.titleMedium,
-                        color = BachataPalette.Primary,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = "Trusted source: ${TurnipReleaseClient.REPOSITORY}",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = BachataPalette.Secondary
-                    )
-                    Text(
-                        text = "Active Scope: ${if (state.scope is ProfileScope.Game) "Game (${(state.scope as ProfileScope.Game).gameId})" else "Global"}",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = BachataPalette.Accent,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    if (state.selectedDriverId != "system") {
-                        Text(
-                            text = "Selected Driver: ${state.selectedDriverId}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = BachataPalette.Primary
-                        )
-                    } else {
-                        Text(
-                            text = "Selected Driver: System driver",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = BachataPalette.Secondary
-                        )
-                    }
-                }
+    val content: LazyListScope.() -> Unit = {
+        if (standalone) {
+            item {
+                BachataScreenHeader(
+                    title = if (onContinue != null) "Select Turnip Driver" else "Turnip Drivers",
+                    onBack = onBack,
+                )
             }
         }
 
         item {
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                item {
-                    BachataPrimaryButton(
-                        onClick = { viewModel.refresh() },
-                        enabled = !state.loading
-                    ) {
-                        Text("Refresh Available")
-                    }
-                }
-                item {
-                    BachataPrimaryButton(
-                        onClick = { importer.launch(arrayOf("application/zip", "application/x-zip-compressed")) }
-                    ) {
-                        Text("Import ZIP")
-                    }
-                }
-                if (state.selectedDriverId != "system") {
-                    item {
-                        TextButton(
-                            onClick = { viewModel.select("system") }
-                        ) {
-                            Text("Switch to System Driver")
+                BachataPanel(
+                    modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
+                    color = BachataPalette.RaisedSurface
+                ) {
+                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = "Turnip Drivers",
+                            style = MaterialTheme.typography.titleMedium,
+                            color = BachataPalette.Primary,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Trusted source: ${TurnipReleaseClient.REPOSITORY}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = BachataPalette.Secondary
+                        )
+                        Text(
+                            text = "Active Scope: ${if (state.scope is ProfileScope.Game) "Game (${(state.scope as ProfileScope.Game).gameId})" else "Global"}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = BachataPalette.Accent,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        if (state.selectedDriverId != "system") {
+                            Text(
+                                text = "Selected Driver: ${state.selectedDriverId}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = BachataPalette.Primary
+                            )
+                        } else {
+                            Text(
+                                text = "Selected Driver: System driver",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = BachataPalette.Secondary
+                            )
                         }
                     }
                 }
             }
-        }
+
+            item {
+                LazyRow(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentPadding = PaddingValues(horizontal = 16.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    item {
+                        BachataPrimaryButton(
+                            onClick = { viewModel.refresh() },
+                            enabled = !state.loading
+                        ) {
+                            Text("Refresh Available")
+                        }
+                    }
+                    item {
+                        BachataPrimaryButton(
+                            onClick = { importer.launch(arrayOf("application/zip", "application/x-zip-compressed")) }
+                        ) {
+                            Text("Import ZIP")
+                        }
+                    }
+                    if (state.selectedDriverId != "system") {
+                        item {
+                            TextButton(
+                                onClick = { viewModel.select("system") }
+                            ) {
+                                Text("Switch to System Driver")
+                            }
+                        }
+                    }
+                }
+            }
 
         state.error?.let { err ->
             item {
@@ -377,6 +389,37 @@ fun DriverManagerScreen(
                 }
             }
         }
+    }
+
+    if (standalone) {
+        val actionBarHints = if (onContinue != null) {
+            arrayOf("A  CONTINUE", "B  BACK")
+        } else {
+            arrayOf("B  BACK")
+        }
+        Scaffold(
+            containerColor = BachataPalette.Canvas,
+            bottomBar = { BachataActionBar(*actionBarHints) },
+            floatingActionButton = {
+                onContinue?.let { continueAction ->
+                    ForwardFab(onClick = continueAction)
+                }
+            },
+        ) { contentPadding ->
+            LazyColumn(
+                modifier = Modifier.fillMaxSize().padding(contentPadding),
+                contentPadding = PaddingValues(bottom = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                content = content,
+            )
+        }
+    } else {
+        LazyColumn(
+            modifier = Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            content = content,
+        )
     }
 }
 
