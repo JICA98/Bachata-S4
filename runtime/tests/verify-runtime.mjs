@@ -61,6 +61,7 @@ const EXPECTED_WINLATOR_PATCHES = [
 const REQUIRED_RUNTIME_PATHS = [
   "bin/hello",
   "bin/audio-tone",
+  "bin/fexcore-smoke",
   "bin/shadps4",
   "bin/sdl-window",
   "bin/vulkan-info",
@@ -343,5 +344,10 @@ if (hello.readUInt16LE(18) !== 62) fail("Probe is not x86_64 ELF");
 const shadps4 = zipEntries.find((entry) => entry.path === "bin/shadps4").bytes;
 if (shadps4.length < 20 || shadps4[0] !== 0x7f || shadps4.subarray(1, 4).toString() !== "ELF") fail("shadPS4 is not ELF");
 if (shadps4.readUInt16LE(18) !== 62) fail("shadPS4 is not x86_64 ELF");
+const fexcoreSmoke = zipEntries.find((entry) => entry.path === "bin/fexcore-smoke").bytes;
+if (fexcoreSmoke.length < 20 || fexcoreSmoke[0] !== 0x7f || fexcoreSmoke.subarray(1, 4).toString() !== "ELF") fail("FEXCore smoke runner is not ELF");
+if (fexcoreSmoke[4] !== 2) fail("FEXCore smoke runner is not ELF64");
+if (fexcoreSmoke[5] !== 1) fail("FEXCore smoke runner is not little-endian ELF");
+if (fexcoreSmoke.readUInt16LE(18) !== 183) fail("FEXCore smoke runner is not AArch64 ELF");
 
 console.log(`runtime verified: ${zipEntries.length} files, sha256=${sha256(readFileSync(zipPath))}`);

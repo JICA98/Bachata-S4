@@ -162,11 +162,17 @@ const extractDir = resolve(projectRoot, "runtime/build/extract");
 const inputDir = resolve(projectRoot, "runtime/build/inputs");
 const shadps4StageDir = resolve(projectRoot, "runtime/build/shadps4-stage");
 const hostBox64Binary = resolve(projectRoot, "runtime/build/box64-host-stage/box64");
+const fexcoreSmokeBinary = resolve(
+  projectRoot,
+  "runtime/build/fexcore-smoke-stage/bin/fexcore-smoke",
+);
 const outputDir = resolve(process.argv[2] ?? resolve(projectRoot, "android/BachataS4/app/src/main/assets/runtime"));
 const nativeOutputDir = resolve(projectRoot, "android/BachataS4/core/runtime/src/main/jniLibs/arm64-v8a");
 const componentLock = JSON.parse(readFileSync(resolve(projectRoot, "runtime/locks/components.lock.json"), "utf8"));
 const inputLock = JSON.parse(readFileSync(resolve(projectRoot, "runtime/locks/runtime-inputs.lock.json"), "utf8"));
 const revisions = Object.fromEntries(componentLock.components.map(({ name, revision }) => [name, revision]));
+const fexcoreSmokeStats = statSync(fexcoreSmokeBinary, { throwIfNoEntry: false });
+if (!fexcoreSmokeStats?.isFile()) fail(`Missing FEXCore smoke runner: ${fexcoreSmokeBinary}`);
 for (const input of inputLock.inputs) {
   const bytes = readFileSync(join(inputDir, input.name));
   if (sha256(bytes) !== input.sha256) fail(`Locked input hash mismatch: ${input.name}`);
@@ -306,6 +312,7 @@ run("tar", [
 const probe = join(rootfs, "bin/hello");
 mkdirSync(dirname(probe), { recursive: true });
 run("x86_64-linux-gnu-gcc", ["-O2", "-s", "-fno-ident", "-Wl,--build-id=none", resolve(projectRoot, "runtime/probes/hello.c"), "-o", probe]);
+copy(fexcoreSmokeBinary, join(rootfs, "bin/fexcore-smoke"), 0o755);
 const sdlProbe = join(rootfs, "bin/sdl-window");
 run("x86_64-linux-gnu-g++", [
   "-O2", "-s", "-fno-ident", "-Wl,--build-id=none",

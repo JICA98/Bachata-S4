@@ -13,6 +13,7 @@ root:
 git submodule update --init --recursive --jobs 8
 runtime/scripts/build-shadps4-x86_64.sh
 runtime/scripts/build-box64-host.sh
+runtime/scripts/build-fexcore-smoke-aarch64.sh
 node runtime/scripts/package-runtime.mjs
 node runtime/tests/verify-runtime.mjs runtime/locks/components.lock.json
 ```
