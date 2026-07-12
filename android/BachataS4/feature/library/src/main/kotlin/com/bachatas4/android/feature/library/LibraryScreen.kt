@@ -35,6 +35,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
+import androidx.compose.foundation.layout.size
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -144,12 +147,34 @@ fun LibraryContent(
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             item {
-                BachataScreenHeader(
-                    title = "BACHATA S4",
-                    actions = {
-                        TextButton(onClick = onOpenSettings) { Text("⚙", color = BachataPalette.Primary) }
-                    },
-                )
+                val context = LocalContext.current
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    androidx.compose.ui.viewinterop.AndroidView(
+                        modifier = Modifier.size(32.dp),
+                        factory = { viewContext ->
+                            android.widget.ImageView(viewContext).apply {
+                                setImageResource(viewContext.applicationInfo.icon)
+                                contentDescription = "Bachata S4 logo"
+                            }
+                        }
+                    )
+                    Text(
+                        text = "BACHATA S4",
+                        modifier = Modifier.weight(1f),
+                        style = MaterialTheme.typography.headlineSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = BachataPalette.Primary,
+                    )
+                    TextButton(onClick = onOpenSettings) {
+                        Text("⚙", color = BachataPalette.Primary, style = MaterialTheme.typography.titleLarge)
+                    }
+                }
             }
             item {
                 if (selected == null) {

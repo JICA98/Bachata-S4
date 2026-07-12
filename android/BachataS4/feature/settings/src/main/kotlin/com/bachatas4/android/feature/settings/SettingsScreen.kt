@@ -2,14 +2,19 @@ package com.bachatas4.android.feature.settings
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -41,6 +46,7 @@ import com.bachatas4.android.runtime.settings.RuntimeSettingSpec
 import com.bachatas4.android.runtime.settings.SettingKind
 import com.bachatas4.android.feature.settings.input.ControllerMappingScreen
 import com.bachatas4.android.feature.settings.input.TouchLayoutEditorScreen
+import com.bachatas4.android.feature.drivers.DriverManagerScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -64,21 +70,8 @@ fun SettingsScreen(
 ) {
     val state by viewModel.state.collectAsState()
     val sessionState by ManagedSession.state.collectAsState()
-    var showRaw by remember { mutableStateOf(false) }
-    var showControllers by remember { mutableStateOf(false) }
-    var showTouchLayout by remember { mutableStateOf(false) }
-    if (showRaw) {
-        RawConfigScreen(scope = state.scope, onBack = { showRaw = false })
-        return
-    }
-    if (showControllers) {
-        ControllerMappingScreen(scope = state.scope, onBack = { showControllers = false })
-        return
-    }
-    if (showTouchLayout) {
-        TouchLayoutEditorScreen(scope = state.scope, onBack = { showTouchLayout = false })
-        return
-    }
+    var activeTab by remember { mutableStateOf("Runtime") }
+    var isSearchActive by remember { mutableStateOf(false) }
     val context = LocalContext.current
     LaunchedEffect(initialGameId) {
         if (initialGameId != null) viewModel.selectScope(ProfileScope.Game(initialGameId))
@@ -103,10 +96,10 @@ fun SettingsScreen(
     SettingsContent(
         state = state,
         onBack = onBack,
-        onOpenDrivers = onOpenDrivers,
-        onOpenRaw = { showRaw = true },
-        onOpenControllers = { showControllers = true },
-        onOpenTouchLayout = { showTouchLayout = true },
+        activeTab = activeTab,
+        onTabSelected = { activeTab = it },
+        isSearchActive = isSearchActive,
+        onSearchActiveChange = { isSearchActive = it },
         onRuntime = viewModel::selectRuntime,
         onSearch = viewModel::search,
         onCategory = viewModel::selectCategory,
@@ -125,10 +118,10 @@ fun SettingsScreen(
 private fun SettingsContent(
     state: SettingsUiState,
     onBack: () -> Unit,
-    onOpenDrivers: () -> Unit,
-    onOpenRaw: () -> Unit,
-    onOpenControllers: () -> Unit,
-    onOpenTouchLayout: () -> Unit,
+    activeTab: String,
+    onTabSelected: (String) -> Unit,
+    isSearchActive: Boolean,
+    onSearchActiveChange: (Boolean) -> Unit,
     onRuntime: (SettingsRuntime) -> Unit,
     onSearch: (String) -> Unit,
     onCategory: (String?) -> Unit,
@@ -141,10 +134,9 @@ private fun SettingsContent(
     onExport: () -> Unit,
     appliesNextLaunch: Boolean,
 ) {
-    var gameId by remember { mutableStateOf("") }
-    val scopeLabel = when (val scope = state.scope) {
-        ProfileScope.Global -> "Global"
-        is ProfileScope.Game -> "Game: ${scope.gameId}"
+    val title = when (val scope = state.scope) {
+        ProfileScope.Global -> "Settings"
+        is ProfileScope.Game -> "Settings (Game: ${scope.gameId})"
     }
     val preset = state.profile.box64Preset ?: Box64Preset.DEFAULT
     val shown = if (state.runtime == SettingsRuntime.BOX64 && preset != Box64Preset.CUSTOM) emptyList() else state.settings
@@ -152,139 +144,315 @@ private fun SettingsContent(
         containerColor = BachataPalette.Canvas,
         bottomBar = { BachataActionBar("A  CONFIRM", "↔  CHANGE", "B  BACK") },
     ) { contentPadding ->
-        LazyColumn(
-            modifier = Modifier.fillMaxSize().padding(contentPadding),
-            contentPadding = PaddingValues(bottom = 16.dp),
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(contentPadding),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            item { BachataScreenHeader(title = "Settings", onBack = onBack) }
-            item {
+            if (isSearchActive) {
                 Row(
-                    modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
                     verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text(
-                        scopeLabel,
+                    TextButton(onClick = {
+                        onSearchActiveChange(false)
+                        onSearch("")
+                    }) {
+                        Text("‹", style = MaterialTheme.typography.headlineMedium)
+                    }
+                    OutlinedTextField(
+                        value = state.query,
+                        onValueChange = onSearch,
+                        placeholder = { Text("Search settings...") },
                         modifier = Modifier.weight(1f),
-                        color = BachataPalette.Accent,
-                        fontWeight = FontWeight.SemiBold,
+                        singleLine = true,
+                        trailingIcon = {
+                            TextButton(onClick = { onSearch("") }) { Text("X") }
+                        }
                     )
-                    TextButton(onClick = { onScope(ProfileScope.Global) }) { Text("Global") }
                 }
-            }
-            item {
-                Row(
-                    modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Button(onClick = { onRuntime(SettingsRuntime.SHADPS4) }, modifier = Modifier.weight(1f)) {
-                        Text("shadPS4")
-                    }
-                    Button(onClick = { onRuntime(SettingsRuntime.BOX64) }, modifier = Modifier.weight(1f)) {
-                        Text("Box64")
-                    }
-                }
-            }
-            item {
-                OutlinedTextField(
-                    value = gameId,
-                    onValueChange = { gameId = it },
-                    label = { Text("Game ID for per-game settings") },
-                    modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
-                    singleLine = true,
-                    trailingIcon = {
-                        TextButton(onClick = { runCatching { onScope(ProfileScope.Game(gameId)) } }) { Text("Use") }
-                    },
-                )
-            }
-            item {
-                LazyRow(
-                    contentPadding = PaddingValues(horizontal = 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    item {
-                        CategoryTab("All", state.selectedCategory == null) { onCategory(null) }
-                    }
-                    items(state.categories) { category ->
-                        CategoryTab(category, state.selectedCategory == category) { onCategory(category) }
-                    }
-                }
-            }
-            item {
-                OutlinedTextField(
-                    value = state.query,
-                    onValueChange = onSearch,
-                    label = { Text("Search name, key, category") },
-                    modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
-                    singleLine = true,
-                )
-            }
-            item {
-                BachataPanel(modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth()) {
-                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("TOOLS", color = BachataPalette.Secondary, style = MaterialTheme.typography.labelMedium)
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            item { TextButton(onClick = onOpenDrivers) { Text("Drivers") } }
-                            item { TextButton(onClick = onOpenRaw) { Text("Raw") } }
-                            item { TextButton(onClick = onOpenControllers) { Text("Controllers") } }
-                            item { TextButton(onClick = onOpenTouchLayout) { Text("Touch layout") } }
-                            item { TextButton(onClick = onImport) { Text("Import") } }
-                            item { TextButton(onClick = onExport) { Text("Export") } }
+            } else {
+                BachataScreenHeader(
+                    title = title,
+                    onBack = onBack,
+                    actions = {
+                        androidx.compose.material3.Surface(
+                            color = BachataPalette.RaisedSurface,
+                            shape = androidx.compose.foundation.shape.RoundedCornerShape(999.dp),
+                            modifier = Modifier.clickable { onSearchActiveChange(true) }
+                        ) {
+                            Text(
+                                text = "SEARCH",
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                style = MaterialTheme.typography.labelMedium,
+                                color = BachataPalette.Accent,
+                                fontWeight = FontWeight.Bold
+                            )
                         }
                     }
+                )
+            }
+            LazyRow(
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(20.dp),
+            ) {
+                item {
+                    TopTab(
+                        label = "Runtime",
+                        selected = activeTab == "Runtime",
+                        onClick = {
+                            onTabSelected("Runtime")
+                            onRuntime(SettingsRuntime.SHADPS4)
+                        }
+                    )
+                }
+                item {
+                    TopTab(
+                        label = "CPU",
+                        selected = activeTab == "CPU",
+                        onClick = {
+                            onTabSelected("CPU")
+                            onRuntime(SettingsRuntime.BOX64)
+                        }
+                    )
+                }
+                item {
+                    TopTab(
+                        label = "Drivers",
+                        selected = activeTab == "Drivers",
+                        onClick = { onTabSelected("Drivers") }
+                    )
+                }
+                item {
+                    TopTab(
+                        label = "RAW",
+                        selected = activeTab == "RAW",
+                        onClick = { onTabSelected("RAW") }
+                    )
+                }
+                item {
+                    TopTab(
+                        label = "Controllers",
+                        selected = activeTab == "Controllers",
+                        onClick = { onTabSelected("Controllers") }
+                    )
+                }
+                item {
+                    TopTab(
+                        label = "Touch Input",
+                        selected = activeTab == "Touch Input",
+                        onClick = { onTabSelected("Touch Input") }
+                    )
+                }
+                item {
+                    TopTab(
+                        label = "Import",
+                        selected = false,
+                        onClick = onImport
+                    )
+                }
+                item {
+                    TopTab(
+                        label = "Export",
+                        selected = false,
+                        onClick = onExport
+                    )
                 }
             }
-            if (appliesNextLaunch) {
-                item {
-                    BachataPanel(modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(), color = Color(0xFF3A2B18)) {
-                        Text("Emulation is active; changes apply next launch.", modifier = Modifier.padding(12.dp), color = Color(0xFFFFDDB5))
-                    }
-                }
-            }
-            if (state.runtime == SettingsRuntime.BOX64) {
-                item {
-                    BachataPanel(modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(), color = BachataPalette.RaisedSurface) {
-                        Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("Official Box64 preset", fontWeight = FontWeight.SemiBold, color = BachataPalette.Primary)
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                items(Box64Preset.entries) { option ->
-                                    CategoryTab(option.name.lowercase(), preset == option) { onPreset(option) }
+
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .weight(1f)
+            ) {
+                if (activeTab == "Runtime" || activeTab == "CPU") {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize(),
+                        contentPadding = PaddingValues(bottom = 16.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        item {
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            ) {
+                                item {
+                                    CategoryTab("All", state.selectedCategory == null) { onCategory(null) }
+                                }
+                                items(state.categories) { category ->
+                                    CategoryTab(category, state.selectedCategory == category) { onCategory(category) }
                                 }
                             }
-                            if (preset != Box64Preset.CUSTOM) {
-                                Text(
-                                    "${preset.name.lowercase()} uses upstream Box64 defaults. Select custom to fine-tune all flags.",
-                                    color = BachataPalette.Secondary,
-                                )
+                        }
+
+                        if (appliesNextLaunch) {
+                            item {
+                                BachataPanel(modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(), color = Color(0xFF3A2B18)) {
+                                    Text("Emulation is active; changes apply next launch.", modifier = Modifier.padding(12.dp), color = Color(0xFFFFDDB5))
+                                }
                             }
+                        }
+                        if (state.runtime == SettingsRuntime.BOX64) {
+                            item {
+                                BachataPanel(modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(), color = BachataPalette.RaisedSurface) {
+                                    Column(modifier = Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Text("Official Box64 preset", fontWeight = FontWeight.SemiBold, color = BachataPalette.Primary)
+                                        LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            items(Box64Preset.entries) { option ->
+                                                CategoryTab(option.name.lowercase(), preset == option) { onPreset(option) }
+                                            }
+                                        }
+                                        if (preset != Box64Preset.CUSTOM) {
+                                            Text(
+                                                "${preset.name.lowercase()} uses upstream Box64 defaults. Select custom to fine-tune all flags.",
+                                                color = BachataPalette.Secondary,
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        state.error?.let { message ->
+                            item { Text(message, modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.error) }
+                        }
+                        if (shown.isEmpty() && state.query.isNotEmpty()) {
+                            item {
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().padding(32.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = "No Results for \"${state.query}\"",
+                                        color = BachataPalette.Secondary,
+                                        style = MaterialTheme.typography.bodyLarge
+                                    )
+                                }
+                            }
+                        }
+                        items(shown, key = { it.id }) { spec ->
+                            SettingEditor(spec, state, onValue, onBoolean, onReset)
+                        }
+                    }
+                } else {
+                    when (activeTab) {
+                        "Drivers" -> {
+                            DriverManagerScreen(
+                                scope = state.scope,
+                                onBack = { onTabSelected("Runtime") }
+                            )
+                        }
+                        "RAW" -> {
+                            RawConfigScreen(
+                                scope = state.scope,
+                                onBack = { onTabSelected("Runtime") }
+                            )
+                        }
+                        "Controllers" -> {
+                            ControllerMappingScreen(
+                                scope = state.scope,
+                                onBack = { onTabSelected("Runtime") }
+                            )
+                        }
+                        "Touch Input" -> {
+                            TouchLayoutEditorScreen(
+                                scope = state.scope,
+                                onBack = { onTabSelected("Runtime") }
+                            )
                         }
                     }
                 }
-            }
-            state.error?.let { message ->
-                item { Text(message, modifier = Modifier.padding(horizontal = 16.dp), color = MaterialTheme.colorScheme.error) }
-            }
-            items(shown, key = { it.id }) { spec ->
-                SettingEditor(spec, state, onValue, onBoolean, onReset)
             }
         }
     }
 }
 
 @Composable
+private fun TopTab(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Text(
+            text = label,
+            color = if (selected) BachataPalette.Primary else BachataPalette.Secondary,
+            style = MaterialTheme.typography.titleMedium,
+            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Box(
+            modifier = Modifier
+                .width(48.dp)
+                .height(2.dp)
+                .background(if (selected) BachataPalette.Accent else Color.Transparent)
+        )
+    }
+}
+
+@Composable
 private fun CategoryTab(label: String, selected: Boolean, onClick: () -> Unit) {
-    BachataPanel(
-        modifier = Modifier.clickable(onClick = onClick),
-        color = if (selected) BachataPalette.Accent else BachataPalette.Surface,
+    Column(
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(horizontal = 8.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
             label,
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-            color = if (selected) BachataPalette.OnAccent else BachataPalette.Primary,
-            style = MaterialTheme.typography.labelLarge,
+            color = if (selected) BachataPalette.Primary else BachataPalette.Secondary,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+        )
+        Spacer(modifier = Modifier.height(4.dp))
+        Box(
+            modifier = Modifier
+                .width(32.dp)
+                .height(2.dp)
+                .background(if (selected) BachataPalette.Accent else Color.Transparent)
         )
     }
+}
+
+@Composable
+private fun HighlightedText(
+    text: String,
+    query: String,
+    modifier: Modifier = Modifier,
+    style: androidx.compose.ui.text.TextStyle = androidx.compose.ui.text.TextStyle.Default,
+    color: Color = BachataPalette.Primary
+) {
+    if (query.isBlank() || !text.contains(query, ignoreCase = true)) {
+        Text(text = text, modifier = modifier, style = style, color = color)
+        return
+    }
+    val annotatedString = remember(text, query) {
+        androidx.compose.ui.text.buildAnnotatedString {
+            var startIndex = 0
+            while (true) {
+                val index = text.indexOf(query, startIndex, ignoreCase = true)
+                if (index == -1) {
+                    append(text.substring(startIndex))
+                    break
+                }
+                append(text.substring(startIndex, index))
+                pushStyle(androidx.compose.ui.text.SpanStyle(background = BachataPalette.Accent, color = BachataPalette.OnAccent))
+                append(text.substring(index, index + query.length))
+                pop()
+                startIndex = index + query.length
+            }
+        }
+    }
+    Text(text = annotatedString, modifier = modifier, style = style, color = color)
 }
 
 @Composable
@@ -304,22 +472,85 @@ private fun SettingEditor(
         modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
         color = if (inherited) BachataPalette.RaisedSurface else BachataPalette.Surface,
     ) {
-        Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Text(spec.title.ifBlank { spec.nativeKey }, style = MaterialTheme.typography.titleMedium, color = BachataPalette.Primary)
-            Text(
-                "${spec.category} · ${spec.nativeKey}${if (inherited) " · inherited" else ""}",
-                color = BachataPalette.Secondary,
-                style = MaterialTheme.typography.labelSmall,
-            )
-            if (spec.help.isNotBlank()) Text(spec.help, style = MaterialTheme.typography.bodySmall, color = BachataPalette.Secondary)
-            spec.readOnlyReason?.let { Text("Managed: $it", color = Color(0xFFFFDDB5)) }
-            if (spec.kind == SettingKind.BOOLEAN) {
-                val checked = (current as? JsonPrimitive)?.booleanOrNull ?: false
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(if (checked) "Enabled" else "Disabled", modifier = Modifier.weight(1f), color = BachataPalette.Primary)
-                    Switch(checked, { onBoolean(spec, JsonPrimitive(it)) }, enabled = spec.readOnlyReason == null)
+        if (spec.kind == SettingKind.BOOLEAN) {
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    HighlightedText(
+                        text = spec.title.ifBlank { spec.nativeKey },
+                        query = state.query,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = BachataPalette.Primary
+                    )
+                    Row {
+                        HighlightedText(
+                            text = spec.category,
+                            query = state.query,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = BachataPalette.Secondary
+                        )
+                        Text(" · ", style = MaterialTheme.typography.labelSmall, color = BachataPalette.Secondary)
+                        HighlightedText(
+                            text = spec.nativeKey,
+                            query = state.query,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = BachataPalette.Secondary
+                        )
+                        if (inherited) {
+                            Text(" · inherited", style = MaterialTheme.typography.labelSmall, color = BachataPalette.Secondary)
+                        }
+                    }
+                    if (spec.help.isNotBlank()) {
+                        HighlightedText(
+                            text = spec.help,
+                            query = state.query,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = BachataPalette.Secondary
+                        )
+                    }
+                    spec.readOnlyReason?.let { Text("Managed: $it", color = Color(0xFFFFDDB5), style = MaterialTheme.typography.bodySmall) }
                 }
-            } else {
+                val checked = (current as? JsonPrimitive)?.booleanOrNull ?: false
+                Switch(checked, { onBoolean(spec, JsonPrimitive(it)) }, enabled = spec.readOnlyReason == null)
+            }
+        } else {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                HighlightedText(
+                    text = spec.title.ifBlank { spec.nativeKey },
+                    query = state.query,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = BachataPalette.Primary
+                )
+                Row {
+                    HighlightedText(
+                        text = spec.category,
+                        query = state.query,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = BachataPalette.Secondary
+                    )
+                    Text(" · ", style = MaterialTheme.typography.labelSmall, color = BachataPalette.Secondary)
+                    HighlightedText(
+                        text = spec.nativeKey,
+                        query = state.query,
+                        style = MaterialTheme.typography.labelSmall,
+                        color = BachataPalette.Secondary
+                    )
+                    if (inherited) {
+                        Text(" · inherited", style = MaterialTheme.typography.labelSmall, color = BachataPalette.Secondary)
+                    }
+                }
+                if (spec.help.isNotBlank()) {
+                    HighlightedText(
+                        text = spec.help,
+                        query = state.query,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = BachataPalette.Secondary
+                    )
+                }
+                spec.readOnlyReason?.let { Text("Managed: $it", color = Color(0xFFFFDDB5), style = MaterialTheme.typography.bodySmall) }
                 OutlinedTextField(
                     value = text,
                     onValueChange = { text = it },

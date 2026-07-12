@@ -22,6 +22,7 @@ dependencies {
     implementation(project(":core:runtime"))
     implementation(project(":core:designsystem"))
     implementation(project(":feature:session"))
+    implementation(project(":feature:drivers"))
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.ui)
     implementation(libs.compose.material3)
