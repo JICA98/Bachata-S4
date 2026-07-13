@@ -92,7 +92,7 @@ android {
         }
         create("fdroid") {
             dimension = "distribution"
-            buildConfigField("Boolean", "DOWNLOAD_RUNTIME", "true")
+            buildConfigField("Boolean", "DOWNLOAD_RUNTIME", "false")
         }
     }
     androidResources {
