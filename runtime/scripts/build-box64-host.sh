@@ -10,6 +10,7 @@ quick_exit_patch="$project_root/runtime/patches/box64-cxa-quick-exit.patch"
 vulkan_qcom_patch="$project_root/runtime/patches/box64-vulkan-dispatch-tile-qcom.patch"
 vex_write_opcode_patch="$project_root/runtime/patches/box64-vex-write-opcode.patch"
 native_write_opcode_patch="$project_root/runtime/patches/box64-native-write-opcode.patch"
+bachata_thread_affinity_patch="$project_root/runtime/patches/box64-bachata-thread-affinity.patch"
 
 for tool in cc cmake ninja aarch64-linux-gnu-gcc aarch64-linux-gnu-g++ readelf; do
   command -v "$tool" >/dev/null || { echo "$tool is required" >&2; exit 1; }
@@ -31,8 +32,15 @@ if ! git -C "$source_dir" apply --reverse --check "$native_write_opcode_patch" 2
   git -C "$source_dir" apply --check "$native_write_opcode_patch"
   git -C "$source_dir" apply "$native_write_opcode_patch"
 fi
+if ! git -C "$source_dir" apply --reverse --check "$bachata_thread_affinity_patch" 2>/dev/null; then
+  git -C "$source_dir" apply --check "$bachata_thread_affinity_patch"
+  git -C "$source_dir" apply "$bachata_thread_affinity_patch"
+fi
 
 mkdir -p "$build_dir"
+affinity_test="$build_dir/test_bachata_thread_affinity"
+cc -Wall -Wextra -Werror "$source_dir/tests/test_bachata_thread_affinity.c" -o "$affinity_test"
+"$affinity_test"
 
 cmake -S "$source_dir" -B "$build_dir" -G Ninja \
   -DCMAKE_SYSTEM_NAME=Linux \

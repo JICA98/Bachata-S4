@@ -67,6 +67,7 @@ class ContentImporter(
     suspend fun importGameTree(
         request: ContentImportRequest,
         entries: List<ContentTreeEntry>,
+        onProgress: ((bytesCopied: Long, totalBytes: Long, currentFile: String) -> Unit)? = null,
     ): ContentImportResult = withContext(Dispatchers.IO) {
         validateGameId(request.id)
         val gamesDir = File(filesDir, "games").canonicalFile
@@ -107,6 +108,7 @@ class ContentImporter(
                 requireInside(staging, payload)
                 payload.parentFile?.mkdirs()
                 bytesCopied += copyUri(entry.sourceUri, payload, digest)
+                onProgress?.invoke(bytesCopied, requiredBytes, entry.relativePath)
             }
             validateBytes(request, bytesCopied)
             val sha256 = digest.digest().joinToString("") { "%02x".format(it) }

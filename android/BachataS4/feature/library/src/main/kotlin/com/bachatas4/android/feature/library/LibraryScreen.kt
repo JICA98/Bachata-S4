@@ -1,8 +1,10 @@
 package com.bachatas4.android.feature.library
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
-import android.net.Uri
+import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
@@ -23,6 +25,9 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -30,6 +35,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -50,27 +56,22 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.documentfile.provider.DocumentFile
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.bachatas4.android.data.ContentImportRequest
-import com.bachatas4.android.data.ContentImporter
-import com.bachatas4.android.data.ContentTreeEntry
 import com.bachatas4.android.data.GameIconPaths
-import com.bachatas4.android.data.GameMetadataResolver
 import com.bachatas4.android.data.GameRepository
-import com.bachatas4.android.data.ParamSfoReader
+import com.bachatas4.android.data.ImportManager
+import com.bachatas4.android.data.ImportProgress
 import com.bachatas4.android.designsystem.BachataActionBar
 import com.bachatas4.android.designsystem.BachataPanel
 import com.bachatas4.android.designsystem.BachataPrimaryButton
 import com.bachatas4.android.designsystem.theme.BachataPalette
+import com.bachatas4.android.runtime.input.GamepadInputManager
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.android.EntryPointAccessors
 import dagger.hilt.components.SingletonComponent
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 @Composable
 fun LibraryScreen(
@@ -84,8 +85,23 @@ fun LibraryScreen(
         EntryPointAccessors.fromApplication(context.applicationContext, LibraryDependencies::class.java)
     }
     val scope = rememberCoroutineScope()
-    var error by remember { mutableStateOf<String?>(null) }
-    var importing by remember { mutableStateOf(false) }
+    val importProgress by ImportManager.progress.collectAsState()
+    var gameToDelete by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(dependencies) {
+        runCatching { dependencies.gameRepository().syncOrphanedFolders() }
+        runCatching { dependencies.gameRepository().backfillTitlesFromSfo() }
+        dependencies.gameRepository().observeGames().collectLatest(viewModel::setGames)
+    }
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission(),
+    ) { /* nothing, just needed for import service foreground notification */ }
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
     LaunchedEffect(dependencies) {
         runCatching { dependencies.gameRepository().syncOrphanedFolders() }
         runCatching { dependencies.gameRepository().backfillTitlesFromSfo() }
@@ -93,45 +109,12 @@ fun LibraryScreen(
     }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
-        scope.launch {
-            importing = true
-            error = null
-            try {
-                context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                val (folderName, entries) = withContext(Dispatchers.IO) {
-                    val root = requireNotNull(DocumentFile.fromTreeUri(context, uri)) {
-                        "Cannot read selected folder"
-                    }
-                    (root.name?.ifBlank { null } ?: "Imported game") to root.toImportEntries()
-                }
-                val sfoEntry = entries.firstOrNull { it.relativePath == "sce_sys/param.sfo" }
-                val sfoBytes = sfoEntry?.let { entry ->
-                    withContext(Dispatchers.IO) {
-                        runCatching {
-                            context.contentResolver.openInputStream(Uri.parse(entry.sourceUri))
-                                ?.use { it.readBytes() }
-                        }.getOrNull()
-                    }
-                }
-                val sfo = sfoBytes?.let { ParamSfoReader.parse(it) }
-                val resolved = GameMetadataResolver.resolve(folderName = folderName, sfo = sfo)
-                val result = dependencies.contentImporter().importGameTree(
-                    ContentImportRequest(
-                        id = resolved.id,
-                        title = resolved.title,
-                        sourceUri = uri.toString(),
-                        subtitle = resolved.subtitle,
-                        detail = resolved.detail,
-                    ),
-                    entries,
-                )
-                dependencies.gameRepository().addImportedGame(result, uri.toString(), System.currentTimeMillis())
-            } catch (failure: Throwable) {
-                error = failure.message ?: failure.javaClass.simpleName
-            } finally {
-                importing = false
-            }
+        context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        val intent = Intent(ImportManager.ACTION_IMPORT).apply {
+            setClassName(context.packageName, ImportManager.SERVICE_CLASS)
+            putExtra(ImportManager.EXTRA_URI, uri.toString())
         }
+        context.startService(intent)
     }
     val onLaunchWithTracking: (String) -> Unit = { id ->
         scope.launch {
@@ -139,32 +122,54 @@ fun LibraryScreen(
             onLaunch(id)
         }
     }
+    DisposableEffect(viewModel) {
+        viewModel.attachNavListener()
+        onDispose { GamepadInputManager.unregisterNavListener() }
+    }
+    LaunchedEffect(viewModel) {
+        viewModel.launch.collect { id ->
+            runCatching { dependencies.gameRepository().updateLastLaunched(id) }
+            onLaunch(id)
+        }
+    }
     val state by viewModel.state.collectAsState()
     LibraryContent(
         state = state,
-        error = error,
-        importing = importing,
+        importProgress = importProgress,
+        gameToDelete = gameToDelete,
         onOpenSettings = onOpenSettings,
         onOpenGameSettings = onOpenGameSettings,
         onSelectGame = viewModel::selectGame,
         onImport = { picker.launch(null) },
         onLaunch = onLaunchWithTracking,
+        onRequestDelete = { gameToDelete = it },
+        onConfirmDelete = { id ->
+            scope.launch {
+                runCatching { dependencies.gameRepository().deleteGame(id) }
+                gameToDelete = null
+            }
+        },
+        onDismissDelete = { gameToDelete = null },
     )
 }
 
 @Composable
 fun LibraryContent(
     state: LibraryUiState,
-    error: String?,
-    importing: Boolean,
+    importProgress: ImportProgress,
+    gameToDelete: String?,
     onOpenSettings: () -> Unit,
     onOpenGameSettings: (String) -> Unit,
     onSelectGame: (String) -> Unit,
     onImport: () -> Unit,
     onLaunch: (String) -> Unit,
+    onRequestDelete: (String) -> Unit,
+    onConfirmDelete: (String) -> Unit,
+    onDismissDelete: () -> Unit,
 ) {
     val selected = state.games.firstOrNull { it.id == state.selectedGameId } ?: state.games.firstOrNull()
     val context = LocalContext.current
+    val isImporting = importProgress !is ImportProgress.Idle && importProgress !is ImportProgress.Failed
     val selectedCoverBitmap = remember(selected?.relativePath) {
         if (selected == null) null else {
             val file = GameIconPaths.icon0(context.filesDir, selected.relativePath)
@@ -259,8 +264,8 @@ fun LibraryContent(
                                 "Import a legally owned game folder to start your library.",
                                 color = BachataPalette.Secondary,
                             )
-                            BachataPrimaryButton(onClick = onImport, enabled = !importing) {
-                                Text(if (importing) "Scanning…" else "Import game")
+                            BachataPrimaryButton(onClick = onImport, enabled = !isImporting) {
+                                Text(if (isImporting) "Scanning…" else "Import game")
                             }
                         }
                     }
@@ -309,32 +314,83 @@ fun LibraryContent(
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                     BachataPrimaryButton(onClick = { onLaunch(selected.id) }) { Text("▶  Resume") }
                                     TextButton(onClick = { onOpenGameSettings(selected.id) }) { Text("Options") }
+                                    TextButton(onClick = { onRequestDelete(selected.id) }) {
+                                        Text("Remove", color = Color(0xFFFFB4AB))
+                                    }
                                 }
                             }
                         }
                     }
                 }
             }
-            if (importing) {
-                item {
-                    Text(
-                        "Scanning and importing game files…",
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        color = BachataPalette.Secondary,
-                    )
-                }
-            }
-            error?.let { message ->
-                item {
-                    Surface(
-                        modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
-                        color = Color(0xFF3A1E21).copy(alpha = 0.5f),
-                        shape = RoundedCornerShape(12.dp),
-                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFB4AB).copy(alpha = 0.3f)),
-                    ) {
-                        Text("Import failed: $message", modifier = Modifier.padding(16.dp), color = Color(0xFFFFB4AB))
+            when (val progress = importProgress) {
+                is ImportProgress.Scanning -> {
+                    item {
+                        Text(
+                            "Identifying ${progress.folderName}…",
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            color = BachataPalette.Secondary,
+                        )
                     }
                 }
+                is ImportProgress.Copying -> {
+                    item {
+                        Column(modifier = Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                "Importing ${progress.gameTitle}",
+                                color = BachataPalette.Primary,
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                            val fraction = if (progress.totalBytes > 0) {
+                                progress.bytesCopied.toFloat() / progress.totalBytes.toFloat()
+                            } else 0f
+                            LinearProgressIndicator(
+                                progress = { fraction.coerceIn(0f, 1f) },
+                                modifier = Modifier.fillMaxWidth(),
+                                color = BachataPalette.Accent,
+                            )
+                            Text(
+                                "${formatBytes(progress.bytesCopied)} / ${formatBytes(progress.totalBytes)}",
+                                color = BachataPalette.Secondary,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            Text(
+                                progress.currentFile,
+                                color = BachataPalette.Secondary,
+                                style = MaterialTheme.typography.bodySmall,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                    }
+                }
+                is ImportProgress.Success -> {
+                    item {
+                        Text(
+                            "${progress.title} imported",
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            color = BachataPalette.Accent,
+                            style = MaterialTheme.typography.titleMedium,
+                        )
+                    }
+                }
+                is ImportProgress.Failed -> {
+                    item {
+                        Surface(
+                            modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
+                            color = Color(0xFF3A1E21).copy(alpha = 0.5f),
+                            shape = RoundedCornerShape(12.dp),
+                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFB4AB).copy(alpha = 0.3f)),
+                        ) {
+                            Text(
+                                "Import failed: ${progress.message}",
+                                modifier = Modifier.padding(16.dp),
+                                color = Color(0xFFFFB4AB),
+                            )
+                        }
+                    }
+                }
+                is ImportProgress.Idle -> { /* nothing */ }
             }
             if (state.games.isNotEmpty()) {
                 item {
@@ -371,7 +427,7 @@ fun LibraryContent(
                             fontWeight = FontWeight.Bold,
                             color = BachataPalette.Primary,
                         )
-                        TextButton(onClick = onImport, enabled = !importing) { Text("Import") }
+                        TextButton(onClick = onImport, enabled = !isImporting) { Text("Import") }
                     }
                 }
                 item {
@@ -386,8 +442,26 @@ fun LibraryContent(
                 }
             }
         }
+        }
     }
-}
+    gameToDelete?.let { id ->
+        val game = state.games.firstOrNull { it.id == id }
+        AlertDialog(
+            onDismissRequest = onDismissDelete,
+            title = { Text("Remove game") },
+            text = { Text("Delete \"${game?.title ?: id}\" and all of its files? This cannot be undone.") },
+            confirmButton = {
+                Button(onClick = { onConfirmDelete(id) }) {
+                    Text("Remove")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = onDismissDelete) {
+                    Text("Cancel")
+                }
+            },
+        )
+    }
 }
 
 @Composable
@@ -485,29 +559,17 @@ private fun GameCover(
     }
 }
 
-private fun DocumentFile.toImportEntries(): List<ContentTreeEntry> {
-    val entries = mutableListOf<ContentTreeEntry>()
-    val pending = ArrayDeque<Pair<DocumentFile, String>>()
-    pending.add(this to "")
-    while (pending.isNotEmpty()) {
-        val (directory, prefix) = pending.removeLast()
-        directory.listFiles().forEach { child ->
-            val name = child.name ?: return@forEach
-            val relativePath = if (prefix.isEmpty()) name else "$prefix/$name"
-            when {
-                child.isDirectory -> pending.add(child to relativePath)
-                child.isFile -> entries.add(
-                    ContentTreeEntry(relativePath, child.uri.toString(), child.length().coerceAtLeast(0)),
-                )
-            }
-        }
-    }
-    return entries
+private fun formatBytes(bytes: Long): String {
+    if (bytes < 1024) return "$bytes B"
+    val kib = bytes / 1024.0
+    if (kib < 1024) return "%.1f KB".format(kib)
+    val mib = kib / 1024.0
+    if (mib < 1024) return "%.1f MB".format(mib)
+    return "%.2f GB".format(mib / 1024.0)
 }
 
 @EntryPoint
 @InstallIn(SingletonComponent::class)
 interface LibraryDependencies {
     fun gameRepository(): GameRepository
-    fun contentImporter(): ContentImporter
 }

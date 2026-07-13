@@ -211,6 +211,7 @@ const shadPs4BuildScriptPath = resolve(projectRoot, "runtime/scripts/build-shadp
 const box64EntrypointPatchPath = resolve(projectRoot, "runtime/patches/box64-winlator-glibc-entrypoint.patch");
 const box64QuickExitPatchPath = resolve(projectRoot, "runtime/patches/box64-cxa-quick-exit.patch");
 const box64NativeWriteOpcodePatchPath = resolve(projectRoot, "runtime/patches/box64-native-write-opcode.patch");
+const box64BachataThreadAffinityPatchPath = resolve(projectRoot, "runtime/patches/box64-bachata-thread-affinity.patch");
 const nativeHostLoaderPath = resolve(projectRoot, "android/BachataS4/core/runtime/src/main/jniLibs/arm64-v8a/libbachata_host_loader.so");
 const nativeHostBox64Path = resolve(projectRoot, "android/BachataS4/core/runtime/src/main/jniLibs/arm64-v8a/libbachata_host_box64.so");
 const playStoreRuntimeDir = resolve(projectRoot, "android/BachataS4/app/src/playstore/assets/runtime");
@@ -241,6 +242,9 @@ if (!readFileSync(box64HostBuildScriptPath, "utf8").includes("box64-cxa-quick-ex
 if (readFileSync(box64HostBuildScriptPath, "utf8").includes("box64-backing-dmem-clean-code.patch")) {
   fail("Host Box64 build must preserve shared-mapping invalidation semantics");
 }
+if (!readFileSync(box64HostBuildScriptPath, "utf8").includes("box64-bachata-thread-affinity.patch")) {
+  fail("Host Box64 build does not apply the opt-in Bachata thread-affinity patch");
+}
 if (!readFileSync(box64QuickExitPatchPath, "utf8").includes("GOM(__cxa_at_quick_exit, iFEpp)")) {
   fail("Box64 quick-exit compatibility patch is invalid");
 }
@@ -257,6 +261,17 @@ for (const marker of [
 ]) {
   if (!nativeWriteOpcodePatch.includes(marker)) {
     fail(`Box64 native write classifier patch is missing ${marker}`);
+  }
+}
+const bachataThreadAffinityPatch = readFileSync(box64BachataThreadAffinityPatchPath, "utf8");
+for (const marker of [
+  "BOX64_BACHATA_PRIME_THREAD",
+  '"NexusRevolution"',
+  "box64_bachata_highest_allowed_cpu",
+  "test_bachata_thread_affinity.c",
+]) {
+  if (!bachataThreadAffinityPatch.includes(marker)) {
+    fail(`Box64 Bachata thread-affinity patch is missing ${marker}`);
   }
 }
 if (lock.schemaVersion !== 1) fail("Lock schemaVersion must be 1");

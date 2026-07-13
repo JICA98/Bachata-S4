@@ -216,6 +216,39 @@ class ContentImporterTest {
         assertFalse(File(temporaryFolder.root, "games/.import-fixed").exists())
     }
 
+    @Test
+    fun progressCallbackFiresAfterEachFile() = runTest {
+        val files = mapOf(
+            "content://eboot" to "exe".toByteArray(),
+            "content://param" to "meta".toByteArray(),
+        )
+        val importer = ContentImporter(
+            filesDir = temporaryFolder.root,
+            source = ImportSource { uri -> ByteArrayInputStream(files.getValue(uri)) },
+            idFactory = { "fixed" },
+        )
+        val progressEvents = mutableListOf<Triple<Long, Long, String>>()
+
+        importer.importGameTree(
+            ContentImportRequest("CUSA09999", "CB Test", "content://tree"),
+            listOf(
+                ContentTreeEntry("eboot.bin", "content://eboot"),
+                ContentTreeEntry("sce_sys/param.sfo", "content://param"),
+            ),
+            onProgress = { copied, total, file ->
+                progressEvents.add(Triple(copied, total, file))
+            },
+        )
+
+        assertEquals(2, progressEvents.size)
+        assertEquals("eboot.bin", progressEvents[0].third)
+        assertEquals(3L, progressEvents[0].first)
+        assertEquals(0L, progressEvents[0].second)
+        assertEquals("sce_sys/param.sfo", progressEvents[1].third)
+        assertEquals(7L, progressEvents[1].first)
+        assertEquals(0L, progressEvents[1].second)
+    }
+
     private fun importerFor(bytes: ByteArray): ContentImporter =
         ContentImporter(
             filesDir = temporaryFolder.root,

@@ -145,7 +145,7 @@ class EmulationService : Service() {
             xServer = WinlatorEmbeddedXServer(
                 this,
                 socketRoot,
-                useAbstractXSocket = false,
+                useAbstractXSocket = true,
                 xSocketPath = "/X0",
                 useSharedMemoryAudio = false,
             )
@@ -302,6 +302,7 @@ class EmulationService : Service() {
         "BACHATA_ALSA_SOCKET" to File(socketRoot, UnixSocketConfig.ALSA_SERVER_PATH).path,
         "DISPLAY" to display,
         "SDL_VIDEODRIVER" to "x11",
+        "XKB_CONFIG_ROOT" to runtimeRoot.resolve("usr/share/X11/xkb").toString(),
         "TMPDIR" to cacheDir.path,
         "XDG_CACHE_HOME" to File(cacheDir, "xdg").apply { mkdirs() }.path,
         "GLIBC_TUNABLES" to "glibc.pthread.rseq=0",

@@ -4,12 +4,21 @@ import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.MotionEvent
 import com.bachatas4.android.runtime.session.ManagedSession
+import java.util.concurrent.atomic.AtomicReference
+import kotlin.math.abs
+
+data class NavControllerEvent(
+    val control: String,
+    val pressed: Boolean,
+)
 
 object GamepadInputManager {
     private val mapper = ControllerMapper()
     private val resolver = ControllerBindingResolver()
     private val profile = ControllerProfile.standard()
     private val perDeviceState = HashMap<Int, MutableMap<PhysicalBinding, Float>>()
+    private val captureSink = AtomicReference<((PhysicalBinding) -> Unit)?>(null)
+    private val navSink = AtomicReference<((NavControllerEvent) -> Boolean)?>(null)
     private val AXIS_CODES = intArrayOf(
         MotionEvent.AXIS_X, MotionEvent.AXIS_Y,
         MotionEvent.AXIS_Z, MotionEvent.AXIS_RZ,
@@ -21,9 +30,37 @@ object GamepadInputManager {
     var hasPhysicalController: Boolean = false
         private set
 
+    fun registerCaptureListener(listener: (PhysicalBinding) -> Unit) {
+        captureSink.set(listener)
+    }
+
+    fun unregisterCaptureListener() {
+        captureSink.set(null)
+    }
+
+    fun registerNavListener(listener: (NavControllerEvent) -> Boolean) {
+        navSink.set(listener)
+    }
+
+    fun unregisterNavListener() {
+        navSink.set(null)
+    }
+
     fun dispatchKeyEvent(event: KeyEvent): Boolean {
         val deviceId = event.deviceId
         if (!isGameController(deviceId)) return false
+
+        val capture = captureSink.get()
+        if (capture != null) {
+            if (event.action == KeyEvent.ACTION_DOWN) {
+                val device = InputDevice.getDevice(deviceId)
+                val key = device?.let { ControllerDeviceKey(it.descriptor, it.vendorId, it.productId, it.name) }
+                    ?: ControllerDeviceKey("", 0, 0, "")
+                capture(mapper.physicalButton(deviceId, key, event.keyCode, true).binding)
+            }
+            return true
+        }
+
         if (event.repeatCount > 0) return true
 
         val controlEvent = mapper.button(
@@ -32,6 +69,11 @@ object GamepadInputManager {
             event.keyCode,
             event.action == KeyEvent.ACTION_DOWN,
         ) ?: return false
+
+        if (event.action == KeyEvent.ACTION_DOWN) {
+            val nav = navSink.get()
+            if (nav != null && nav(NavControllerEvent(controlEvent.control, true))) return true
+        }
 
         val binding = profile.bindings[controlEvent.control] ?: return false
         val state = perDeviceState.getOrPut(deviceId) { HashMap() }
@@ -43,6 +85,32 @@ object GamepadInputManager {
     fun dispatchGenericMotionEvent(event: MotionEvent): Boolean {
         val deviceId = event.deviceId
         if (!isGameController(deviceId)) return false
+
+        val capture = captureSink.get()
+        if (capture != null) {
+            val device = InputDevice.getDevice(deviceId)
+            val key = device?.let { ControllerDeviceKey(it.descriptor, it.vendorId, it.productId, it.name) }
+                ?: ControllerDeviceKey("", 0, 0, "")
+            for (axis in AXIS_CODES) {
+                val raw = event.getAxisValue(axis)
+                if (abs(raw) >= AXIS_CAPTURE_THRESHOLD) {
+                    capture(mapper.physicalAxis(deviceId, key, axis, raw).binding)
+                    return true
+                }
+            }
+            return false
+        }
+
+        val nav = navSink.get()
+        if (nav != null) {
+            for (axis in AXIS_CODES) {
+                val raw = event.getAxisValue(axis)
+                val controlEvent = mapper.axis(deviceId, event.eventTime, axis, raw) ?: continue
+                val navEvent = NavControllerEvent(controlEvent.control, abs(controlEvent.value) >= AXIS_CAPTURE_THRESHOLD)
+                if (nav(navEvent)) return true
+            }
+            return false
+        }
 
         val state = perDeviceState.getOrPut(deviceId) { HashMap() }
         var handled = false
@@ -86,4 +154,6 @@ object GamepadInputManager {
         return (sources and InputDevice.SOURCE_GAMEPAD) == InputDevice.SOURCE_GAMEPAD ||
             (sources and InputDevice.SOURCE_JOYSTICK) == InputDevice.SOURCE_JOYSTICK
     }
+
+    private const val AXIS_CAPTURE_THRESHOLD = 0.5f
 }

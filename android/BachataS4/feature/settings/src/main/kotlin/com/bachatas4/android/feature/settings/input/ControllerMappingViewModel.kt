@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.bachatas4.android.data.RuntimeProfileStore
 import com.bachatas4.android.runtime.input.ControllerDeviceKey
 import com.bachatas4.android.runtime.input.ControllerProfile
+import com.bachatas4.android.runtime.input.GamepadInputManager
 import com.bachatas4.android.runtime.input.PhysicalBinding
 import com.bachatas4.android.runtime.settings.ProfileScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -36,8 +37,20 @@ class ControllerMappingViewModel @Inject constructor(private val store: RuntimeP
     }
 
     fun selectSlot(slot: Int) { require(slot in 0..3); mutableState.value = mutableState.value.copy(slot = slot, conflict = null) }
-    fun capture(control: String) { require(control in ControllerProfile.LOGICAL_CONTROLS); mutableState.value = mutableState.value.copy(captureQueue = listOf(control)) }
-    fun captureSequential() { mutableState.value = mutableState.value.copy(captureQueue = ControllerProfile.LOGICAL_CONTROLS.toList().sorted()) }
+    fun capture(control: String) {
+        require(control in ControllerProfile.LOGICAL_CONTROLS)
+        mutableState.value = mutableState.value.copy(captureQueue = listOf(control))
+        startCapture()
+    }
+    fun captureSequential() {
+        mutableState.value = mutableState.value.copy(captureQueue = ControllerProfile.LOGICAL_CONTROLS.toList().sorted())
+        startCapture()
+    }
+
+    override fun onCleared() {
+        stopCapture()
+        super.onCleared()
+    }
 
     fun accept(binding: PhysicalBinding) {
         val target = mutableState.value.captureQueue.firstOrNull() ?: return
@@ -51,6 +64,11 @@ class ControllerMappingViewModel @Inject constructor(private val store: RuntimeP
     fun replaceConflict() {
         val conflict = mutableState.value.conflict ?: return
         applyBinding(conflict.target, conflict.binding, conflict.existing)
+    }
+
+    fun cancelCapture() {
+        mutableState.value = mutableState.value.copy(captureQueue = emptyList(), conflict = null)
+        stopCapture()
     }
 
     fun cancelConflict() { mutableState.value = mutableState.value.copy(conflict = null) }
@@ -73,8 +91,17 @@ class ControllerMappingViewModel @Inject constructor(private val store: RuntimeP
     private fun applyBinding(target: String, binding: PhysicalBinding, remove: String?) {
         val bindings = current().bindings.toMutableMap().apply { if (remove != null) remove(remove); put(target, binding) }
         replaceCurrent(current().copy(bindings = bindings))
-        mutableState.value = mutableState.value.copy(captureQueue = mutableState.value.captureQueue.drop(1), conflict = null)
+        val next = mutableState.value.captureQueue.drop(1)
+        mutableState.value = mutableState.value.copy(captureQueue = next, conflict = null)
+        if (next.isEmpty()) stopCapture()
         save()
+    }
+
+    private fun startCapture() {
+        GamepadInputManager.registerCaptureListener(::accept)
+    }
+    private fun stopCapture() {
+        GamepadInputManager.unregisterCaptureListener()
     }
 
     private fun current() = mutableState.value.profiles[mutableState.value.slot]

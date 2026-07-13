@@ -1,0 +1,50 @@
+{
+	"bmi-installation" : null,
+	"compiler-frontend-variant" : "GNU",
+	"compiler-id" : "GNU",
+	"compiler-simulate-id" : "",
+	"config" : "Debug",
+	"cxx-modules" : {},
+	"database-info" : null,
+	"dir-cur-bld" : "/home/jica/repo/Bachata-S4/build-tests/externals/pugixml",
+	"dir-cur-src" : "/home/jica/repo/Bachata-S4/externals/pugixml",
+	"dir-top-bld" : "/home/jica/repo/Bachata-S4/build-tests",
+	"dir-top-src" : "/home/jica/repo/Bachata-S4",
+	"exports" : 
+	[
+		{
+			"cxx-module-info-dir" : "",
+			"destination" : "lib/cmake/pugixml",
+			"export-name" : "static",
+			"export-prefix" : "/home/jica/repo/Bachata-S4/build-tests/externals/pugixml/CMakeFiles/Export/be764272e56105fc8ff11fec8314e604",
+			"filesystem-export-name" : "static",
+			"install" : true,
+			"namespace" : "pugixml::"
+		},
+		{
+			"cxx-module-info-dir" : "",
+			"destination" : "/home/jica/repo/Bachata-S4/build-tests/externals/pugixml",
+			"export-name" : "static",
+			"export-prefix" : "/home/jica/repo/Bachata-S4/build-tests/externals/pugixml",
+			"filesystem-export-name" : "static",
+			"install" : false,
+			"namespace" : "pugixml::"
+		}
+	],
+	"forward-modules-from-target-dirs" : [],
+	"include-dirs" : 
+	[
+		"/home/jica/repo/Bachata-S4/externals/pugixml/src"
+	],
+	"language" : "CXX",
+	"linked-target-dirs" : [],
+	"module-dir" : "/home/jica/repo/Bachata-S4/build-tests/externals/pugixml/CMakeFiles/pugixml-static.dir",
+	"sources" : 
+	{
+		"externals/pugixml/CMakeFiles/pugixml-static.dir/src/pugixml.cpp.o" : 
+		{
+			"language" : "CXX",
+			"source" : "/home/jica/repo/Bachata-S4/externals/pugixml/src/pugixml.cpp"
+		}
+	}
+}

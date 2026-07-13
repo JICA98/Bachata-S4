@@ -50,6 +50,7 @@ class GameRepository @Inject constructor(
 
         folders.forEach { folder ->
             val id = folder.name
+            if (id.startsWith(".")) return@forEach
             if (id !in dbGames) {
                 val sfoFile = GameIconPaths.paramSfo(context.filesDir, "games/$id")
                 val sfo = if (sfoFile.isFile) {
