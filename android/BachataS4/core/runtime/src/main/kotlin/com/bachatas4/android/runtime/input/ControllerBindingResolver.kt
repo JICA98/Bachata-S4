@@ -46,7 +46,7 @@ class ControllerBindingResolver {
             "cross" to Ps4Button.CROSS, "circle" to Ps4Button.CIRCLE, "square" to Ps4Button.SQUARE, "triangle" to Ps4Button.TRIANGLE,
             "l1" to Ps4Button.L1, "r1" to Ps4Button.R1, "l3" to Ps4Button.L3, "r3" to Ps4Button.R3,
             "dpad_up" to Ps4Button.UP, "dpad_down" to Ps4Button.DOWN, "dpad_left" to Ps4Button.LEFT, "dpad_right" to Ps4Button.RIGHT,
-            "options" to Ps4Button.OPTIONS, "touchpad" to Ps4Button.TOUCH_PAD,
+            "options" to Ps4Button.OPTIONS, "touchpad" to Ps4Button.TOUCH_PAD, "ps" to Ps4Button.PS,
         )
     }
 }

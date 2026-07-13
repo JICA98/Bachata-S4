@@ -41,6 +41,7 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeoutException
+import com.bachatas4.android.runtime.input.GamepadInputManager
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
@@ -112,6 +113,7 @@ class EmulationService : Service() {
         )
         val outputFile = sessionLog.backendLog.toFile()
         sessionLog.info("Session", "start game=$gameId driver=$vulkanDriver")
+        GamepadInputManager.onSessionStart()
         sessionLog.info(
             "Device",
             "manufacturer=${android.os.Build.MANUFACTURER} model=${android.os.Build.MODEL} sdk=${android.os.Build.VERSION.SDK_INT}",
@@ -255,6 +257,7 @@ class EmulationService : Service() {
                 repeat(4) { slot -> ManagedSession.submitController(slot, ControllerSnapshot.Neutral) }
                 ManagedSession.detachControllerSlotSink(sink)
             }
+            GamepadInputManager.onSessionEnd()
             process?.destroyForcibly()
             process = null
             runCatching { clientSocket?.close() }
