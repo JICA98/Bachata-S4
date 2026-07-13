@@ -7,23 +7,35 @@ import android.graphics.BitmapFactory
 import android.os.Build
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -49,12 +61,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.bachatas4.android.data.GameIconPaths
@@ -102,11 +116,6 @@ fun LibraryScreen(
             }
         }
     }
-    LaunchedEffect(dependencies) {
-        runCatching { dependencies.gameRepository().syncOrphanedFolders() }
-        runCatching { dependencies.gameRepository().backfillTitlesFromSfo() }
-        dependencies.gameRepository().observeGames().collectLatest(viewModel::setGames)
-    }
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
         if (uri == null) return@rememberLauncherForActivityResult
         context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -117,9 +126,13 @@ fun LibraryScreen(
         context.startService(intent)
     }
     val onLaunchWithTracking: (String) -> Unit = { id ->
-        scope.launch {
-            runCatching { dependencies.gameRepository().updateLastLaunched(id) }
-            onLaunch(id)
+        if (id == "__import_card__") {
+            picker.launch(null)
+        } else {
+            scope.launch {
+                runCatching { dependencies.gameRepository().updateLastLaunched(id) }
+                onLaunch(id)
+            }
         }
     }
     DisposableEffect(viewModel) {
@@ -128,8 +141,17 @@ fun LibraryScreen(
     }
     LaunchedEffect(viewModel) {
         viewModel.launch.collect { id ->
-            runCatching { dependencies.gameRepository().updateLastLaunched(id) }
-            onLaunch(id)
+            if (id == "__import_card__") {
+                picker.launch(null)
+            } else {
+                runCatching { dependencies.gameRepository().updateLastLaunched(id) }
+                onLaunch(id)
+            }
+        }
+    }
+    LaunchedEffect(viewModel) {
+        viewModel.openSettings.collect { id ->
+            onOpenGameSettings(id)
         }
     }
     val state by viewModel.state.collectAsState()
@@ -150,6 +172,8 @@ fun LibraryScreen(
             }
         },
         onDismissDelete = { gameToDelete = null },
+        onShowDetails = viewModel::showDetails,
+        onSetNumColumns = viewModel::setNumColumns,
     )
 }
 
@@ -166,8 +190,10 @@ fun LibraryContent(
     onRequestDelete: (String) -> Unit,
     onConfirmDelete: (String) -> Unit,
     onDismissDelete: () -> Unit,
+    onShowDetails: (String?) -> Unit,
+    onSetNumColumns: (Int) -> Unit,
 ) {
-    val selected = state.games.firstOrNull { it.id == state.selectedGameId } ?: state.games.firstOrNull()
+    val selected = state.games.firstOrNull { it.id == state.selectedGameId }
     val context = LocalContext.current
     val isImporting = importProgress !is ImportProgress.Idle && importProgress !is ImportProgress.Failed
     val selectedCoverBitmap = remember(selected?.relativePath) {
@@ -181,14 +207,21 @@ fun LibraryContent(
     Scaffold(
         containerColor = BachataPalette.Canvas,
         bottomBar = {
-            BachataActionBar(
-                "A  LAUNCH",
-                "X  FAVORITE",
-                "B  BACK",
-            )
+            if (state.showDetailsGameId == null) {
+                BachataActionBar(
+                    "A  LAUNCH",
+                    "X  DETAILS",
+                )
+            }
         },
     ) { contentPadding ->
-        Box(modifier = Modifier.fillMaxSize()) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val localMaxHeight = maxHeight
+            val cols = ((maxWidth - 32.dp + 12.dp) / (148.dp + 12.dp)).toInt().coerceAtLeast(1)
+            LaunchedEffect(cols) {
+                onSetNumColumns(cols)
+            }
+
             if (selectedCoverBitmap != null) {
                 Image(
                     bitmap = selectedCoverBitmap.asImageBitmap(),
@@ -216,234 +249,236 @@ fun LibraryContent(
                     alpha = 0.22f,
                     contentScale = ContentScale.Crop,
                 )
-            }
-            LazyColumn(
-                modifier = Modifier.fillMaxSize().padding(contentPadding),
-            contentPadding = PaddingValues(bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
-        ) {
-            item {
-                val context = LocalContext.current
-                Row(
+            } else if (state.games.isEmpty()) {
+                Image(
+                    painter = painterResource(id = R.drawable.bg_library),
+                    contentDescription = null,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                ) {
-                    androidx.compose.ui.viewinterop.AndroidView(
-                        modifier = Modifier.size(32.dp),
-                        factory = { viewContext ->
-                            android.widget.ImageView(viewContext).apply {
-                                setImageResource(viewContext.applicationInfo.icon)
-                                contentDescription = "Bachata S4 logo"
-                            }
-                        }
-                    )
-                    Text(
-                        text = "Library",
-                        modifier = Modifier.weight(1f),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = BachataPalette.Primary,
-                    )
-                    TextButton(onClick = onOpenSettings) {
-                        Text("⚙", color = BachataPalette.Primary, style = MaterialTheme.typography.titleLarge)
-                    }
-                }
-            }
-            item {
-                if (selected == null) {
-                    GlassMorphicPanel(modifier = Modifier.padding(horizontal = 16.dp)) {
-                        Column(
-                            modifier = Modifier.fillMaxWidth().padding(24.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            Text("No games yet", style = MaterialTheme.typography.headlineSmall, color = BachataPalette.Primary)
-                            Text(
-                                "Import a legally owned game folder to start your library.",
-                                color = BachataPalette.Secondary,
-                            )
-                            BachataPrimaryButton(onClick = onImport, enabled = !isImporting) {
-                                Text(if (isImporting) "Scanning…" else "Import game")
-                            }
-                        }
-                    }
-                } else {
-                    GlassMorphicPanel(
-                        modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
-                        selected = true,
-                    ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth().padding(24.dp),
-                            horizontalArrangement = Arrangement.spacedBy(16.dp),
-                            verticalAlignment = Alignment.Top,
-                        ) {
-                            GameCover(
-                                relativePath = selected.relativePath,
-                                modifier = Modifier.width(120.dp).aspectRatio(0.75f),
-                            )
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                verticalArrangement = Arrangement.spacedBy(10.dp),
-                            ) {
-                                Text("SELECTED GAME", style = MaterialTheme.typography.labelMedium, color = BachataPalette.Accent)
-                                Text(
-                                    selected.title,
-                                    style = MaterialTheme.typography.displaySmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = BachataPalette.Primary,
+                        .fillMaxSize()
+                        .drawWithContent {
+                            drawContent()
+                            drawRect(
+                                brush = Brush.verticalGradient(
+                                    colors = listOf(
+                                        Color.Transparent,
+                                        BachataPalette.Canvas
+                                    ),
+                                    startY = size.height * 0.30f,
+                                    endY = size.height * 0.65f
                                 )
-                                val subtitle = selected.subtitle
-                                if (!subtitle.isNullOrBlank()) {
-                                    Text(
-                                        subtitle,
-                                        style = MaterialTheme.typography.titleMedium,
-                                        color = BachataPalette.Primary.copy(alpha = 0.8f),
-                                    )
-                                }
-                                val detail = selected.detail
-                                if (!detail.isNullOrBlank()) {
-                                    Text(
-                                        detail,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = BachataPalette.Secondary,
-                                    )
-                                }
-                                Text("Ready to play", color = BachataPalette.Secondary, style = MaterialTheme.typography.labelMedium)
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    BachataPrimaryButton(onClick = { onLaunch(selected.id) }) { Text("▶  Resume") }
-                                    TextButton(onClick = { onOpenGameSettings(selected.id) }) { Text("Options") }
-                                    TextButton(onClick = { onRequestDelete(selected.id) }) {
-                                        Text("Remove", color = Color(0xFFFFB4AB))
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                            )
+                            drawRect(
+                                color = BachataPalette.Canvas,
+                                topLeft = Offset(0f, size.height * 0.65f),
+                                size = Size(size.width, size.height * 0.35f)
+                            )
+                        },
+                    alpha = 0.15f,
+                    contentScale = ContentScale.Fit,
+                )
             }
-            when (val progress = importProgress) {
-                is ImportProgress.Scanning -> {
-                    item {
-                        Text(
-                            "Identifying ${progress.folderName}…",
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            color = BachataPalette.Secondary,
-                        )
-                    }
-                }
-                is ImportProgress.Copying -> {
-                    item {
-                        Column(modifier = Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(
-                                "Importing ${progress.gameTitle}",
-                                color = BachataPalette.Primary,
-                                style = MaterialTheme.typography.titleMedium,
-                            )
-                            val fraction = if (progress.totalBytes > 0) {
-                                progress.bytesCopied.toFloat() / progress.totalBytes.toFloat()
-                            } else 0f
-                            LinearProgressIndicator(
-                                progress = { fraction.coerceIn(0f, 1f) },
-                                modifier = Modifier.fillMaxWidth(),
-                                color = BachataPalette.Accent,
-                            )
-                            Text(
-                                "${formatBytes(progress.bytesCopied)} / ${formatBytes(progress.totalBytes)}",
-                                color = BachataPalette.Secondary,
-                                style = MaterialTheme.typography.bodySmall,
-                            )
-                            Text(
-                                progress.currentFile,
-                                color = BachataPalette.Secondary,
-                                style = MaterialTheme.typography.bodySmall,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                        }
-                    }
-                }
-                is ImportProgress.Success -> {
-                    item {
-                        Text(
-                            "${progress.title} imported",
-                            modifier = Modifier.padding(horizontal = 16.dp),
-                            color = BachataPalette.Accent,
-                            style = MaterialTheme.typography.titleMedium,
-                        )
-                    }
-                }
-                is ImportProgress.Failed -> {
-                    item {
-                        Surface(
-                            modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
-                            color = Color(0xFF3A1E21).copy(alpha = 0.5f),
-                            shape = RoundedCornerShape(12.dp),
-                            border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFB4AB).copy(alpha = 0.3f)),
-                        ) {
-                            Text(
-                                "Import failed: ${progress.message}",
-                                modifier = Modifier.padding(16.dp),
-                                color = Color(0xFFFFB4AB),
-                            )
-                        }
-                    }
-                }
-                is ImportProgress.Idle -> { /* nothing */ }
-            }
-            if (state.games.isNotEmpty()) {
-                item {
-                    Text(
-                        "Continue Playing",
-                        modifier = Modifier.padding(horizontal = 16.dp),
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.Bold,
-                        color = BachataPalette.Primary,
-                    )
-                }
-                item {
-                    val continuePlayingGames = remember(state.games) {
-                        state.games.sortedByDescending { it.lastLaunchedAtMs }
-                    }
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
+
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 148.dp),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(contentPadding),
+                contentPadding = PaddingValues(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                item(span = { GridItemSpan(maxLineSpan) }) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
-                        items(continuePlayingGames.take(5), key = { it.id }) { game ->
-                            LibraryGameCard(game, game.id == selected?.id, onSelectGame, onLaunch, onOpenGameSettings)
-                        }
-                    }
-                }
-                item {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
+                        androidx.compose.ui.viewinterop.AndroidView(
+                            modifier = Modifier.size(32.dp),
+                            factory = { viewContext ->
+                                android.widget.ImageView(viewContext).apply {
+                                    setImageResource(viewContext.applicationInfo.icon)
+                                    contentDescription = "Bachata S4 logo"
+                                }
+                            }
+                        )
                         Text(
-                            "All Games",
+                            text = "Library",
                             modifier = Modifier.weight(1f),
                             style = MaterialTheme.typography.headlineSmall,
                             fontWeight = FontWeight.Bold,
                             color = BachataPalette.Primary,
                         )
-                        TextButton(onClick = onImport, enabled = !isImporting) { Text("Import") }
+                        TextButton(onClick = onOpenSettings) {
+                            Text("⚙", color = BachataPalette.Primary, style = MaterialTheme.typography.titleLarge)
+                        }
                     }
                 }
-                item {
-                    LazyRow(
-                        contentPadding = PaddingValues(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    ) {
-                        items(state.games, key = { it.id }) { game ->
-                            LibraryGameCard(game, game.id == selected?.id, onSelectGame, onLaunch, onOpenGameSettings)
+
+                when (val progress = importProgress) {
+                    is ImportProgress.Scanning -> {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            Text(
+                                "Identifying ${progress.folderName}…",
+                                color = BachataPalette.Secondary,
+                            )
                         }
+                    }
+                    is ImportProgress.Copying -> {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                Text(
+                                    "Importing ${progress.gameTitle}",
+                                    color = BachataPalette.Primary,
+                                    style = MaterialTheme.typography.titleMedium,
+                                )
+                                val fraction = if (progress.totalBytes > 0) {
+                                    progress.bytesCopied.toFloat() / progress.totalBytes.toFloat()
+                                } else 0f
+                                LinearProgressIndicator(
+                                    progress = { fraction.coerceIn(0f, 1f) },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    color = BachataPalette.Accent,
+                                )
+                                Text(
+                                    "${formatBytes(progress.bytesCopied)} / ${formatBytes(progress.totalBytes)}",
+                                    color = BachataPalette.Secondary,
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                                Text(
+                                    progress.currentFile,
+                                    color = BachataPalette.Secondary,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                )
+                            }
+                        }
+                    }
+                    is ImportProgress.Success -> {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            Text(
+                                "${progress.title} imported",
+                                color = BachataPalette.Accent,
+                                style = MaterialTheme.typography.titleMedium,
+                            )
+                        }
+                    }
+                    is ImportProgress.Failed -> {
+                        item(span = { GridItemSpan(maxLineSpan) }) {
+                            Surface(
+                                modifier = Modifier.fillMaxWidth(),
+                                color = Color(0xFF3A1E21).copy(alpha = 0.5f),
+                                shape = RoundedCornerShape(12.dp),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFB4AB).copy(alpha = 0.3f)),
+                            ) {
+                                Text(
+                                    "Import failed: ${progress.message}",
+                                    modifier = Modifier.padding(16.dp),
+                                    color = Color(0xFFFFB4AB),
+                                )
+                            }
+                        }
+                    }
+                    is ImportProgress.Idle -> { /* nothing */ }
+                }
+
+                if (state.games.isNotEmpty()) {
+                    item(span = { GridItemSpan(maxLineSpan) }) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Text(
+                                "All Games",
+                                modifier = Modifier.weight(1f),
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = BachataPalette.Primary,
+                            )
+                        }
+                    }
+                }
+
+                items(state.games, key = { it.id }) { game ->
+                    val isSelected = game.id == selected?.id
+                    LibraryGameCard(
+                        game = game,
+                        selected = isSelected,
+                        onClick = {
+                            onSelectGame(game.id)
+                            onShowDetails(game.id)
+                        }
+                    )
+                }
+
+                item(key = "import_card") {
+                    ImportGameCard(
+                        onClick = {
+                            onSelectGame("__import_card__")
+                            onImport()
+                        },
+                        selected = state.selectedGameId == "__import_card__"
+                    )
+                }
+            }
+
+            val showDetailsId = state.showDetailsGameId
+            val detailsGame = remember(showDetailsId, state.games) {
+                state.games.firstOrNull { it.id == showDetailsId }
+            }
+
+            AnimatedVisibility(
+                visible = detailsGame != null,
+                enter = fadeIn(),
+                exit = fadeOut(),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.6f))
+                        .clickable(
+                            interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                            indication = null
+                        ) { onShowDetails(null) }
+                )
+            }
+
+            AnimatedVisibility(
+                visible = detailsGame != null,
+                enter = slideInVertically(initialOffsetY = { it }),
+                exit = slideOutVertically(targetOffsetY = { it }),
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    if (detailsGame != null) {
+                        GlassBottomSheet(
+                            game = detailsGame,
+                            onLaunch = {
+                                onShowDetails(null)
+                                onLaunch(detailsGame.id)
+                            },
+                            onCancel = { onShowDetails(null) },
+                            onOpenGameSettings = {
+                                onShowDetails(null)
+                                onOpenGameSettings(detailsGame.id)
+                            },
+                            onRequestDelete = {
+                                onShowDetails(null)
+                                onRequestDelete(detailsGame.id)
+                            },
+                            maxHeight = localMaxHeight,
+                            modifier = Modifier.align(Alignment.BottomCenter)
+                        )
                     }
                 }
             }
         }
-        }
     }
+
     gameToDelete?.let { id ->
         val game = state.games.firstOrNull { it.id == id }
         AlertDialog(
@@ -468,12 +503,11 @@ fun LibraryContent(
 private fun LibraryGameCard(
     game: com.bachatas4.android.model.Game,
     selected: Boolean,
-    onSelectGame: (String) -> Unit,
-    onLaunch: (String) -> Unit,
-    onOpenGameSettings: (String) -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     GlassMorphicPanel(
-        modifier = Modifier.width(148.dp).clickable { onSelectGame(game.id) },
+        modifier = modifier.clickable { onClick() },
         selected = selected,
     ) {
         Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -481,7 +515,14 @@ private fun LibraryGameCard(
                 relativePath = game.relativePath,
                 modifier = Modifier.fillMaxWidth().aspectRatio(0.75f),
             )
-            Text(game.title, maxLines = 2, color = BachataPalette.Primary, fontWeight = FontWeight.SemiBold)
+            Text(
+                text = game.title,
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                color = BachataPalette.Primary,
+                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.bodyMedium
+            )
             val subtitle = game.subtitle
             if (!subtitle.isNullOrBlank()) {
                 Box(
@@ -500,10 +541,52 @@ private fun LibraryGameCard(
                     )
                 }
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                TextButton(onClick = { onLaunch(game.id) }) { Text("Launch") }
-                TextButton(onClick = { onOpenGameSettings(game.id) }) { Text("⋮") }
+        }
+    }
+}
+
+@Composable
+private fun ImportGameCard(
+    onClick: () -> Unit,
+    selected: Boolean,
+    modifier: Modifier = Modifier,
+) {
+    GlassMorphicPanel(
+        modifier = modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        selected = selected,
+    ) {
+        Column(
+            modifier = Modifier
+                .padding(10.dp)
+                .fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(0.75f)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(BachataPalette.Canvas.copy(alpha = 0.3f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "+",
+                    style = MaterialTheme.typography.displayMedium,
+                    color = BachataPalette.Accent,
+                    fontWeight = FontWeight.Bold
+                )
             }
+            Text(
+                text = "Import Game",
+                maxLines = 2,
+                color = BachataPalette.Primary,
+                fontWeight = FontWeight.SemiBold,
+                style = MaterialTheme.typography.bodyMedium,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
@@ -516,14 +599,214 @@ private fun GlassMorphicPanel(
 ) {
     Surface(
         modifier = modifier,
-        color = if (selected) BachataPalette.RaisedSurface.copy(alpha = 0.65f) else BachataPalette.Surface.copy(alpha = 0.40f),
+        color = if (selected) BachataPalette.RaisedSurface.copy(alpha = 0.75f) else BachataPalette.Surface.copy(alpha = 0.40f),
         shape = RoundedCornerShape(12.dp),
         border = androidx.compose.foundation.BorderStroke(
-            1.dp,
-            Color.White.copy(alpha = if (selected) 0.30f else 0.12f)
+            width = if (selected) 2.dp else 1.dp,
+            color = if (selected) BachataPalette.Accent else Color.White.copy(alpha = 0.12f)
         ),
         content = content,
     )
+}
+
+@Composable
+private fun ControllerKeyIcon(
+    key: String,
+    backgroundColor: Color,
+    modifier: Modifier = Modifier
+) {
+    Box(
+        modifier = modifier
+            .size(20.dp)
+            .background(color = backgroundColor, shape = CircleShape),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(
+            text = key,
+            color = Color.White,
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            textAlign = TextAlign.Center
+        )
+    }
+}
+
+@Composable
+private fun GlassBottomSheet(
+    game: com.bachatas4.android.model.Game,
+    onLaunch: () -> Unit,
+    onCancel: () -> Unit,
+    onOpenGameSettings: () -> Unit,
+    onRequestDelete: () -> Unit,
+    maxHeight: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
+) {
+    Surface(
+        modifier = modifier
+            .fillMaxWidth()
+            .heightIn(max = maxHeight * 0.75f),
+        color = BachataPalette.Surface.copy(alpha = 0.85f),
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            Color.White.copy(alpha = 0.15f)
+        ),
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Box(
+                modifier = Modifier
+                    .width(48.dp)
+                    .height(4.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(Color.White.copy(alpha = 0.3f))
+            )
+
+            Column(
+                modifier = Modifier
+                    .weight(1f, fill = false)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                GameCover(
+                    relativePath = game.relativePath,
+                    modifier = Modifier
+                        .width(140.dp)
+                        .aspectRatio(0.75f)
+                )
+
+                Text(
+                    text = game.title,
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = BachataPalette.Primary,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center
+                )
+
+                val subtitle = game.subtitle
+                if (!subtitle.isNullOrBlank()) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.titleMedium,
+                        color = BachataPalette.Secondary,
+                        textAlign = TextAlign.Center
+                    )
+                }
+
+                val detail = game.detail
+                if (!detail.isNullOrBlank()) {
+                    Text(
+                        text = detail,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = BachataPalette.Secondary.copy(alpha = 0.9f),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Button(
+                    onClick = onLaunch,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(56.dp),
+                    colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                        containerColor = BachataPalette.Accent,
+                        contentColor = Color.Black
+                    ),
+                    shape = RoundedCornerShape(14.dp)
+                ) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        ControllerKeyIcon(key = "A", backgroundColor = Color(0xFF2E7D32))
+                        Text("Launch", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold, color = Color.Black)
+                    }
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = onCancel,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp),
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = Color.White.copy(alpha = 0.10f),
+                            contentColor = BachataPalette.Primary
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            ControllerKeyIcon(key = "B", backgroundColor = Color(0xFFC62828))
+                            Text("Cancel", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+
+                    Button(
+                        onClick = onOpenGameSettings,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp),
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = Color.White.copy(alpha = 0.05f),
+                            contentColor = BachataPalette.Primary
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            ControllerKeyIcon(key = "X", backgroundColor = Color(0xFF1565C0))
+                            Text("Options", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+
+                    Button(
+                        onClick = onRequestDelete,
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(50.dp),
+                        colors = androidx.compose.material3.ButtonDefaults.buttonColors(
+                            containerColor = Color(0x33FFB4AB),
+                            contentColor = Color(0xFFFFB4AB)
+                        ),
+                        shape = RoundedCornerShape(12.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp)
+                    ) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text("🗑", style = MaterialTheme.typography.bodyMedium)
+                            Text("Remove", style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.SemiBold)
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
