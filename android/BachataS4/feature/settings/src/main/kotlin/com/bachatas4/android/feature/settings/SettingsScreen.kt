@@ -230,6 +230,11 @@ private fun SettingsContent(
             var focusArea by remember { mutableStateOf("tabs") }
             var focusedTabIndex by remember { mutableStateOf(tabs.indexOfFirst { pair -> pair.first == activeTab }.coerceAtLeast(0)) }
 
+            val categoriesList = remember(state.categories) {
+                listOf("All") + state.categories
+            }
+            var focusedCategoryIndex by remember { mutableStateOf(0) }
+
             LaunchedEffect(activeTab) {
                 val idx = tabs.indexOfFirst { pair -> pair.first == activeTab }
                 if (idx >= 0 && focusArea == "tabs") {
@@ -237,56 +242,105 @@ private fun SettingsContent(
                 }
             }
 
+            LaunchedEffect(state.selectedCategory, state.categories) {
+                val idx = if (state.selectedCategory == null) 0 else categoriesList.indexOf(state.selectedCategory).coerceAtLeast(0)
+                if (focusArea == "categories") {
+                    focusedCategoryIndex = idx
+                }
+            }
+
             val contentFocusRequester = remember { FocusRequester() }
 
-            DisposableEffect(activeTab, focusArea, focusedTabIndex) {
+            DisposableEffect(activeTab, focusArea, focusedTabIndex, focusedCategoryIndex, categoriesList) {
                 com.bachatas4.android.runtime.input.GamepadInputManager.registerNavListener { event ->
                     if (event.pressed) {
-                        if (focusArea == "tabs") {
-                            when (event.control) {
-                                "dpad_left" -> {
-                                    focusedTabIndex = (focusedTabIndex - 1).coerceAtLeast(0)
-                                    true
+                        when (focusArea) {
+                            "tabs" -> {
+                                when (event.control) {
+                                    "dpad_left" -> {
+                                        focusedTabIndex = (focusedTabIndex - 1).coerceAtLeast(0)
+                                        true
+                                    }
+                                    "dpad_right" -> {
+                                        focusedTabIndex = (focusedTabIndex + 1).coerceAtMost(tabs.lastIndex)
+                                        true
+                                    }
+                                    "dpad_down" -> {
+                                        val tabName = tabs[focusedTabIndex].first
+                                        if (tabName == "Runtime" || tabName == "CPU") {
+                                            focusArea = "categories"
+                                            focusedCategoryIndex = if (state.selectedCategory == null) 0 else categoriesList.indexOf(state.selectedCategory).coerceAtLeast(0)
+                                        } else if (tabName != "Import" && tabName != "Export") {
+                                            focusArea = "content"
+                                            contentFocusRequester.requestFocus()
+                                        }
+                                        true
+                                    }
+                                    "cross" -> {
+                                        val tabName = tabs[focusedTabIndex].first
+                                        if (tabName == "Import") {
+                                            onImport()
+                                        } else if (tabName == "Export") {
+                                            onExport()
+                                        } else {
+                                            onTabSelected(tabName)
+                                            if (tabName == "Runtime") onRuntime(SettingsRuntime.SHADPS4)
+                                            if (tabName == "CPU") onRuntime(SettingsRuntime.BOX64)
+                                        }
+                                        true
+                                    }
+                                    "circle" -> {
+                                        onBack()
+                                        true
+                                    }
+                                    else -> false
                                 }
-                                "dpad_right" -> {
-                                    focusedTabIndex = (focusedTabIndex + 1).coerceAtMost(tabs.lastIndex)
-                                    true
-                                }
-                                "dpad_down" -> {
-                                    val tabName = tabs[focusedTabIndex].first
-                                    if (tabName != "Import" && tabName != "Export") {
+                            }
+                            "categories" -> {
+                                when (event.control) {
+                                    "dpad_left" -> {
+                                        focusedCategoryIndex = (focusedCategoryIndex - 1).coerceAtLeast(0)
+                                        true
+                                    }
+                                    "dpad_right" -> {
+                                        focusedCategoryIndex = (focusedCategoryIndex + 1).coerceAtMost(categoriesList.lastIndex)
+                                        true
+                                    }
+                                    "dpad_up" -> {
+                                        focusArea = "tabs"
+                                        true
+                                    }
+                                    "dpad_down" -> {
                                         focusArea = "content"
                                         contentFocusRequester.requestFocus()
+                                        true
                                     }
-                                    true
-                                }
-                                "cross" -> {
-                                    val tabName = tabs[focusedTabIndex].first
-                                    if (tabName == "Import") {
-                                        onImport()
-                                    } else if (tabName == "Export") {
-                                        onExport()
-                                    } else {
-                                        onTabSelected(tabName)
-                                        if (tabName == "Runtime") onRuntime(SettingsRuntime.SHADPS4)
-                                        if (tabName == "CPU") onRuntime(SettingsRuntime.BOX64)
+                                    "cross" -> {
+                                        val cat = if (focusedCategoryIndex == 0) null else categoriesList[focusedCategoryIndex]
+                                        onCategory(cat)
+                                        true
                                     }
-                                    true
+                                    "circle" -> {
+                                        focusArea = "tabs"
+                                        true
+                                    }
+                                    else -> false
                                 }
-                                "circle" -> {
-                                    onBack()
-                                    true
-                                }
-                                else -> false
                             }
-                        } else {
-                            when (event.control) {
-                                "circle" -> {
-                                    focusArea = "tabs"
-                                    true
+                            "content" -> {
+                                when (event.control) {
+                                    "circle" -> {
+                                        if (activeTab == "Runtime" || activeTab == "CPU") {
+                                            focusArea = "categories"
+                                        } else {
+                                            focusArea = "tabs"
+                                        }
+                                        true
+                                    }
+                                    else -> false
                                 }
-                                else -> false
                             }
+                            else -> false
                         }
                     } else {
                         false
@@ -301,6 +355,12 @@ private fun SettingsContent(
             LaunchedEffect(focusedTabIndex) {
                 val targetScroll = (focusedTabIndex * 126).coerceAtLeast(0)
                 scrollState.animateScrollTo(targetScroll)
+            }
+
+            val categoryScrollState = rememberScrollState()
+            LaunchedEffect(focusedCategoryIndex) {
+                val targetScroll = (focusedCategoryIndex * 90).coerceAtLeast(0)
+                categoryScrollState.animateScrollTo(targetScroll)
             }
 
             Row(
@@ -351,15 +411,26 @@ private fun SettingsContent(
                         verticalArrangement = Arrangement.spacedBy(12.dp),
                     ) {
                         item {
-                            LazyRow(
-                                contentPadding = PaddingValues(horizontal = 16.dp),
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .horizontalScroll(categoryScrollState)
+                                    .padding(horizontal = 16.dp),
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                item {
-                                    CategoryTab("All", state.selectedCategory == null) { onCategory(null) }
-                                }
-                                items(state.categories) { category ->
-                                    CategoryTab(category, state.selectedCategory == category) { onCategory(category) }
+                                categoriesList.forEachIndexed { index, category ->
+                                    val isSelected = if (category == "All") state.selectedCategory == null else state.selectedCategory == category
+                                    val isFocused = focusArea == "categories" && focusedCategoryIndex == index
+                                    CategoryTab(
+                                        label = category,
+                                        selected = isSelected,
+                                        focused = isFocused,
+                                        onClick = {
+                                            focusedCategoryIndex = index
+                                            onCategory(if (category == "All") null else category)
+                                        }
+                                    )
                                 }
                             }
                         }
@@ -378,7 +449,7 @@ private fun SettingsContent(
                                         Text("Official Box64 preset", fontWeight = FontWeight.SemiBold, color = BachataPalette.Primary)
                                         LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                             items(Box64Preset.entries) { option ->
-                                                CategoryTab(option.name.lowercase(), preset == option) { onPreset(option) }
+                                                CategoryTab(option.name.lowercase(), preset == option, focused = false) { onPreset(option) }
                                             }
                                         }
                                         if (preset != Box64Preset.CUSTOM) {
@@ -495,25 +566,33 @@ private fun TopTab(
 }
 
 @Composable
-private fun CategoryTab(label: String, selected: Boolean, onClick: () -> Unit) {
-    Column(
+private fun CategoryTab(
+    label: String,
+    selected: Boolean,
+    focused: Boolean,
+    onClick: () -> Unit,
+) {
+    androidx.compose.material3.Surface(
+        onClick = onClick,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(999.dp),
+        color = if (selected) BachataPalette.RaisedSurface else BachataPalette.Surface,
+        border = androidx.compose.foundation.BorderStroke(
+            width = 2.dp,
+            color = when {
+                focused -> BachataPalette.Accent
+                selected -> BachataPalette.Accent.copy(alpha = 0.4f)
+                else -> Color.Transparent
+            }
+        ),
         modifier = Modifier
-            .clickable(onClick = onClick)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .padding(vertical = 4.dp)
     ) {
         Text(
-            label,
-            color = if (selected) BachataPalette.Primary else BachataPalette.Secondary,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Box(
-            modifier = Modifier
-                .width(32.dp)
-                .height(2.dp)
-                .background(if (selected) BachataPalette.Accent else Color.Transparent)
+            text = label,
+            color = if (selected || focused) BachataPalette.Primary else BachataPalette.Secondary,
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = if (selected || focused) FontWeight.Bold else FontWeight.Normal,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
         )
     }
 }
