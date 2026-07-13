@@ -33,6 +33,24 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.foundation.focusable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.size
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Create
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.graphics.Color
@@ -196,71 +214,125 @@ private fun SettingsContent(
                     }
                 )
             }
-            LazyRow(
-                modifier = Modifier.fillMaxWidth(),
-                contentPadding = PaddingValues(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.spacedBy(20.dp),
+            val tabs: List<Pair<String, ImageVector>> = remember {
+                listOf(
+                    Pair("Runtime", Icons.Default.PlayArrow),
+                    Pair("CPU", Icons.Default.Build),
+                    Pair("Drivers", Icons.Default.Settings),
+                    Pair("RAW", Icons.Default.Info),
+                    Pair("Controllers", Icons.Default.List),
+                    Pair("Touch Input", Icons.Default.Create),
+                    Pair("Import", Icons.Default.Add),
+                    Pair("Export", Icons.Default.Share)
+                )
+            }
+
+            var focusArea by remember { mutableStateOf("tabs") }
+            var focusedTabIndex by remember { mutableStateOf(tabs.indexOfFirst { pair -> pair.first == activeTab }.coerceAtLeast(0)) }
+
+            LaunchedEffect(activeTab) {
+                val idx = tabs.indexOfFirst { pair -> pair.first == activeTab }
+                if (idx >= 0 && focusArea == "tabs") {
+                    focusedTabIndex = idx
+                }
+            }
+
+            val contentFocusRequester = remember { FocusRequester() }
+
+            DisposableEffect(activeTab, focusArea, focusedTabIndex) {
+                com.bachatas4.android.runtime.input.GamepadInputManager.registerNavListener { event ->
+                    if (event.pressed) {
+                        if (focusArea == "tabs") {
+                            when (event.control) {
+                                "dpad_left" -> {
+                                    focusedTabIndex = (focusedTabIndex - 1).coerceAtLeast(0)
+                                    true
+                                }
+                                "dpad_right" -> {
+                                    focusedTabIndex = (focusedTabIndex + 1).coerceAtMost(tabs.lastIndex)
+                                    true
+                                }
+                                "dpad_down" -> {
+                                    val tabName = tabs[focusedTabIndex].first
+                                    if (tabName != "Import" && tabName != "Export") {
+                                        focusArea = "content"
+                                        contentFocusRequester.requestFocus()
+                                    }
+                                    true
+                                }
+                                "cross" -> {
+                                    val tabName = tabs[focusedTabIndex].first
+                                    if (tabName == "Import") {
+                                        onImport()
+                                    } else if (tabName == "Export") {
+                                        onExport()
+                                    } else {
+                                        onTabSelected(tabName)
+                                        if (tabName == "Runtime") onRuntime(SettingsRuntime.SHADPS4)
+                                        if (tabName == "CPU") onRuntime(SettingsRuntime.BOX64)
+                                    }
+                                    true
+                                }
+                                "circle" -> {
+                                    onBack()
+                                    true
+                                }
+                                else -> false
+                            }
+                        } else {
+                            when (event.control) {
+                                "circle" -> {
+                                    focusArea = "tabs"
+                                    true
+                                }
+                                else -> false
+                            }
+                        }
+                    } else {
+                        false
+                    }
+                }
+                onDispose {
+                    com.bachatas4.android.runtime.input.GamepadInputManager.unregisterNavListener()
+                }
+            }
+
+            val scrollState = rememberScrollState()
+            LaunchedEffect(focusedTabIndex) {
+                val targetScroll = (focusedTabIndex * 126).coerceAtLeast(0)
+                scrollState.animateScrollTo(targetScroll)
+            }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(scrollState)
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                item {
+                tabs.forEachIndexed { index, pair ->
+                    val label = pair.first
+                    val icon = pair.second
+                    val isSelected = activeTab == label
+                    val isFocused = focusArea == "tabs" && focusedTabIndex == index
                     TopTab(
-                        label = "Runtime",
-                        selected = activeTab == "Runtime",
+                        label = label,
+                        icon = icon,
+                        selected = isSelected,
+                        focused = isFocused,
                         onClick = {
-                            onTabSelected("Runtime")
-                            onRuntime(SettingsRuntime.SHADPS4)
+                            focusedTabIndex = index
+                            if (label == "Import") {
+                                onImport()
+                            } else if (label == "Export") {
+                                onExport()
+                            } else {
+                                onTabSelected(label)
+                                if (label == "Runtime") onRuntime(SettingsRuntime.SHADPS4)
+                                if (label == "CPU") onRuntime(SettingsRuntime.BOX64)
+                            }
                         }
-                    )
-                }
-                item {
-                    TopTab(
-                        label = "CPU",
-                        selected = activeTab == "CPU",
-                        onClick = {
-                            onTabSelected("CPU")
-                            onRuntime(SettingsRuntime.BOX64)
-                        }
-                    )
-                }
-                item {
-                    TopTab(
-                        label = "Drivers",
-                        selected = activeTab == "Drivers",
-                        onClick = { onTabSelected("Drivers") }
-                    )
-                }
-                item {
-                    TopTab(
-                        label = "RAW",
-                        selected = activeTab == "RAW",
-                        onClick = { onTabSelected("RAW") }
-                    )
-                }
-                item {
-                    TopTab(
-                        label = "Controllers",
-                        selected = activeTab == "Controllers",
-                        onClick = { onTabSelected("Controllers") }
-                    )
-                }
-                item {
-                    TopTab(
-                        label = "Touch Input",
-                        selected = activeTab == "Touch Input",
-                        onClick = { onTabSelected("Touch Input") }
-                    )
-                }
-                item {
-                    TopTab(
-                        label = "Import",
-                        selected = false,
-                        onClick = onImport
-                    )
-                }
-                item {
-                    TopTab(
-                        label = "Export",
-                        selected = false,
-                        onClick = onExport
                     )
                 }
             }
@@ -269,6 +341,8 @@ private fun SettingsContent(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
+                    .focusRequester(contentFocusRequester)
+                    .focusable()
             ) {
                 if (activeTab == "Runtime" || activeTab == "CPU") {
                     LazyColumn(
@@ -375,28 +449,48 @@ private fun SettingsContent(
 @Composable
 private fun TopTab(
     label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
     selected: Boolean,
+    focused: Boolean,
     onClick: () -> Unit,
 ) {
-    Column(
+    androidx.compose.material3.Surface(
+        onClick = onClick,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(10.dp),
+        color = if (selected) BachataPalette.RaisedSurface else BachataPalette.Surface,
+        border = androidx.compose.foundation.BorderStroke(
+            width = 2.dp,
+            color = when {
+                focused -> BachataPalette.Accent
+                selected -> BachataPalette.Accent.copy(alpha = 0.5f)
+                else -> Color.Transparent
+            }
+        ),
         modifier = Modifier
-            .clickable(onClick = onClick)
-            .padding(vertical = 8.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
+            .width(110.dp)
+            .height(76.dp)
     ) {
-        Text(
-            text = label,
-            color = if (selected) BachataPalette.Primary else BachataPalette.Secondary,
-            style = MaterialTheme.typography.titleMedium,
-            fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-        )
-        Spacer(modifier = Modifier.height(4.dp))
-        Box(
-            modifier = Modifier
-                .width(48.dp)
-                .height(2.dp)
-                .background(if (selected) BachataPalette.Accent else Color.Transparent)
-        )
+        Column(
+            modifier = Modifier.fillMaxSize().padding(8.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            androidx.compose.material3.Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = if (selected || focused) BachataPalette.Accent else BachataPalette.Secondary,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = label,
+                color = if (selected || focused) BachataPalette.Primary else BachataPalette.Secondary,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = if (selected || focused) FontWeight.Bold else FontWeight.Normal,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
