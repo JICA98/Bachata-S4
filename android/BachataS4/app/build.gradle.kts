@@ -92,7 +92,7 @@ android {
         }
         create("fdroid") {
             dimension = "distribution"
-            buildConfigField("Boolean", "DOWNLOAD_RUNTIME", "true")
+            buildConfigField("Boolean", "DOWNLOAD_RUNTIME", "false")
         }
     }
     androidResources {
@@ -147,6 +147,7 @@ dependencies {
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.hilt.navigation.compose)
+    implementation("androidx.documentfile:documentfile:1.1.0")
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     implementation(platform(libs.compose.bom))

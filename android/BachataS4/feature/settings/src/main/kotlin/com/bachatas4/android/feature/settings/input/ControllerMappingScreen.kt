@@ -34,8 +34,6 @@ import com.bachatas4.android.designsystem.BachataPanel
 import com.bachatas4.android.designsystem.BachataPrimaryButton
 import com.bachatas4.android.designsystem.theme.BachataPalette
 import com.bachatas4.android.runtime.input.ControllerProfile
-import com.bachatas4.android.runtime.input.PhysicalBinding
-import com.bachatas4.android.runtime.input.PhysicalBindingKind
 import com.bachatas4.android.runtime.settings.ProfileScope
 
 @Composable
@@ -151,13 +149,13 @@ fun ControllerMappingScreen(
                         fontWeight = FontWeight.Bold,
                         style = MaterialTheme.typography.titleMedium
                     )
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        BachataPrimaryButton(onClick = { viewModel.accept(PhysicalBinding(PhysicalBindingKind.BUTTON, 96)) }) {
-                            Text("Simulate Cross button")
-                        }
-                        BachataPrimaryButton(onClick = { viewModel.accept(PhysicalBinding(PhysicalBindingKind.AXIS, 0)) }) {
-                            Text("Simulate Axis")
-                        }
+                    Text(
+                        text = "Press a button or move a stick on your controller",
+                        color = Color(0xFF8AB4F8),
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                    TextButton(onClick = { viewModel.cancelCapture() }) {
+                        Text("Cancel", color = Color(0xFF8AB4F8))
                     }
                 }
             }

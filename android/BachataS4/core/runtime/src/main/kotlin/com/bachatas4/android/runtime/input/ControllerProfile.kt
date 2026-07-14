@@ -40,7 +40,7 @@ data class ControllerProfile(
         val LOGICAL_CONTROLS = setOf(
             "left_x", "left_y", "right_x", "right_y", "left_trigger", "right_trigger",
             "cross", "circle", "square", "triangle", "l1", "r1", "l2", "r2", "l3", "r3",
-            "dpad_up", "dpad_down", "dpad_left", "dpad_right", "options", "share", "touchpad",
+            "dpad_up", "dpad_down", "dpad_left", "dpad_right", "options", "share", "touchpad", "ps",
         )
 
         fun standard(device: ControllerDeviceKey? = null): ControllerProfile = ControllerProfile(
@@ -57,6 +57,7 @@ data class ControllerProfile(
                 "options" to PhysicalBinding(PhysicalBindingKind.BUTTON, 108), "share" to PhysicalBinding(PhysicalBindingKind.BUTTON, 109),
                 "dpad_up" to PhysicalBinding(PhysicalBindingKind.BUTTON, 19), "dpad_down" to PhysicalBinding(PhysicalBindingKind.BUTTON, 20),
                 "dpad_left" to PhysicalBinding(PhysicalBindingKind.BUTTON, 21), "dpad_right" to PhysicalBinding(PhysicalBindingKind.BUTTON, 22),
+                "ps" to PhysicalBinding(PhysicalBindingKind.BUTTON, 188),
             ),
         )
     }

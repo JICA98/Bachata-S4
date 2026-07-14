@@ -1,0 +1,21 @@
+# ninja log v7
+1	32	1783881460704973084	zlib-populate-prefix/src/zlib-populate-stamp/zlib-populate-mkdir	7650e6882dd5065a
+1	32	1783881460704973084	/home/jica/repo/Bachata-S4/build-tests/_deps/zlib-subbuild/zlib-populate-prefix/src/zlib-populate-stamp/zlib-populate-mkdir	7650e6882dd5065a
+32	61	1783881460732973077	zlib-populate-prefix/src/zlib-populate-stamp/zlib-populate-download	e150c2eb28cdbb1e
+32	61	1783881460732973077	/home/jica/repo/Bachata-S4/build-tests/_deps/zlib-subbuild/zlib-populate-prefix/src/zlib-populate-stamp/zlib-populate-download	e150c2eb28cdbb1e
+61	89	1783881460760973067	zlib-populate-prefix/src/zlib-populate-stamp/zlib-populate-update	239854bbd5858e41
+61	89	1783881460760973067	/home/jica/repo/Bachata-S4/build-tests/_deps/zlib-subbuild/zlib-populate-prefix/src/zlib-populate-stamp/zlib-populate-update	239854bbd5858e41
+90	119	1783881460788973061	zlib-populate-prefix/src/zlib-populate-stamp/zlib-populate-patch	926641e7f794ac86
+90	119	1783881460788973061	/home/jica/repo/Bachata-S4/build-tests/_deps/zlib-subbuild/zlib-populate-prefix/src/zlib-populate-stamp/zlib-populate-patch	926641e7f794ac86
+119	146	1783881460816973054	zlib-populate-prefix/src/zlib-populate-stamp/zlib-populate-configure	24ba8767346cbb81
+119	146	1783881460816973054	/home/jica/repo/Bachata-S4/build-tests/_deps/zlib-subbuild/zlib-populate-prefix/src/zlib-populate-stamp/zlib-populate-configure	24ba8767346cbb81
+146	173	1783881460844973044	zlib-populate-prefix/src/zlib-populate-stamp/zlib-populate-build	c9a4e16eb98bf7d5
+146	173	1783881460844973044	/home/jica/repo/Bachata-S4/build-tests/_deps/zlib-subbuild/zlib-populate-prefix/src/zlib-populate-stamp/zlib-populate-build	c9a4e16eb98bf7d5
+174	207	1783881460876973035	zlib-populate-prefix/src/zlib-populate-stamp/zlib-populate-install	4eaaa0d0525a66fa
+174	207	1783881460876973035	/home/jica/repo/Bachata-S4/build-tests/_deps/zlib-subbuild/zlib-populate-prefix/src/zlib-populate-stamp/zlib-populate-install	4eaaa0d0525a66fa
+207	233	1783881460904973029	zlib-populate-prefix/src/zlib-populate-stamp/zlib-populate-test	82efc43d6ac3380e
+207	233	1783881460904973029	/home/jica/repo/Bachata-S4/build-tests/_deps/zlib-subbuild/zlib-populate-prefix/src/zlib-populate-stamp/zlib-populate-test	82efc43d6ac3380e
+233	268	1783881460940973017	CMakeFiles/zlib-populate-complete	89aedae1a522a0b5
+233	268	1783881460940973017	zlib-populate-prefix/src/zlib-populate-stamp/zlib-populate-done	89aedae1a522a0b5
+233	268	1783881460940973017	/home/jica/repo/Bachata-S4/build-tests/_deps/zlib-subbuild/CMakeFiles/zlib-populate-complete	89aedae1a522a0b5
+233	268	1783881460940973017	/home/jica/repo/Bachata-S4/build-tests/_deps/zlib-subbuild/zlib-populate-prefix/src/zlib-populate-stamp/zlib-populate-done	89aedae1a522a0b5

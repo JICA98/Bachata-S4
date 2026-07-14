@@ -1,0 +1,21 @@
+# ninja log v7
+1	30	1783881603116941812	googletest-populate-prefix/src/googletest-populate-stamp/googletest-populate-mkdir	994f7efeb0635ba
+1	30	1783881603116941812	/home/jica/repo/Bachata-S4/build-tests/_deps/googletest-subbuild/googletest-populate-prefix/src/googletest-populate-stamp/googletest-populate-mkdir	994f7efeb0635ba
+31	1088	1783881604172941635	googletest-populate-prefix/src/googletest-populate-stamp/googletest-populate-download	16b7eebe1631fe23
+31	1088	1783881604172941635	/home/jica/repo/Bachata-S4/build-tests/_deps/googletest-subbuild/googletest-populate-prefix/src/googletest-populate-stamp/googletest-populate-download	16b7eebe1631fe23
+1088	1111	1783881604196941631	googletest-populate-prefix/src/googletest-populate-stamp/googletest-populate-update	9805cf9f5f9944bf
+1088	1111	1783881604196941631	/home/jica/repo/Bachata-S4/build-tests/_deps/googletest-subbuild/googletest-populate-prefix/src/googletest-populate-stamp/googletest-populate-update	9805cf9f5f9944bf
+1111	1134	1783881604220941625	googletest-populate-prefix/src/googletest-populate-stamp/googletest-populate-patch	a5d2110c8d469136
+1111	1134	1783881604220941625	/home/jica/repo/Bachata-S4/build-tests/_deps/googletest-subbuild/googletest-populate-prefix/src/googletest-populate-stamp/googletest-populate-patch	a5d2110c8d469136
+1134	1164	1783881604248941623	googletest-populate-prefix/src/googletest-populate-stamp/googletest-populate-configure	aacec5da0139f7c9
+1134	1164	1783881604248941623	/home/jica/repo/Bachata-S4/build-tests/_deps/googletest-subbuild/googletest-populate-prefix/src/googletest-populate-stamp/googletest-populate-configure	aacec5da0139f7c9
+1164	1196	1783881604280941617	googletest-populate-prefix/src/googletest-populate-stamp/googletest-populate-build	dd6e290812e4fb43
+1164	1196	1783881604280941617	/home/jica/repo/Bachata-S4/build-tests/_deps/googletest-subbuild/googletest-populate-prefix/src/googletest-populate-stamp/googletest-populate-build	dd6e290812e4fb43
+1196	1228	1783881604312941609	googletest-populate-prefix/src/googletest-populate-stamp/googletest-populate-install	cab2e9eaf603bc1c
+1196	1228	1783881604312941609	/home/jica/repo/Bachata-S4/build-tests/_deps/googletest-subbuild/googletest-populate-prefix/src/googletest-populate-stamp/googletest-populate-install	cab2e9eaf603bc1c
+1228	1254	1783881604340941607	googletest-populate-prefix/src/googletest-populate-stamp/googletest-populate-test	924427de367d5cfd
+1228	1254	1783881604340941607	/home/jica/repo/Bachata-S4/build-tests/_deps/googletest-subbuild/googletest-populate-prefix/src/googletest-populate-stamp/googletest-populate-test	924427de367d5cfd
+1254	1297	1783881604380941598	CMakeFiles/googletest-populate-complete	19c263370c50bbd1
+1254	1297	1783881604380941598	googletest-populate-prefix/src/googletest-populate-stamp/googletest-populate-done	19c263370c50bbd1
+1254	1297	1783881604380941598	/home/jica/repo/Bachata-S4/build-tests/_deps/googletest-subbuild/CMakeFiles/googletest-populate-complete	19c263370c50bbd1
+1254	1297	1783881604380941598	/home/jica/repo/Bachata-S4/build-tests/_deps/googletest-subbuild/googletest-populate-prefix/src/googletest-populate-stamp/googletest-populate-done	19c263370c50bbd1

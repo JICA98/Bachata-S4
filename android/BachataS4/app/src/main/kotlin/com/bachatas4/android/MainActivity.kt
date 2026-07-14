@@ -11,7 +11,11 @@ import androidx.compose.ui.Modifier
 import com.bachatas4.android.designsystem.theme.AppTheme
 import dagger.hilt.android.AndroidEntryPoint
 import androidx.lifecycle.lifecycleScope
+import android.view.KeyEvent
+import android.view.MotionEvent
 import com.bachatas4.android.data.LegacyRuntimeSettingsMigration
+import com.bachatas4.android.runtime.input.GamepadInputManager
+import androidx.activity.enableEdgeToEdge
 import javax.inject.Inject
 import kotlinx.coroutines.launch
 
@@ -19,7 +23,14 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     @Inject lateinit var legacyRuntimeSettingsMigration: LegacyRuntimeSettingsMigration
 
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean =
+        GamepadInputManager.dispatchKeyEvent(event) || super.dispatchKeyEvent(event)
+
+    override fun dispatchGenericMotionEvent(event: MotionEvent): Boolean =
+        GamepadInputManager.dispatchGenericMotionEvent(event) || super.dispatchGenericMotionEvent(event)
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         lifecycleScope.launch { legacyRuntimeSettingsMigration.migrate() }
         val runtimeRoot = java.io.File(filesDir, "runtime")

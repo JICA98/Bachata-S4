@@ -1,0 +1,79 @@
+{
+	"bmi-installation" : null,
+	"compiler-frontend-variant" : "GNU",
+	"compiler-id" : "GNU",
+	"compiler-simulate-id" : "",
+	"config" : "Debug",
+	"cxx-modules" : {},
+	"database-info" : null,
+	"dir-cur-bld" : "/home/jica/repo/Bachata-S4/build-tests/externals/openal-soft",
+	"dir-cur-src" : "/home/jica/repo/Bachata-S4/externals/openal-soft",
+	"dir-top-bld" : "/home/jica/repo/Bachata-S4/build-tests",
+	"dir-top-src" : "/home/jica/repo/Bachata-S4",
+	"exports" : [],
+	"forward-modules-from-target-dirs" : [],
+	"include-dirs" : 
+	[
+		"/home/jica/repo/Bachata-S4/externals/openal-soft",
+		"externals/openal-soft",
+		"/home/jica/repo/Bachata-S4/externals/openal-soft/common",
+		"/home/jica/repo/Bachata-S4/externals/openal-soft/gsl/include",
+		"/home/jica/repo/Bachata-S4/externals/openal-soft/fmt-11.2.0/include"
+	],
+	"language" : "CXX",
+	"linked-target-dirs" : [],
+	"module-dir" : "/home/jica/repo/Bachata-S4/build-tests/externals/openal-soft/CMakeFiles/alsoft.common.dir",
+	"sources" : 
+	{
+		"externals/openal-soft/CMakeFiles/alsoft.common.dir/common/alcomplex.cpp.o" : 
+		{
+			"language" : "CXX",
+			"source" : "/home/jica/repo/Bachata-S4/externals/openal-soft/common/alcomplex.cpp"
+		},
+		"externals/openal-soft/CMakeFiles/alsoft.common.dir/common/almalloc.cpp.o" : 
+		{
+			"language" : "CXX",
+			"source" : "/home/jica/repo/Bachata-S4/externals/openal-soft/common/almalloc.cpp"
+		},
+		"externals/openal-soft/CMakeFiles/alsoft.common.dir/common/alstring.cpp.o" : 
+		{
+			"language" : "CXX",
+			"source" : "/home/jica/repo/Bachata-S4/externals/openal-soft/common/alstring.cpp"
+		},
+		"externals/openal-soft/CMakeFiles/alsoft.common.dir/common/althrd_setname.cpp.o" : 
+		{
+			"language" : "CXX",
+			"source" : "/home/jica/repo/Bachata-S4/externals/openal-soft/common/althrd_setname.cpp"
+		},
+		"externals/openal-soft/CMakeFiles/alsoft.common.dir/common/altypes.cpp.o" : 
+		{
+			"language" : "CXX",
+			"source" : "/home/jica/repo/Bachata-S4/externals/openal-soft/common/altypes.cpp"
+		},
+		"externals/openal-soft/CMakeFiles/alsoft.common.dir/common/dynload.cpp.o" : 
+		{
+			"language" : "CXX",
+			"source" : "/home/jica/repo/Bachata-S4/externals/openal-soft/common/dynload.cpp"
+		},
+		"externals/openal-soft/CMakeFiles/alsoft.common.dir/common/filesystem.cpp.o" : 
+		{
+			"language" : "CXX",
+			"source" : "/home/jica/repo/Bachata-S4/externals/openal-soft/common/filesystem.cpp"
+		},
+		"externals/openal-soft/CMakeFiles/alsoft.common.dir/common/pffft.cpp.o" : 
+		{
+			"language" : "CXX",
+			"source" : "/home/jica/repo/Bachata-S4/externals/openal-soft/common/pffft.cpp"
+		},
+		"externals/openal-soft/CMakeFiles/alsoft.common.dir/common/polyphase_resampler.cpp.o" : 
+		{
+			"language" : "CXX",
+			"source" : "/home/jica/repo/Bachata-S4/externals/openal-soft/common/polyphase_resampler.cpp"
+		},
+		"externals/openal-soft/CMakeFiles/alsoft.common.dir/common/strutils.cpp.o" : 
+		{
+			"language" : "CXX",
+			"source" : "/home/jica/repo/Bachata-S4/externals/openal-soft/common/strutils.cpp"
+		}
+	}
+}

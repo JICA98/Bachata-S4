@@ -19,6 +19,8 @@ import com.winlator.xserver.XClientRequestHandler
 import com.winlator.xserver.XServer
 import java.io.File
 import java.nio.Buffer
+import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.withTimeout
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -45,7 +47,7 @@ class WinlatorEmbeddedXServer(
     private var session: Session? = null
     private var stopped = false
 
-    override suspend fun start(surface: Surface, width: Int, height: Int) = mutex.withLock {
+    override suspend fun start(surface: Surface, width: Int, height: Int): Unit = mutex.withLock {
         require(width > 0 && height > 0) { "X server dimensions must be positive" }
         check(session == null && !stopped) { "Embedded X server already started or stopped" }
         check(surface.isValid) { "Display surface is invalid" }
@@ -77,6 +79,7 @@ class WinlatorEmbeddedXServer(
             alsaConnector.start()
             renderer.start()
             session = Session(xConnector, alsaConnector, renderer)
+            Log.d("WinlatorEmbeddedXServer", "socket type: ${if (useAbstractXSocket) "abstract" else "filesystem"}, DISPLAY=$display")
         } catch (error: Throwable) {
             renderer.stop()
             alsaConnector.destroy()

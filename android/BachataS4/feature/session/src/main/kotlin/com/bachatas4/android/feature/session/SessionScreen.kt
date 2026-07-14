@@ -52,6 +52,7 @@ import androidx.compose.ui.text.font.FontWeight
 import com.bachatas4.android.designsystem.theme.BachataPalette
 import com.bachatas4.android.runtime.input.ControllerSnapshot
 import com.bachatas4.android.runtime.input.Ps4Button
+import com.bachatas4.android.runtime.input.GamepadInputManager
 import kotlinx.coroutines.delay
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.ui.platform.LocalDensity
@@ -129,7 +130,7 @@ fun SessionScreen(
                 }
                 if (showStopOverlay) {
                     ManagedSession.submitController(ControllerSnapshot.Neutral)
-                } else {
+                } else if (!GamepadInputManager.hasPhysicalController) {
                     ManagedSession.submitController(snapshot)
                 }
             }

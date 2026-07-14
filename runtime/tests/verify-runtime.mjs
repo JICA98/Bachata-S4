@@ -11,12 +11,6 @@ const EXPECTED_COMPONENTS = [
   { name: "winlator-components", url: "https://github.com/brunodev85/winlator.git", revision: "fb66541b93a4eb3ee585a433b4c7b20544d58e40", license: "MIT" },
   { name: "glibc-packages", url: "https://github.com/termux-pacman/glibc-packages.git", revision: "26d89ba7a1f856b99f0d437bef54f558b2485075", license: "mixed" },
   { name: "mesa", url: "https://gitlab.freedesktop.org/mesa/mesa.git", revision: "6984e91b5fe1d1c204e54954a4282fcdc0c44b78", license: "MIT" },
-  {
-    name: "fex",
-    url: "https://github.com/FEX-Emu/FEX.git",
-    revision: "f2b679f6028ce1c38875233aecfcf5d3f8ebecec",
-    license: "MIT",
-  },
 ];
 const EXPECTED_INPUTS = [
   { name: "glibc-2.43+r22+g8362e8ce10b2-2-x86_64.pkg.tar.zst", url: "https://archive.archlinux.org/packages/g/glibc/glibc-2.43%2Br22%2Bg8362e8ce10b2-2-x86_64.pkg.tar.zst", sha256: "2c20828b3a571b272697671c90b1e3a8c426d6a7e7fb99a242099373f2710fe1" },
@@ -61,7 +55,6 @@ const EXPECTED_WINLATOR_PATCHES = [
 const REQUIRED_RUNTIME_PATHS = [
   "bin/hello",
   "bin/audio-tone",
-  "bin/fexcore-smoke",
   "bin/shadps4",
   "bin/sdl-window",
   "bin/vulkan-info",
@@ -218,8 +211,7 @@ const shadPs4BuildScriptPath = resolve(projectRoot, "runtime/scripts/build-shadp
 const box64EntrypointPatchPath = resolve(projectRoot, "runtime/patches/box64-winlator-glibc-entrypoint.patch");
 const box64QuickExitPatchPath = resolve(projectRoot, "runtime/patches/box64-cxa-quick-exit.patch");
 const box64NativeWriteOpcodePatchPath = resolve(projectRoot, "runtime/patches/box64-native-write-opcode.patch");
-const fexCoreOnlyPatchPath = resolve(projectRoot, "runtime/patches/fex-fexcore-only.patch");
-const fexCoreSmokeBuildScriptPath = resolve(projectRoot, "runtime/scripts/build-fexcore-smoke-aarch64.sh");
+const box64BachataThreadAffinityPatchPath = resolve(projectRoot, "runtime/patches/box64-bachata-thread-affinity.patch");
 const nativeHostLoaderPath = resolve(projectRoot, "android/BachataS4/core/runtime/src/main/jniLibs/arm64-v8a/libbachata_host_loader.so");
 const nativeHostBox64Path = resolve(projectRoot, "android/BachataS4/core/runtime/src/main/jniLibs/arm64-v8a/libbachata_host_box64.so");
 const playStoreRuntimeDir = resolve(projectRoot, "android/BachataS4/app/src/playstore/assets/runtime");
@@ -250,30 +242,14 @@ if (!readFileSync(box64HostBuildScriptPath, "utf8").includes("box64-cxa-quick-ex
 if (readFileSync(box64HostBuildScriptPath, "utf8").includes("box64-backing-dmem-clean-code.patch")) {
   fail("Host Box64 build must preserve shared-mapping invalidation semantics");
 }
+if (!readFileSync(box64HostBuildScriptPath, "utf8").includes("box64-bachata-thread-affinity.patch")) {
+  fail("Host Box64 build does not apply the opt-in Bachata thread-affinity patch");
+}
 if (!readFileSync(box64QuickExitPatchPath, "utf8").includes("GOM(__cxa_at_quick_exit, iFEpp)")) {
   fail("Box64 quick-exit compatibility patch is invalid");
 }
 if (!readFileSync(box64EntrypointPatchPath, "utf8").includes("!defined(WINLATOR_GLIBC)")) {
   fail("Box64 Android entrypoint patch does not select glibc startup");
-}
-if (!existsSync(fexCoreOnlyPatchPath)) {
-  fail("FEXCore-only patch is missing");
-}
-if (!/^\s*-DTUNE_CPU=none \\$/m.test(readFileSync(fexCoreSmokeBuildScriptPath, "utf8"))) {
-  fail("FEXCore smoke cross-build must set -DTUNE_CPU=none");
-}
-const fexCoreOnlyPatch = readFileSync(fexCoreOnlyPatchPath, "utf8");
-for (const marker of [
-  "BUILD_FEXCORE_ONLY",
-  "FEXCORE_SMOKE_SOURCE",
-  "add_executable(fexcore-smoke",
-  "FEXCore",
-  "CommonTools",
-  "install(TARGETS fexcore-smoke",
-]) {
-  if (!fexCoreOnlyPatch.includes(marker)) {
-    fail(`FEXCore-only patch is missing ${marker}`);
-  }
 }
 const nativeWriteOpcodePatch = readFileSync(box64NativeWriteOpcodePatchPath, "utf8");
 for (const marker of [
@@ -285,6 +261,17 @@ for (const marker of [
 ]) {
   if (!nativeWriteOpcodePatch.includes(marker)) {
     fail(`Box64 native write classifier patch is missing ${marker}`);
+  }
+}
+const bachataThreadAffinityPatch = readFileSync(box64BachataThreadAffinityPatchPath, "utf8");
+for (const marker of [
+  "BOX64_BACHATA_PRIME_THREAD",
+  '"NexusRevolution"',
+  "box64_bachata_highest_allowed_cpu",
+  "test_bachata_thread_affinity.c",
+]) {
+  if (!bachataThreadAffinityPatch.includes(marker)) {
+    fail(`Box64 Bachata thread-affinity patch is missing ${marker}`);
   }
 }
 if (lock.schemaVersion !== 1) fail("Lock schemaVersion must be 1");
@@ -348,10 +335,5 @@ if (hello.readUInt16LE(18) !== 62) fail("Probe is not x86_64 ELF");
 const shadps4 = zipEntries.find((entry) => entry.path === "bin/shadps4").bytes;
 if (shadps4.length < 20 || shadps4[0] !== 0x7f || shadps4.subarray(1, 4).toString() !== "ELF") fail("shadPS4 is not ELF");
 if (shadps4.readUInt16LE(18) !== 62) fail("shadPS4 is not x86_64 ELF");
-const fexcoreSmoke = zipEntries.find((entry) => entry.path === "bin/fexcore-smoke").bytes;
-if (fexcoreSmoke.length < 20 || fexcoreSmoke[0] !== 0x7f || fexcoreSmoke.subarray(1, 4).toString() !== "ELF") fail("FEXCore smoke runner is not ELF");
-if (fexcoreSmoke[4] !== 2) fail("FEXCore smoke runner is not ELF64");
-if (fexcoreSmoke[5] !== 1) fail("FEXCore smoke runner is not little-endian ELF");
-if (fexcoreSmoke.readUInt16LE(18) !== 183) fail("FEXCore smoke runner is not AArch64 ELF");
 
 console.log(`runtime verified: ${zipEntries.length} files, sha256=${sha256(readFileSync(zipPath))}`);

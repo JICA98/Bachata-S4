@@ -24,6 +24,7 @@ cmake -S "$project_root" -B "$build_dir" -G Ninja \
   -DCMAKE_BUILD_TYPE=Release \
   -DCMAKE_C_COMPILER=clang \
   -DCMAKE_CXX_COMPILER=clang++ \
+  -DCMAKE_CXX_SCAN_FOR_MODULES=OFF \
   -DCMAKE_AR="$llvm_ar" \
   -DCMAKE_RANLIB="$llvm_ranlib" \
   -DCMAKE_C_COMPILER_AR="$llvm_ar" \

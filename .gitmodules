@@ -157,5 +157,8 @@
 	shallow = true
 [submodule "externals/winlator-app"]
 	path = externals/winlator-app
-	url = https://github.com/brunodev85/winlator-app.git
+	url = https://github.com/JICA98/winlator-app.git
 	shallow = true
+[submodule "box64-sources"]
+	path = runtime/sources/box64
+	url = https://github.com/ptitSeb/box64.git

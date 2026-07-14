@@ -46,6 +46,7 @@ class ControllerMapper(
             102 to "l1", 103 to "r1", 104 to "l2", 105 to "r2",
             106 to "l3", 107 to "r3", 108 to "options", 109 to "share",
             19 to "dpad_up", 20 to "dpad_down", 21 to "dpad_left", 22 to "dpad_right",
+            188 to "ps",
         )
         private val AXES = mapOf(
             0 to "left_x", 1 to "left_y", 11 to "right_x", 14 to "right_y",

@@ -41,6 +41,7 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeoutException
+import com.bachatas4.android.runtime.input.GamepadInputManager
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.CancellationException
@@ -112,6 +113,7 @@ class EmulationService : Service() {
         )
         val outputFile = sessionLog.backendLog.toFile()
         sessionLog.info("Session", "start game=$gameId driver=$vulkanDriver")
+        GamepadInputManager.onSessionStart()
         sessionLog.info(
             "Device",
             "manufacturer=${android.os.Build.MANUFACTURER} model=${android.os.Build.MODEL} sdk=${android.os.Build.VERSION.SDK_INT}",
@@ -143,7 +145,7 @@ class EmulationService : Service() {
             xServer = WinlatorEmbeddedXServer(
                 this,
                 socketRoot,
-                useAbstractXSocket = false,
+                useAbstractXSocket = true,
                 xSocketPath = "/X0",
                 useSharedMemoryAudio = false,
             )
@@ -255,6 +257,7 @@ class EmulationService : Service() {
                 repeat(4) { slot -> ManagedSession.submitController(slot, ControllerSnapshot.Neutral) }
                 ManagedSession.detachControllerSlotSink(sink)
             }
+            GamepadInputManager.onSessionEnd()
             process?.destroyForcibly()
             process = null
             runCatching { clientSocket?.close() }
@@ -299,6 +302,7 @@ class EmulationService : Service() {
         "BACHATA_ALSA_SOCKET" to File(socketRoot, UnixSocketConfig.ALSA_SERVER_PATH).path,
         "DISPLAY" to display,
         "SDL_VIDEODRIVER" to "x11",
+        "XKB_CONFIG_ROOT" to runtimeRoot.resolve("usr/share/X11/xkb").toString(),
         "TMPDIR" to cacheDir.path,
         "XDG_CACHE_HOME" to File(cacheDir, "xdg").apply { mkdirs() }.path,
         "GLIBC_TUNABLES" to "glibc.pthread.rseq=0",

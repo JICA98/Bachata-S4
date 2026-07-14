@@ -1,0 +1,21 @@
+# ninja log v7
+1	29	1783881456272974248	fmt-populate-prefix/src/fmt-populate-stamp/fmt-populate-mkdir	14d93e56d6795ab3
+1	29	1783881456272974248	/home/jica/repo/Bachata-S4/build-tests/_deps/fmt-subbuild/fmt-populate-prefix/src/fmt-populate-stamp/fmt-populate-mkdir	14d93e56d6795ab3
+29	1085	1783881457328973978	fmt-populate-prefix/src/fmt-populate-stamp/fmt-populate-download	1dd0e32bcd8028b9
+29	1085	1783881457328973978	/home/jica/repo/Bachata-S4/build-tests/_deps/fmt-subbuild/fmt-populate-prefix/src/fmt-populate-stamp/fmt-populate-download	1dd0e32bcd8028b9
+1085	1107	1783881457352973974	fmt-populate-prefix/src/fmt-populate-stamp/fmt-populate-update	df9e8df392c550ad
+1085	1107	1783881457352973974	/home/jica/repo/Bachata-S4/build-tests/_deps/fmt-subbuild/fmt-populate-prefix/src/fmt-populate-stamp/fmt-populate-update	df9e8df392c550ad
+1107	1133	1783881457376973968	fmt-populate-prefix/src/fmt-populate-stamp/fmt-populate-patch	f150f10bdd00cfc9
+1107	1133	1783881457376973968	/home/jica/repo/Bachata-S4/build-tests/_deps/fmt-subbuild/fmt-populate-prefix/src/fmt-populate-stamp/fmt-populate-patch	f150f10bdd00cfc9
+1133	1157	1783881457400973960	fmt-populate-prefix/src/fmt-populate-stamp/fmt-populate-configure	19546900e3a9b52
+1133	1157	1783881457400973960	/home/jica/repo/Bachata-S4/build-tests/_deps/fmt-subbuild/fmt-populate-prefix/src/fmt-populate-stamp/fmt-populate-configure	19546900e3a9b52
+1157	1183	1783881457424973956	fmt-populate-prefix/src/fmt-populate-stamp/fmt-populate-build	e3a48561843d1e5e
+1157	1183	1783881457424973956	/home/jica/repo/Bachata-S4/build-tests/_deps/fmt-subbuild/fmt-populate-prefix/src/fmt-populate-stamp/fmt-populate-build	e3a48561843d1e5e
+1183	1210	1783881457452973949	fmt-populate-prefix/src/fmt-populate-stamp/fmt-populate-install	4ad2f263680d1463
+1183	1210	1783881457452973949	/home/jica/repo/Bachata-S4/build-tests/_deps/fmt-subbuild/fmt-populate-prefix/src/fmt-populate-stamp/fmt-populate-install	4ad2f263680d1463
+1210	1240	1783881457484973939	fmt-populate-prefix/src/fmt-populate-stamp/fmt-populate-test	32c5b840cd68c6e8
+1210	1240	1783881457484973939	/home/jica/repo/Bachata-S4/build-tests/_deps/fmt-subbuild/fmt-populate-prefix/src/fmt-populate-stamp/fmt-populate-test	32c5b840cd68c6e8
+1240	1278	1783881457520973931	CMakeFiles/fmt-populate-complete	fb25b5b769d4b51a
+1240	1278	1783881457520973931	fmt-populate-prefix/src/fmt-populate-stamp/fmt-populate-done	fb25b5b769d4b51a
+1240	1278	1783881457520973931	/home/jica/repo/Bachata-S4/build-tests/_deps/fmt-subbuild/CMakeFiles/fmt-populate-complete	fb25b5b769d4b51a
+1240	1278	1783881457520973931	/home/jica/repo/Bachata-S4/build-tests/_deps/fmt-subbuild/fmt-populate-prefix/src/fmt-populate-stamp/fmt-populate-done	fb25b5b769d4b51a
