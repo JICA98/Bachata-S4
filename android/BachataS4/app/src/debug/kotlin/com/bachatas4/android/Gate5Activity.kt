@@ -10,7 +10,7 @@ import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import com.bachatas4.android.runtime.install.RuntimeInstaller
 import com.bachatas4.android.runtime.install.RuntimeManifest
-import com.bachatas4.android.runtime.process.Box64Mode
+import com.bachatas4.android.runtime.process.RuntimeProbeExecutionMode
 import com.bachatas4.android.runtime.process.RuntimeProbeLauncher
 import com.bachatas4.android.runtime.process.RuntimeProbeRequest
 import java.io.File
@@ -73,7 +73,7 @@ class Gate5Activity : ComponentActivity() {
                     runtimeRoot = runtimeRoot,
                     executable = runtimeRoot.resolve("bin/shadps4"),
                     environment = environment,
-                    box64Mode = Box64Mode.HOST_GLIBC,
+                    executionMode = RuntimeProbeExecutionMode.BOX64_HOST_GLIBC,
                     arguments = listOf(
                         "--override-root",
                         filesDir.path,

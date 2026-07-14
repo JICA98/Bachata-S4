@@ -10,7 +10,7 @@ import androidx.lifecycle.lifecycleScope
 import com.bachatas4.android.runtime.display.WinlatorEmbeddedXServer
 import com.bachatas4.android.runtime.install.RuntimeInstaller
 import com.bachatas4.android.runtime.install.RuntimeManifest
-import com.bachatas4.android.runtime.process.Box64Mode
+import com.bachatas4.android.runtime.process.RuntimeProbeExecutionMode
 import com.bachatas4.android.runtime.process.RuntimeProbeLauncher
 import com.bachatas4.android.runtime.process.RuntimeProbeRequest
 import com.winlator.xconnector.UnixSocketConfig
@@ -88,7 +88,7 @@ class Gate4Activity : ComponentActivity(), SurfaceHolder.Callback2 {
                             ).path,
                             "GLIBC_TUNABLES" to "glibc.pthread.rseq=0",
                         ),
-                        box64Mode = Box64Mode.HOST_GLIBC,
+                        executionMode = RuntimeProbeExecutionMode.BOX64_HOST_GLIBC,
                     ),
                     timeoutSeconds = 30,
                 )
@@ -140,7 +140,7 @@ class Gate4Activity : ComponentActivity(), SurfaceHolder.Callback2 {
                                 .toString(),
                             "GLIBC_TUNABLES" to "glibc.pthread.rseq=0",
                         ),
-                        box64Mode = Box64Mode.HOST_GLIBC,
+                        executionMode = RuntimeProbeExecutionMode.BOX64_HOST_GLIBC,
                     ),
                     timeoutSeconds = 30,
                 )
