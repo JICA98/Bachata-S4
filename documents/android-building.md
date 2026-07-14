@@ -5,16 +5,13 @@
 - Linux or WSL2 x86-64, JDK 17, Node.js 20+
 - Android SDK platform/build-tools 37
 - Android NDK `30.0.14904198`, CMake `3.22.1`, Ninja
-- AArch64 GNU cross compiler for host-glibc Box64
+- Debian/Ubuntu runtime prerequisites from `runtime/scripts/install-debian-runtime-deps.sh`
 
 All runtime inputs and upstream revisions are pinned under `runtime/locks`. Runtime packaging never downloads artifacts; fetch inputs separately, verify their lock hashes, then build from the repository root:
 
 ```bash
 git submodule update --init --recursive --jobs 8
-runtime/scripts/build-shadps4-x86_64.sh
-runtime/scripts/build-box64-host.sh
-runtime/scripts/build-fexcore-smoke-aarch64.sh
-node runtime/scripts/package-runtime.mjs
+runtime/scripts/build-runtime-debian.sh
 node runtime/tests/verify-runtime.mjs runtime/locks/components.lock.json
 node runtime/tests/verify-no-bundled-turnip.mjs runtime/build/rootfs
 ```

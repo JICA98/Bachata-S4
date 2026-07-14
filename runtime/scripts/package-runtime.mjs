@@ -154,6 +154,7 @@ const rootfs = resolve(projectRoot, "runtime/build/rootfs");
 const stagedRoot = resolve(projectRoot, "runtime/build/staged");
 const shadps4Stage = resolve(projectRoot, "runtime/build/shadps4-stage");
 const hostBox64Binary = resolve(projectRoot, "runtime/build/box64-host-stage/box64");
+const hostFexcoreSmoke = join(rootfs, "host/fexcore-smoke");
 const outputDir = resolve(process.argv[2] ?? resolve(projectRoot, "android/BachataS4/app/src/main/assets/runtime"));
 const nativeOutputDir = resolve(projectRoot, "android/BachataS4/core/runtime/src/main/jniLibs/arm64-v8a");
 
@@ -162,6 +163,9 @@ const revisions = Object.fromEntries(componentLock.components.map(({ name, revis
 
 if (!existsSync(join(rootfs, "host/ld-linux-aarch64.so.1"))) {
   fail(`Runtime rootfs not staged. Run stage-debian-runtime.mjs first.`);
+}
+if (!existsSync(hostFexcoreSmoke)) {
+  fail(`FEXCore smoke not staged: ${hostFexcoreSmoke}`);
 }
 
 const hostDir = join(rootfs, "host");

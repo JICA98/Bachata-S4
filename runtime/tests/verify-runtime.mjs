@@ -18,6 +18,7 @@ const EXPECTED_COMPONENTS = [
     license: "MIT",
   },
 ];
+const FEX_REVISION = EXPECTED_COMPONENTS.find(({ name }) => name === "fex").revision;
 const EXPECTED_INPUTS = [
   { name: "glibc-2.43+r22+g8362e8ce10b2-2-x86_64.pkg.tar.zst", url: "https://archive.archlinux.org/packages/g/glibc/glibc-2.43%2Br22%2Bg8362e8ce10b2-2-x86_64.pkg.tar.zst", sha256: "2c20828b3a571b272697671c90b1e3a8c426d6a7e7fb99a242099373f2710fe1" },
   { name: "glibc-2.43+r22+g8362e8ce10b2-2-aarch64.pkg.tar.xz", url: "https://de3.mirror.archlinuxarm.org/aarch64/core/glibc-2.43+r22+g8362e8ce10b2-2-aarch64.pkg.tar.xz", sha256: "8fac217e98c6e4342326726b2640ac254e8c82032f06f30bfa13ebbcc4fcb25b" },
@@ -66,9 +67,9 @@ const REQUIRED_RUNTIME_PATHS = [
   "bin/vulkan-info",
   "etc/ssl/certs/ca-certificates.crt",
   "host/box64",
+  "host/fexcore-smoke",
   "host/ld-linux-aarch64.so.1",
   "host/libvulkan.so.1",
-  "host/libc.so",
   "host/libc.so.6",
   "host/libdl.so.2",
   "host/libgcc_s.so.1",
@@ -78,33 +79,23 @@ const REQUIRED_RUNTIME_PATHS = [
   "host/libX11.so",
   "host/libX11.so.6",
   "host/libX11-xcb.so.1",
-  "host/libXcursor.so",
   "host/libXcursor.so.1",
-  "host/libXext.so",
   "host/libXext.so.6",
-  "host/libXfixes.so",
   "host/libXfixes.so.3",
-  "host/libXi.so",
   "host/libXi.so.6",
-  "host/libXrandr.so",
   "host/libXrandr.so.2",
   "host/libXss.so.1",
   "host/libxkbcommon.so.0",
-  "host/libxkbcommon.so",
-  "host/libXss.so",
   "host/libdbus-1.so.3",
   "host/libsystemd.so.0",
-  "host/libXrender.so",
   "host/libXrender.so.1",
   "host/libXau.so.6",
   "host/libXdmcp.so.6",
   "host/libxcb.so",
   "host/libxcb.so.1",
   "lib/x86_64-linux-gnu/libc.so.6",
-  "lib/x86_64-linux-gnu/libdl.so.2",
   "lib/x86_64-linux-gnu/libgcc_s.so.1",
   "lib/x86_64-linux-gnu/libm.so.6",
-  "lib/x86_64-linux-gnu/libpthread.so.0",
   "lib/x86_64-linux-gnu/libstdc++.so.6",
   "lib/x86_64-linux-gnu/libudev.so.1",
   "lib/x86_64-linux-gnu/libuuid.so.1",
@@ -123,7 +114,6 @@ const REQUIRED_RUNTIME_PATHS = [
   "lib/x86_64-linux-gnu/libXdmcp.so.6",
   "lib/x86_64-linux-gnu/libxkbcommon.so.0",
   "lib64/ld-linux-x86-64.so.2",
-  "usr/share/bachata/winlator-glibc-patches.sha256",
   "usr/share/bachata/shadps4-needed.txt",
 ];
 
@@ -298,14 +288,12 @@ if (locksOnly) {
 }
 
 const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
-if (manifest.schemaVersion !== 1 || manifest.protocolVersion !== 1) fail("Invalid runtime manifest schema/protocol");
+if (manifest.schemaVersion !== 2 || manifest.protocolVersion !== 1 || manifest.distribution !== "debian") {
+  fail("Invalid Debian runtime manifest schema/protocol");
+}
 if (!manifest.runtimeVersion) fail("Missing runtimeVersion");
 const componentProvenance = lock.components.map(({ name, revision }) => ({ name, revision }));
-const inputProvenance = inputLock.inputs.map(({ name, sha256: digest }) => ({ name, sha256: digest }));
 if (JSON.stringify(manifest.components) !== JSON.stringify(componentProvenance)) fail("Manifest component provenance mismatch");
-if (JSON.stringify(manifest.inputs) !== JSON.stringify(inputProvenance)) fail("Manifest input provenance mismatch");
-if (manifest.winlatorRevision !== inputLock.winlatorRevision) fail("Manifest Winlator revision mismatch");
-if (JSON.stringify(manifest.winlatorGlibcPatches) !== JSON.stringify(inputLock.winlatorGlibcPatches)) fail("Manifest Winlator patch provenance mismatch");
 const zipEntries = parseStoredZip(readFileSync(zipPath));
 const paths = zipEntries.map((entry) => entry.path);
 if (new Set(paths).size !== paths.length) fail("Duplicate ZIP paths");
@@ -321,18 +309,23 @@ for (let index = 0; index < zipEntries.length; index++) {
   if (declared.size !== entry.bytes.length) fail(`Manifest size mismatch: ${entry.path}`);
   if (declared.sha256 !== sha256(entry.bytes)) fail(`Manifest SHA-256 mismatch: ${entry.path}`);
 }
-const patchProvenance = zipEntries.find((entry) => entry.path === "usr/share/bachata/winlator-glibc-patches.sha256").bytes.toString("utf8");
-const expectedPatchProvenance = inputLock.winlatorGlibcPatches.map(({ path, sha256: digest }) => `${digest}  ${path}`).join("\n") + "\n";
-if (patchProvenance !== expectedPatchProvenance) fail("Archived Winlator patch provenance mismatch");
 const hostLoader = zipEntries.find((entry) => entry.path === "host/ld-linux-aarch64.so.1").bytes;
 const hostLibc = zipEntries.find((entry) => entry.path === "host/libc.so.6").bytes;
 const hostBox64 = zipEntries.find((entry) => entry.path === "host/box64").bytes;
+const hostFexcoreSmoke = zipEntries.find((entry) => entry.path === "host/fexcore-smoke").bytes;
 if (countArm64SetRobustListCalls(hostLoader) !== 0 || countArm64SetRobustListCalls(hostLibc) !== 0) {
   fail("Host glibc retains set_robust_list calls blocked by Android app seccomp");
 }
 if (countArm64Clone3Calls(hostLibc) !== 0) fail("Host glibc retains clone3 calls blocked by Android app seccomp");
 if (countArm64Faccessat2Calls(hostLibc) !== 0) fail("Host glibc retains faccessat2 calls blocked by Android app seccomp");
 if (!hostBox64.includes(Buffer.from("__cxa_at_quick_exit"))) fail("Host Box64 lacks __cxa_at_quick_exit wrapper");
+if (hostFexcoreSmoke.length < 20 || hostFexcoreSmoke[0] !== 0x7f || hostFexcoreSmoke.subarray(1, 4).toString() !== "ELF") {
+  fail("FEXCore smoke runner is not ELF");
+}
+if (hostFexcoreSmoke.readUInt16LE(18) !== 183) fail("FEXCore smoke runner is not AArch64 ELF");
+for (const marker of [FEX_REVISION, "gpr=ok", "stack=ok", "fp=ok"]) {
+  if (!hostFexcoreSmoke.includes(Buffer.from(marker))) fail(`FEXCore smoke runner lacks ${marker}`);
+}
 if (sha256(readFileSync(nativeHostLoaderPath)) !== sha256(hostLoader)) fail("Native host loader differs from runtime host loader");
 if (sha256(readFileSync(nativeHostBox64Path)) !== sha256(hostBox64)) fail("Native host Box64 differs from runtime host Box64");
 const hello = zipEntries.find((entry) => entry.path === "bin/hello").bytes;
