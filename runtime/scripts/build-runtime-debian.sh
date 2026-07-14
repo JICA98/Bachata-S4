@@ -11,5 +11,6 @@ fi
 
 runtime/scripts/build-shadps4-x86_64.sh
 runtime/scripts/build-box64-host.sh
+runtime/scripts/build-fexcore-smoke-aarch64.sh
 node runtime/scripts/stage-debian-runtime.mjs
 node runtime/scripts/package-runtime.mjs

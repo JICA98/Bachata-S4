@@ -47,7 +47,7 @@ try {
     encoding: "utf8",
     maxBuffer: 16 * 1024 * 1024,
   }));
-  const runnerPath = "bin/fexcore-smoke";
+  const runnerPath = "host/fexcore-smoke";
   if (!runtimeEntries.includes(runnerPath)) throw new Error(`Nested runtime ZIP is missing ${runnerPath}`);
   const declaredRunner = Array.isArray(manifest.files)
     ? manifest.files.find((file) => file.path === runnerPath)
@@ -65,6 +65,8 @@ try {
   if (runner.readUInt16LE(18) !== 183) throw new Error("Nested FEXCore smoke runner is not AArch64 ELF");
   if (declaredRunner.size !== runner.length) throw new Error(`Runtime manifest size mismatch: ${runnerPath}`);
   if (declaredRunner.sha256 !== sha256(runner)) throw new Error(`Runtime manifest SHA-256 mismatch: ${runnerPath}`);
+  const nativeFexEntries = apkEntries.filter((entry) => entry.startsWith("lib/") && entry.toLowerCase().includes("fex"));
+  if (nativeFexEntries.length) throw new Error(`APK packages FEXCore through jniLibs: ${nativeFexEntries.join(", ")}`);
   const offenders = [...forbidden(apkEntries), ...forbidden(runtimeEntries).map((entry) => `runtime.zip:${entry}`)];
   if (offenders.length) throw new Error(`APK bundles forbidden Turnip payloads:\n${offenders.join("\n")}`);
   console.log(`APK runtime verified: ${apkEntries.length} APK entries, FEXCore smoke runner verified, no bundled Turnip`);
