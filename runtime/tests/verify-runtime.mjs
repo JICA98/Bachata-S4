@@ -11,6 +11,12 @@ const EXPECTED_COMPONENTS = [
   { name: "winlator-components", url: "https://github.com/brunodev85/winlator.git", revision: "fb66541b93a4eb3ee585a433b4c7b20544d58e40", license: "MIT" },
   { name: "glibc-packages", url: "https://github.com/termux-pacman/glibc-packages.git", revision: "26d89ba7a1f856b99f0d437bef54f558b2485075", license: "mixed" },
   { name: "mesa", url: "https://gitlab.freedesktop.org/mesa/mesa.git", revision: "6984e91b5fe1d1c204e54954a4282fcdc0c44b78", license: "MIT" },
+  {
+    name: "fex",
+    url: "https://github.com/FEX-Emu/FEX.git",
+    revision: "f2b679f6028ce1c38875233aecfcf5d3f8ebecec",
+    license: "MIT",
+  },
 ];
 const EXPECTED_INPUTS = [
   { name: "glibc-2.43+r22+g8362e8ce10b2-2-x86_64.pkg.tar.zst", url: "https://archive.archlinux.org/packages/g/glibc/glibc-2.43%2Br22%2Bg8362e8ce10b2-2-x86_64.pkg.tar.zst", sha256: "2c20828b3a571b272697671c90b1e3a8c426d6a7e7fb99a242099373f2710fe1" },
