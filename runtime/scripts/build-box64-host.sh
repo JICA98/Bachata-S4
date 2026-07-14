@@ -2,10 +2,48 @@
 set -euo pipefail
 
 project_root=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
+LOCK_PATH="$project_root/runtime/locks/components.lock.json"
+mapfile -t BOX64_LOCK < <(
+  node - "$LOCK_PATH" <<'NODE'
+const { readFileSync } = require("node:fs");
+
+let lock;
+try {
+  lock = JSON.parse(readFileSync(process.argv[2], "utf8"));
+} catch {
+  console.error("invalid box64 component lock");
+  process.exit(1);
+}
+
+const box64 = Array.isArray(lock.components)
+  ? lock.components.find((component) => component?.name === "box64")
+  : undefined;
+if (
+  !box64 ||
+  box64.name !== "box64" ||
+  typeof box64.url !== "string" ||
+  !/^https:\/\//.test(box64.url) ||
+  typeof box64.revision !== "string" ||
+  !/^[0-9a-f]{40}$/.test(box64.revision)
+) {
+  console.error("invalid box64 component lock");
+  process.exit(1);
+}
+
+process.stdout.write(`${box64.url}\n${box64.revision}\n`);
+NODE
+)
+if [[ ${#BOX64_LOCK[@]} -ne 2 ]]; then
+  echo "invalid box64 component lock" >&2
+  exit 1
+fi
+BOX64_URL=${BOX64_LOCK[0]}
+BOX64_REVISION=${BOX64_LOCK[1]}
+bash "$project_root/runtime/scripts/checkout-component.sh" box64 "$BOX64_URL" "$BOX64_REVISION"
+
 source_dir="$project_root/runtime/sources/box64"
 build_dir="$project_root/runtime/build/box64-host"
 stage_dir="$project_root/runtime/build/box64-host-stage"
-expected_revision=50c8b90b09b433ab0767de44af2d0731cb0748b7
 quick_exit_patch="$project_root/runtime/patches/box64-cxa-quick-exit.patch"
 vulkan_qcom_patch="$project_root/runtime/patches/box64-vulkan-dispatch-tile-qcom.patch"
 vex_write_opcode_patch="$project_root/runtime/patches/box64-vex-write-opcode.patch"
@@ -15,7 +53,7 @@ bachata_thread_affinity_patch="$project_root/runtime/patches/box64-bachata-threa
 for tool in cc cmake ninja aarch64-linux-gnu-gcc aarch64-linux-gnu-g++ readelf; do
   command -v "$tool" >/dev/null || { echo "$tool is required" >&2; exit 1; }
 done
-test "$(git -C "$source_dir" rev-parse HEAD)" = "$expected_revision"
+test "$(git -C "$source_dir" rev-parse HEAD)" = "$BOX64_REVISION"
 if ! git -C "$source_dir" apply --reverse --check "$quick_exit_patch" 2>/dev/null; then
   git -C "$source_dir" apply --check "$quick_exit_patch"
   git -C "$source_dir" apply "$quick_exit_patch"
@@ -68,4 +106,4 @@ fi
 
 rm -rf "$stage_dir"
 install -Dm755 "$binary" "$stage_dir/box64"
-printf 'box64_host=%s\nrevision=%s\n' "$stage_dir/box64" "$expected_revision"
+printf 'box64_host=%s\nrevision=%s\n' "$stage_dir/box64" "$BOX64_REVISION"
