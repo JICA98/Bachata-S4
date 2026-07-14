@@ -75,7 +75,7 @@ class RuntimeProbeLauncherTest {
 
     @Test
     fun buildsHostGlibcCommandThroughRuntimeLoader() {
-        val request = validRequest(box64Mode = Box64Mode.HOST_GLIBC)
+        val request = validRequest(executionMode = RuntimeProbeExecutionMode.BOX64_HOST_GLIBC)
 
         assertEquals(
             listOf(
@@ -90,8 +90,26 @@ class RuntimeProbeLauncherTest {
     }
 
     @Test
+    fun buildsHostGlibcNativeCommandWithoutBox64() {
+        val request = nativeProbeRequest()
+
+        val command = RuntimeProbeLauncher().command(request)
+
+        assertEquals(
+            listOf(
+                request.nativeLibraryDir.resolve("libbachata_host_loader.so").toRealPath().toString(),
+                "--library-path",
+                request.runtimeRoot.resolve("host").toRealPath().toString(),
+                request.runtimeRoot.resolve("host/fexcore-smoke").toRealPath().toString(),
+            ),
+            command,
+        )
+        assertFalse(command.any { it.contains("box64", ignoreCase = true) })
+    }
+
+    @Test
     fun clearsInheritedEnvironmentAndCopiesOnlyAllowlist() {
-        val request = validRequest(
+        val request = nativeProbeRequest(
             environment = mapOf(
                 "HOME" to "/data/home",
                 "DISPLAY" to ":0",
@@ -133,6 +151,55 @@ class RuntimeProbeLauncherTest {
     }
 
     @Test
+    fun rejectsHostGlibcNativeProbeOutsideRuntimeRoot() {
+        val request = nativeProbeRequest()
+        val outside = temporaryFolder.newFile("outside-probe").toPath()
+
+        assertThrows(SecurityException::class.java) {
+            RuntimeProbeLauncher().command(request.copy(executable = outside))
+        }
+    }
+
+    @Test
+    fun rejectsHostGlibcNativeProbeThatIsNotARegularFile() {
+        val request = nativeProbeRequest()
+        Files.delete(request.executable)
+        Files.createDirectories(request.executable)
+
+        assertThrows(IllegalArgumentException::class.java) {
+            RuntimeProbeLauncher().command(request)
+        }
+    }
+
+    @Test
+    fun rejectsHostGlibcNativeHostDirectoryOutsideRuntimeRoot() {
+        val request = nativeProbeRequest()
+        val hostDirectory = request.runtimeRoot.resolve("host")
+        Files.delete(request.executable)
+        Files.delete(hostDirectory)
+        val outsideDirectory = temporaryFolder.newFolder("outside-host").toPath()
+        Files.write(outsideDirectory.resolve("fexcore-smoke"), byteArrayOf(6))
+        Files.createSymbolicLink(hostDirectory, outsideDirectory)
+
+        assertThrows(SecurityException::class.java) {
+            RuntimeProbeLauncher().command(request)
+        }
+    }
+
+    @Test
+    fun rejectsHostGlibcNativeLoaderOutsideNativeLibraryDirectory() {
+        val request = nativeProbeRequest()
+        val loader = request.nativeLibraryDir.resolve("libbachata_host_loader.so")
+        Files.delete(loader)
+        val outsideLoader = temporaryFolder.newFile("outside-loader").toPath()
+        Files.createSymbolicLink(loader, outsideLoader)
+
+        assertThrows(SecurityException::class.java) {
+            RuntimeProbeLauncher().command(request)
+        }
+    }
+
+    @Test
     fun promotesContainedProbeToOwnerExecutableBeforeLaunch() {
         val request = validRequest()
         assertFalse(Files.isExecutable(request.executable))
@@ -144,7 +211,7 @@ class RuntimeProbeLauncherTest {
 
     @Test
     fun promotesHostGlibcExecutablesBeforeLaunch() {
-        val request = validRequest(box64Mode = Box64Mode.HOST_GLIBC)
+        val request = validRequest(executionMode = RuntimeProbeExecutionMode.BOX64_HOST_GLIBC)
         val loader = request.nativeLibraryDir.resolve("libbachata_host_loader.so")
         val box64 = request.nativeLibraryDir.resolve("libbachata_host_box64.so")
         assertFalse(Files.isExecutable(loader))
@@ -158,9 +225,22 @@ class RuntimeProbeLauncherTest {
         assertTrue(Files.isExecutable(request.executable))
     }
 
+    @Test
+    fun doesNotPromoteHostGlibcNativeRunnerToExecutableBeforeLaunch() {
+        val request = nativeProbeRequest()
+        val loader = request.nativeLibraryDir.resolve("libbachata_host_loader.so")
+        assertFalse(Files.isExecutable(loader))
+        assertFalse(Files.isExecutable(request.executable))
+
+        RuntimeProbeLauncher().processBuilder(request)
+
+        assertTrue(Files.isExecutable(loader))
+        assertFalse(Files.isExecutable(request.executable))
+    }
+
     private fun validRequest(
         environment: Map<String, String> = emptyMap(),
-        box64Mode: Box64Mode = Box64Mode.APK_NATIVE,
+        executionMode: RuntimeProbeExecutionMode = RuntimeProbeExecutionMode.BOX64_APK_NATIVE,
     ): RuntimeProbeRequest {
         val base = temporaryFolder.newFolder().toPath()
         val nativeLibraryDir = Files.createDirectories(base.resolve("apk/lib"))
@@ -173,6 +253,24 @@ class RuntimeProbeLauncherTest {
         Files.createDirectories(executable.parent)
         Files.write(executable, byteArrayOf(2))
         Files.createDirectories(runtimeRoot.resolve("host"))
-        return RuntimeProbeRequest(nativeLibraryDir, runtimeRoot, executable, environment, box64Mode)
+        return RuntimeProbeRequest(
+            nativeLibraryDir = nativeLibraryDir,
+            runtimeRoot = runtimeRoot,
+            executable = executable,
+            environment = environment,
+            executionMode = executionMode,
+        )
+    }
+
+    private fun nativeProbeRequest(
+        environment: Map<String, String> = emptyMap(),
+    ): RuntimeProbeRequest {
+        val request = validRequest(
+            environment = environment,
+            executionMode = RuntimeProbeExecutionMode.HOST_GLIBC_NATIVE,
+        )
+        val executable = request.runtimeRoot.resolve("host/fexcore-smoke")
+        Files.write(executable, byteArrayOf(5))
+        return request.copy(executable = executable)
     }
 }

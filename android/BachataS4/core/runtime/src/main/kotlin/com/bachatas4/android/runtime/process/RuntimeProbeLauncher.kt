@@ -11,13 +11,19 @@ data class RuntimeProbeRequest(
     val runtimeRoot: Path,
     val executable: Path,
     val environment: Map<String, String> = emptyMap(),
-    val box64Mode: Box64Mode = Box64Mode.APK_NATIVE,
+    val executionMode: RuntimeProbeExecutionMode = RuntimeProbeExecutionMode.BOX64_APK_NATIVE,
     val arguments: List<String> = emptyList(),
 )
 
 enum class Box64Mode {
     APK_NATIVE,
     HOST_GLIBC,
+}
+
+enum class RuntimeProbeExecutionMode {
+    BOX64_APK_NATIVE,
+    BOX64_HOST_GLIBC,
+    HOST_GLIBC_NATIVE,
 }
 
 data class RuntimeProbeResult(
@@ -45,9 +51,10 @@ class RuntimeProbeLauncher {
         request.arguments.forEach { argument ->
             require('\u0000' !in argument) { "Probe argument contains NUL" }
         }
-        return when (request.box64Mode) {
-            Box64Mode.APK_NATIVE -> apkNativeCommand(request, executable)
-            Box64Mode.HOST_GLIBC -> hostGlibcCommand(request, runtimeRoot, executable)
+        return when (request.executionMode) {
+            RuntimeProbeExecutionMode.BOX64_APK_NATIVE -> apkNativeCommand(request, executable)
+            RuntimeProbeExecutionMode.BOX64_HOST_GLIBC -> hostGlibcCommand(request, runtimeRoot, executable)
+            RuntimeProbeExecutionMode.HOST_GLIBC_NATIVE -> hostGlibcNativeCommand(request, runtimeRoot)
         } + request.arguments
     }
 
@@ -81,6 +88,22 @@ class RuntimeProbeLauncher {
         )
     }
 
+    private fun hostGlibcNativeCommand(request: RuntimeProbeRequest, runtimeRoot: Path): List<String> {
+        val nativeLibraryDir = request.nativeLibraryDir.toRealPath()
+        val loader = request.nativeLibraryDir.resolve(HOST_LOADER_LIBRARY).toRealPath()
+        val hostDirectory = runtimeRoot.resolve(HOST_DIRECTORY).toRealPath()
+        val runner = hostDirectory.resolve(FEXCORE_SMOKE_RUNNER).toRealPath()
+        validateNativeFile(nativeLibraryDir, loader, "Host glibc loader")
+        validateContainedDirectory(runtimeRoot, hostDirectory, "Host runtime directory")
+        validateContainedFile(runtimeRoot, runner, "FEXCore smoke runner")
+        return listOf(
+            loader.toString(),
+            "--library-path",
+            hostDirectory.toString(),
+            runner.toString(),
+        )
+    }
+
     fun processBuilder(request: RuntimeProbeRequest): ProcessBuilder {
         val command = command(request)
         executablePaths(request).forEach { executable ->
@@ -104,12 +127,15 @@ class RuntimeProbeLauncher {
 
     private fun executablePaths(request: RuntimeProbeRequest): List<Path> {
         val probe = request.executable.toRealPath()
-        return when (request.box64Mode) {
-            Box64Mode.APK_NATIVE -> listOf(probe)
-            Box64Mode.HOST_GLIBC -> listOf(
+        return when (request.executionMode) {
+            RuntimeProbeExecutionMode.BOX64_APK_NATIVE -> listOf(probe)
+            RuntimeProbeExecutionMode.BOX64_HOST_GLIBC -> listOf(
                 request.nativeLibraryDir.resolve(HOST_LOADER_LIBRARY).toRealPath(),
                 request.nativeLibraryDir.resolve(HOST_BOX64_LIBRARY).toRealPath(),
                 probe,
+            )
+            RuntimeProbeExecutionMode.HOST_GLIBC_NATIVE -> listOf(
+                request.nativeLibraryDir.resolve(HOST_LOADER_LIBRARY).toRealPath(),
             )
         }
     }
@@ -168,6 +194,7 @@ class RuntimeProbeLauncher {
         const val HOST_DIRECTORY = "host"
         const val HOST_LOADER_LIBRARY = "libbachata_host_loader.so"
         const val HOST_BOX64_LIBRARY = "libbachata_host_box64.so"
+        const val FEXCORE_SMOKE_RUNNER = "fexcore-smoke"
         const val DEFAULT_TIMEOUT_SECONDS = 15L
         const val KILL_GRACE_SECONDS = 2L
         const val READER_JOIN_MILLIS = 1_000L
