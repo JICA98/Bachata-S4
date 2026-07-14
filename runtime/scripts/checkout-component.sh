@@ -26,6 +26,7 @@ fi
 
 git -C "$dest" fetch --depth 1 origin "$revision"
 git -C "$dest" checkout --detach --force "$revision"
+git -C "$dest" clean -fd
 test "$(git -C "$dest" rev-parse HEAD)" = "$revision"
 test -z "$(git -C "$dest" status --porcelain)"
 printf '%s %s\n' "$name" "$revision"
