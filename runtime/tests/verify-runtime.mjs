@@ -219,6 +219,7 @@ const box64EntrypointPatchPath = resolve(projectRoot, "runtime/patches/box64-win
 const box64QuickExitPatchPath = resolve(projectRoot, "runtime/patches/box64-cxa-quick-exit.patch");
 const box64NativeWriteOpcodePatchPath = resolve(projectRoot, "runtime/patches/box64-native-write-opcode.patch");
 const fexCoreOnlyPatchPath = resolve(projectRoot, "runtime/patches/fex-fexcore-only.patch");
+const fexCoreSmokeBuildScriptPath = resolve(projectRoot, "runtime/scripts/build-fexcore-smoke-aarch64.sh");
 const nativeHostLoaderPath = resolve(projectRoot, "android/BachataS4/core/runtime/src/main/jniLibs/arm64-v8a/libbachata_host_loader.so");
 const nativeHostBox64Path = resolve(projectRoot, "android/BachataS4/core/runtime/src/main/jniLibs/arm64-v8a/libbachata_host_box64.so");
 const playStoreRuntimeDir = resolve(projectRoot, "android/BachataS4/app/src/playstore/assets/runtime");
@@ -257,6 +258,9 @@ if (!readFileSync(box64EntrypointPatchPath, "utf8").includes("!defined(WINLATOR_
 }
 if (!existsSync(fexCoreOnlyPatchPath)) {
   fail("FEXCore-only patch is missing");
+}
+if (!/^\s*-DTUNE_CPU=none \\$/m.test(readFileSync(fexCoreSmokeBuildScriptPath, "utf8"))) {
+  fail("FEXCore smoke cross-build must set -DTUNE_CPU=none");
 }
 const fexCoreOnlyPatch = readFileSync(fexCoreOnlyPatchPath, "utf8");
 for (const marker of [

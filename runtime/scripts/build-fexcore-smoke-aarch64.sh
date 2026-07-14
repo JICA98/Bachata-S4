@@ -61,6 +61,7 @@ cmake -S "${FEX_SOURCE}" -B "${BUILD_DIR}" -G Ninja \
   -DCMAKE_CXX_COMPILER_TARGET=aarch64-linux-gnu \
   -DCMAKE_FIND_ROOT_PATH=/usr/aarch64-linux-gnu \
   -DCMAKE_BUILD_TYPE=Release \
+  -DTUNE_CPU=none \
   -DCMAKE_INSTALL_PREFIX="${STAGE_DIR}" \
   -DBUILD_FEXCORE_ONLY=ON \
   -DFEXCORE_SMOKE_SOURCE="${SMOKE_SOURCE}" \
