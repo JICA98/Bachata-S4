@@ -11,12 +11,21 @@
 #include <FEXCore/Debug/InternalThreadState.h>
 #include <FEXCore/HLE/SyscallHandler.h>
 
+#if defined(FEXCORE_SMOKE_DIAGNOSTIC)
+#include <fstream>
+#include <signal.h>
+#include <string>
+#include <ucontext.h>
+#endif
+
 #include <sys/mman.h>
 #include <unistd.h>
 
 #include <array>
+#include <cerrno>
 #include <cstdint>
 #include <cstdio>
+#include <cstdlib>
 #include <cstring>
 #include <limits>
 #include <string_view>
@@ -35,6 +44,108 @@ constexpr double kFpResult = 3.75;
 constexpr std::string_view kFexRevision =
   "f2b679f6028ce1c38875233aecfcf5d3f8ebecec";
 
+#if defined(FEXCORE_SMOKE_DIAGNOSTIC)
+void WriteDiagnostic(const char* message, size_t size) {
+  while (size != 0) {
+    const auto written = write(STDERR_FILENO, message, size);
+    if (written <= 0) return;
+    message += written;
+    size -= static_cast<size_t>(written);
+  }
+}
+
+void SmokeDiagnosticPreinit() {
+  WriteDiagnostic("FEXCORE_DIAG:PREINIT\n", sizeof("FEXCORE_DIAG:PREINIT\n") - 1);
+}
+
+__attribute__((section(".preinit_array"), used))
+void (*const kSmokeDiagnosticPreinit)() = SmokeDiagnosticPreinit;
+
+bool IsDiagnosticExecutableMap(std::string_view line) {
+  const auto firstSpace = line.find(' ');
+  if (firstSpace == std::string_view::npos) return false;
+
+  auto permissionsBegin = firstSpace + 1;
+  while (permissionsBegin < line.size() && line[permissionsBegin] == ' ') {
+    ++permissionsBegin;
+  }
+  const auto permissionsEnd = line.find(' ', permissionsBegin);
+  if (permissionsEnd == std::string_view::npos) return false;
+  return line.substr(permissionsBegin, permissionsEnd - permissionsBegin).find('x') != std::string_view::npos;
+}
+
+void DumpDiagnosticExecutableMaps() {
+  std::ifstream maps {"/proc/self/maps"};
+  std::string line;
+  while (std::getline(maps, line)) {
+    if (IsDiagnosticExecutableMap(line)) {
+      std::fprintf(stderr, "FEXCORE_DIAG:MAP %s\n", line.c_str());
+    }
+  }
+}
+
+void AppendFaultLiteral(char*& cursor, const char* value) {
+  while (*value != '\0') {
+    *cursor++ = *value++;
+  }
+}
+
+void AppendFaultUnsigned(char*& cursor, uint64_t value, uint64_t base) {
+  char reversed[16];
+  size_t count = 0;
+  do {
+    const auto digit = value % base;
+    reversed[count++] = static_cast<char>(digit < 10 ? '0' + digit : 'a' + digit - 10);
+    value /= base;
+  } while (value != 0);
+  while (count != 0) {
+    *cursor++ = reversed[--count];
+  }
+}
+
+void FaultDiagnosticHandler(int signal, siginfo_t* info, void* rawContext) {
+  char message[128];
+  char* cursor = message;
+  const auto faultAddress = static_cast<uint64_t>(reinterpret_cast<uintptr_t>(info == nullptr ? nullptr : info->si_addr));
+  const auto pc = rawContext == nullptr
+    ? 0ULL
+    : static_cast<uint64_t>(reinterpret_cast<ucontext_t*>(rawContext)->uc_mcontext.pc);
+
+  AppendFaultLiteral(cursor, "FEXCORE_DIAG:FAULT signal=");
+  AppendFaultUnsigned(cursor, static_cast<uint64_t>(signal), 10);
+  AppendFaultLiteral(cursor, " addr=0x");
+  AppendFaultUnsigned(cursor, faultAddress, 16);
+  AppendFaultLiteral(cursor, " pc=0x");
+  AppendFaultUnsigned(cursor, pc, 16);
+  *cursor++ = '\n';
+  WriteDiagnostic(message, static_cast<size_t>(cursor - message));
+  _exit(128 + signal);
+}
+
+bool InstallFaultDiagnosticHandler(int signal) {
+  struct sigaction action {};
+  action.sa_sigaction = FaultDiagnosticHandler;
+  action.sa_flags = SA_SIGINFO;
+  sigemptyset(&action.sa_mask);
+  return sigaction(signal, &action, nullptr) == 0;
+}
+
+bool InstallFaultDiagnosticHandlers() {
+  return InstallFaultDiagnosticHandler(SIGSEGV) &&
+         InstallFaultDiagnosticHandler(SIGILL) &&
+         InstallFaultDiagnosticHandler(SIGBUS) &&
+         InstallFaultDiagnosticHandler(SIGSYS);
+}
+
+#define FEXCORE_DIAG(marker) WriteDiagnostic("FEXCORE_DIAG:" marker "\n", sizeof("FEXCORE_DIAG:" marker "\n") - 1)
+#define FEXCORE_DUMP_EXECUTABLE_MAPS() DumpDiagnosticExecutableMaps()
+#define FEXCORE_INSTALL_FAULT_DIAGNOSTIC() InstallFaultDiagnosticHandlers()
+#else
+#define FEXCORE_DIAG(marker) ((void)0)
+#define FEXCORE_DUMP_EXECUTABLE_MAPS() ((void)0)
+#define FEXCORE_INSTALL_FAULT_DIAGNOSTIC() true
+#endif
+
 int Fail(std::string_view check) {
   std::fprintf(stderr, "FEXCORE_SMOKE_FAIL check=%.*s\n", static_cast<int>(check.size()), check.data());
   return 1;
@@ -50,8 +161,9 @@ public:
   Mapping& operator=(const Mapping&) = delete;
 
   ~Mapping() {
-    if (Address != MAP_FAILED) {
-      munmap(Address, Size);
+    if (Address != MAP_FAILED && munmap(Address, Size) != 0) {
+      std::fprintf(stderr, "FEXCORE_SMOKE_FATAL check=release-mapping errno=%d\n", errno);
+      std::abort();
     }
   }
 
@@ -65,6 +177,46 @@ public:
 
 private:
   size_t Size;
+  void* Address;
+};
+
+class CallRetStack final {
+public:
+  CallRetStack()
+    : Address {mmap(nullptr, kAllocationSize, PROT_NONE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0)} {}
+
+  CallRetStack(const CallRetStack&) = delete;
+  CallRetStack& operator=(const CallRetStack&) = delete;
+
+  ~CallRetStack() {
+    if (IsReserved() && munmap(Address, kAllocationSize) != 0) {
+      std::fprintf(stderr, "FEXCORE_SMOKE_FATAL check=release-callret-stack errno=%d\n", errno);
+      std::abort();
+    }
+  }
+
+  bool IsReserved() const {
+    return Address != MAP_FAILED;
+  }
+
+  bool MakeWritable() const {
+    return mprotect(StackBase(), FEXCore::Core::InternalThreadState::CALLRET_STACK_SIZE, PROT_READ | PROT_WRITE) == 0;
+  }
+
+  void Initialize(FEXCore::Core::InternalThreadState* thread) const {
+    thread->CallRetStackBase = StackBase();
+    // FEX's documented default location is one quarter into the writable stack.
+    thread->CurrentFrame->State.callret_sp =
+      reinterpret_cast<uint64_t>(StackBase()) + FEXCore::Core::InternalThreadState::CALLRET_STACK_SIZE / 4;
+  }
+
+private:
+  static constexpr size_t kAllocationSize = FEXCore::Core::InternalThreadState::CALLRET_STACK_SIZE + 2 * kRequiredPageSize;
+
+  void* StackBase() const {
+    return static_cast<uint8_t*>(Address) + kRequiredPageSize;
+  }
+
   void* Address;
 };
 
@@ -126,6 +278,24 @@ private:
   FEXCore::Core::InternalThreadState* Thread;
 };
 
+class GuestSegmentState final {
+public:
+  void Initialize(FEXCore::Core::CPUState& state) {
+    state.segment_arrays[FEXCore::Core::CPUState::SEGMENT_ARRAY_INDEX_GDT] = GDT.data();
+    state.segment_arrays[FEXCore::Core::CPUState::SEGMENT_ARRAY_INDEX_LDT] = GDT.data();
+    state.cs_idx = FEXCore::Core::CPUState::DEFAULT_USER_CS << 3;
+    auto* codeSegment = FEXCore::Core::CPUState::GetSegmentFromIndex(state, state.cs_idx);
+    FEXCore::Core::CPUState::SetGDTBase(codeSegment, 0);
+    FEXCore::Core::CPUState::SetGDTLimit(codeSegment, 0xF'FFFFU);
+    state.cs_cached = FEXCore::Core::CPUState::CalculateGDTBase(*codeSegment);
+    codeSegment->L = 1;
+    codeSegment->D = 0;
+  }
+
+private:
+  std::array<FEXCore::Core::CPUState::gdt_segment, 32> GDT {};
+};
+
 void AppendImmediate(std::vector<uint8_t>& code, uint64_t value) {
   const auto offset = code.size();
   code.resize(offset + sizeof(value));
@@ -175,40 +345,66 @@ uint64_t DoubleBits(double value) {
 } // namespace
 
 int main() {
+  FEXCORE_DIAG("MAIN_ENTER");
+  FEXCORE_DIAG("PAGE_SIZE_BEFORE");
   const long pageSize = sysconf(_SC_PAGESIZE);
+  FEXCORE_DIAG("PAGE_SIZE_AFTER");
   if (pageSize != kRequiredPageSize) {
     std::fprintf(stderr, "FEXCORE_SMOKE_FAIL check=page-size expected=4096 actual=%ld\n", pageSize);
     return 2;
   }
 
+  FEXCORE_DIAG("MAPPINGS_BEFORE");
   Mapping codePage {static_cast<size_t>(pageSize), PROT_READ | PROT_WRITE | PROT_EXEC};
   if (!codePage.IsValid()) return Fail("map-code");
   Mapping stackPage {static_cast<size_t>(pageSize), PROT_READ | PROT_WRITE};
   if (!stackPage.IsValid()) return Fail("map-stack");
   Mapping tlsPage {static_cast<size_t>(pageSize), PROT_READ | PROT_WRITE};
   if (!tlsPage.IsValid()) return Fail("map-tls");
+  FEXCORE_DIAG("MAPPINGS_AFTER");
 
+  FEXCORE_DIAG("GUEST_CODE_BEFORE");
   const auto guestCode = BuildGuestCode();
   if (guestCode.size() > static_cast<size_t>(pageSize)) return Fail("guest-code-size");
   std::memcpy(codePage.Get(), guestCode.data(), guestCode.size());
+  FEXCORE_DIAG("GUEST_CODE_AFTER");
 
+  FEXCORE_DIAG("CONFIG_SCOPE_BEFORE");
   ConfigScope config;
+  FEXCORE_DIAG("CONFIG_SCOPE_AFTER");
+  FEXCORE_DIAG("HOST_FEATURES_BEFORE");
   auto hostFeatures = FEX::FetchHostFeatures();
+  FEXCORE_DIAG("HOST_FEATURES_AFTER");
+  FEXCORE_DIAG("CREATE_CONTEXT_BEFORE");
   auto context = FEXCore::Context::Context::CreateNewContext(hostFeatures);
+  FEXCORE_DIAG("CREATE_CONTEXT_AFTER");
   if (!context) return Fail("create-context");
+  FEXCORE_DIAG("SIGNAL_SYSCALL_BEFORE");
   auto signalDelegator = FEX::DummyHandlers::CreateSignalDelegator();
   auto syscallHandler = fextl::make_unique<SmokeSyscallHandler>();
 
   context->SetSignalDelegator(signalDelegator.get());
   context->SetSyscallHandler(syscallHandler.get());
   context->EnableExitOnHLT();
-  if (!context->InitCore()) return Fail("init-core");
+  FEXCORE_DIAG("SIGNAL_SYSCALL_AFTER");
+  FEXCORE_DIAG("INIT_CORE_BEFORE");
+  const bool initialized = context->InitCore();
+  FEXCORE_DIAG("INIT_CORE_AFTER");
+  if (!initialized) return Fail("init-core");
 
   const uint64_t initialRip = reinterpret_cast<uint64_t>(codePage.Get());
   const uint64_t initialRsp = reinterpret_cast<uint64_t>(stackPage.Get()) + pageSize - 16;
+  GuestSegmentState guestSegmentState;
+  CallRetStack callRetStack;
+  if (!callRetStack.IsReserved()) return Fail("reserve-callret-stack");
+  if (!callRetStack.MakeWritable()) return Fail("protect-callret-stack");
+  FEXCORE_DIAG("CREATE_THREAD_BEFORE");
   auto* thread = context->CreateThread(initialRip, initialRsp);
+  FEXCORE_DIAG("CREATE_THREAD_AFTER");
   if (thread == nullptr) return Fail("create-thread");
+  callRetStack.Initialize(thread);
   ThreadScope threadScope {context.get(), thread};
+  guestSegmentState.Initialize(thread->CurrentFrame->State);
   thread->CurrentFrame->State.fs_cached = reinterpret_cast<uint64_t>(tlsPage.Get());
 
   std::array<__uint128_t, FEXCore::Core::CPUState::NUM_XMMS> initialXmm {};
@@ -219,7 +415,11 @@ int main() {
   std::memcpy(&initialXmm[1], &fpRightBits, sizeof(fpRightBits));
   context->SetXMMRegistersFromState(thread, initialXmm.data(), hostFeatures.SupportsAVX ? initialYmmHigh.data() : nullptr);
 
+  FEXCORE_DIAG("EXECUTE_BEFORE");
+  FEXCORE_DUMP_EXECUTABLE_MAPS();
+  if (!FEXCORE_INSTALL_FAULT_DIAGNOSTIC()) return Fail("install-fault-diagnostic");
   context->ExecuteThread(thread);
+  FEXCORE_DIAG("EXECUTE_AFTER");
 
   const auto& state = thread->CurrentFrame->State;
   if (state.gregs[FEXCore::X86State::REG_RAX] != kAddLeft + kAddRight ||
