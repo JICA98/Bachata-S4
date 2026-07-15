@@ -35,8 +35,8 @@ test("FEXCore smoke initializes stable x86-64 segment state before execution", (
 
   const stateOwner = source.indexOf("GuestSegmentState guestSegmentState;");
   const createThread = source.indexOf("auto* thread = context->CreateThread(initialRip, initialRsp);");
-  const initializeState = source.indexOf("guestSegmentState.Initialize(thread->CurrentFrame->State);");
-  const executeThread = source.indexOf("context->ExecuteThread(thread);");
+  const initializeState = source.lastIndexOf("guestSegmentState.Initialize(thread->CurrentFrame->State);");
+  const executeThread = source.lastIndexOf("context->ExecuteThread(thread);");
 
   assert.notEqual(stateOwner, -1);
   assert.notEqual(createThread, -1);

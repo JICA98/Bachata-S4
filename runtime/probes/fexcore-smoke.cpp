@@ -2,11 +2,10 @@
 
 #include "Common/Config.h"
 #include "Common/HostFeatures.h"
-#include "DummyHandlers.h"
-
 #include <FEXCore/Config/Config.h>
 #include <FEXCore/Core/Context.h>
 #include <FEXCore/Core/CoreState.h>
+#include <FEXCore/Core/SignalDelegator.h>
 #include <FEXCore/Core/X86Enums.h>
 #include <FEXCore/Debug/InternalThreadState.h>
 #include <FEXCore/HLE/SyscallHandler.h>
@@ -28,7 +27,9 @@
 #include <cstdlib>
 #include <cstring>
 #include <limits>
+#include <mutex>
 #include <string_view>
+#include <thread>
 #include <vector>
 
 namespace {
@@ -41,6 +42,11 @@ constexpr uint64_t kStackSentinel = 0xcafe'babe'dead'beefULL;
 constexpr double kFpLeft = 1.5;
 constexpr double kFpRight = 2.25;
 constexpr double kFpResult = 3.75;
+constexpr uint64_t kThreadSentinelA = 0x1357'9bdf'2468'ace0ULL;
+constexpr uint64_t kThreadSentinelB = 0x0246'8ace'1357'9bdfULL;
+constexpr uint64_t kCallbackInput = 0x1020'3040'5060'7080ULL;
+constexpr uint64_t kInvalidationInitial = 0x0123'4567'89ab'cdefULL;
+constexpr uint64_t kInvalidationUpdated = 0xfedc'ba98'7654'3210ULL;
 constexpr std::string_view kFexRevision =
   "f2b679f6028ce1c38875233aecfcf5d3f8ebecec";
 
@@ -258,6 +264,19 @@ public:
   }
 };
 
+class SmokeSignalDelegator final : public FEXCore::SignalDelegator {
+public:
+  explicit SmokeSignalDelegator(uintptr_t callbackReturn)
+    : CallbackReturn {callbackReturn} {}
+
+  uintptr_t GetThunkCallbackRET() const override {
+    return CallbackReturn;
+  }
+
+private:
+  uintptr_t CallbackReturn;
+};
+
 class ThreadScope final {
 public:
   ThreadScope(FEXCore::Context::Context* context, FEXCore::Core::InternalThreadState* thread)
@@ -302,8 +321,23 @@ void AppendImmediate(std::vector<uint8_t>& code, uint64_t value) {
   std::memcpy(code.data() + offset, &value, sizeof(value));
 }
 
-std::vector<uint8_t> BuildGuestCode() {
-  std::vector<uint8_t> code;
+struct GuestCode final {
+  std::vector<uint8_t> Bytes;
+  size_t CallbackOffset;
+  size_t CallbackReturnOffset;
+  size_t InvalidationOffset;
+  size_t InvalidationImmediateOffset;
+  size_t ThreadOffset;
+};
+
+struct ThreadProof final {
+  bool Created {};
+  bool TlsRead {};
+};
+
+GuestCode BuildGuestCode() {
+  GuestCode result;
+  auto& code = result.Bytes;
 
   code.insert(code.end(), {0x48, 0xb8}); // mov rax, kAddLeft
   AppendImmediate(code, kAddLeft);
@@ -334,7 +368,49 @@ std::vector<uint8_t> BuildGuestCode() {
 
   const auto displacement = static_cast<int32_t>(stackTestOffset - (callDisplacementOffset + sizeof(int32_t)));
   std::memcpy(code.data() + callDisplacementOffset, &displacement, sizeof(displacement));
-  return code;
+
+  result.CallbackOffset = code.size();
+  code.insert(code.end(), {0x48, 0x8d, 0x47, 0x05, 0xc3}); // lea rax, [rdi + 5]; ret
+
+  result.CallbackReturnOffset = code.size();
+  code.insert(code.end(), {0x0f, 0x3e}); // FEX CALLBACKRET instruction
+
+  result.InvalidationOffset = code.size();
+  code.insert(code.end(), {0x48, 0xb8}); // mov rax, kInvalidationInitial
+  result.InvalidationImmediateOffset = code.size();
+  AppendImmediate(code, kInvalidationInitial);
+  code.push_back(0xf4); // hlt
+
+  result.ThreadOffset = code.size();
+  code.insert(code.end(), {0x64, 0x48, 0x8b, 0x04, 0x25, 0x00, 0x00, 0x00, 0x00}); // mov rax, fs:[0]
+  code.push_back(0xf4); // hlt
+  return result;
+}
+
+ThreadProof ExecuteThreadTlsCheck(FEXCore::Context::Context* context, uint64_t rip, size_t pageSize, uint64_t sentinel) {
+  ThreadProof proof;
+  Mapping stackPage {pageSize, PROT_READ | PROT_WRITE};
+  Mapping tlsPage {pageSize, PROT_READ | PROT_WRITE};
+  if (!stackPage.IsValid() || !tlsPage.IsValid()) return proof;
+  std::memcpy(tlsPage.Get(), &sentinel, sizeof(sentinel));
+
+  GuestSegmentState guestSegmentState;
+  CallRetStack callRetStack;
+  if (!callRetStack.IsReserved() || !callRetStack.MakeWritable()) return proof;
+
+  const uint64_t initialRsp = reinterpret_cast<uint64_t>(stackPage.Get()) + pageSize - 16;
+  auto* thread = context->CreateThread(rip, initialRsp);
+  if (thread == nullptr) return proof;
+  callRetStack.Initialize(thread);
+  ThreadScope threadScope {context, thread};
+  guestSegmentState.Initialize(thread->CurrentFrame->State);
+  thread->CurrentFrame->State.fs_cached = reinterpret_cast<uint64_t>(tlsPage.Get());
+
+  context->ExecuteThread(thread);
+  proof.Created = true;
+  proof.TlsRead = thread->CurrentFrame->State.gregs[FEXCore::X86State::REG_RAX] == sentinel &&
+                  thread->CurrentFrame->State.gregs[FEXCore::X86State::REG_RSP] == initialRsp;
+  return proof;
 }
 
 uint64_t DoubleBits(double value) {
@@ -365,8 +441,9 @@ int main() {
 
   FEXCORE_DIAG("GUEST_CODE_BEFORE");
   const auto guestCode = BuildGuestCode();
-  if (guestCode.size() > static_cast<size_t>(pageSize)) return Fail("guest-code-size");
-  std::memcpy(codePage.Get(), guestCode.data(), guestCode.size());
+  if (guestCode.Bytes.size() > static_cast<size_t>(pageSize)) return Fail("guest-code-size");
+  std::memcpy(codePage.Get(), guestCode.Bytes.data(), guestCode.Bytes.size());
+  const uint64_t initialRip = reinterpret_cast<uint64_t>(codePage.Get());
   FEXCORE_DIAG("GUEST_CODE_AFTER");
 
   FEXCORE_DIAG("CONFIG_SCOPE_BEFORE");
@@ -380,10 +457,10 @@ int main() {
   FEXCORE_DIAG("CREATE_CONTEXT_AFTER");
   if (!context) return Fail("create-context");
   FEXCORE_DIAG("SIGNAL_SYSCALL_BEFORE");
-  auto signalDelegator = FEX::DummyHandlers::CreateSignalDelegator();
+  SmokeSignalDelegator signalDelegator {initialRip + guestCode.CallbackReturnOffset};
   auto syscallHandler = fextl::make_unique<SmokeSyscallHandler>();
 
-  context->SetSignalDelegator(signalDelegator.get());
+  context->SetSignalDelegator(&signalDelegator);
   context->SetSyscallHandler(syscallHandler.get());
   context->EnableExitOnHLT();
   FEXCORE_DIAG("SIGNAL_SYSCALL_AFTER");
@@ -392,7 +469,6 @@ int main() {
   FEXCORE_DIAG("INIT_CORE_AFTER");
   if (!initialized) return Fail("init-core");
 
-  const uint64_t initialRip = reinterpret_cast<uint64_t>(codePage.Get());
   const uint64_t initialRsp = reinterpret_cast<uint64_t>(stackPage.Get()) + pageSize - 16;
   GuestSegmentState guestSegmentState;
   CallRetStack callRetStack;
@@ -421,7 +497,7 @@ int main() {
   context->ExecuteThread(thread);
   FEXCORE_DIAG("EXECUTE_AFTER");
 
-  const auto& state = thread->CurrentFrame->State;
+  auto& state = thread->CurrentFrame->State;
   if (state.gregs[FEXCore::X86State::REG_RAX] != kAddLeft + kAddRight ||
       state.gregs[FEXCore::X86State::REG_RCX] != (kXorLeft ^ kXorRight)) {
     return Fail("gpr");
@@ -438,7 +514,56 @@ int main() {
   std::memcpy(&fpResultBits, &finalXmm[0], sizeof(fpResultBits));
   if (fpResultBits != DoubleBits(kFpResult)) return Fail("fp");
 
-  std::printf("FEXCORE_SMOKE_BOOTSTRAP_OK revision=%.*s gpr=ok stack=ok fp=ok\n", static_cast<int>(kFexRevision.size()),
+  ThreadProof firstThreadProof;
+  ThreadProof secondThreadProof;
+  const uint64_t threadRip = initialRip + guestCode.ThreadOffset;
+  FEXCORE_DIAG("THREADS_BEFORE");
+  std::thread firstHostThread {[&] {
+    firstThreadProof = ExecuteThreadTlsCheck(context.get(), threadRip, static_cast<size_t>(pageSize), kThreadSentinelA);
+  }};
+  std::thread secondHostThread {[&] {
+    secondThreadProof = ExecuteThreadTlsCheck(context.get(), threadRip, static_cast<size_t>(pageSize), kThreadSentinelB);
+  }};
+  firstHostThread.join();
+  secondHostThread.join();
+  FEXCORE_DIAG("THREADS_AFTER");
+  if (!firstThreadProof.Created || !secondThreadProof.Created) return Fail("threads");
+  if (!firstThreadProof.TlsRead || !secondThreadProof.TlsRead) return Fail("tls");
+
+  const uint64_t callbackRsp = initialRsp;
+  state.gregs[FEXCore::X86State::REG_RDI] = kCallbackInput;
+  state.gregs[FEXCore::X86State::REG_RSP] = callbackRsp;
+  FEXCORE_DIAG("CALLBACK_BEFORE");
+  context->HandleCallback(thread, initialRip + guestCode.CallbackOffset);
+  FEXCORE_DIAG("CALLBACK_AFTER");
+  if (state.gregs[FEXCore::X86State::REG_RAX] != kCallbackInput + 5 ||
+      state.gregs[FEXCore::X86State::REG_RSP] != callbackRsp) {
+    return Fail("callback");
+  }
+
+  const uint64_t invalidationRip = initialRip + guestCode.InvalidationOffset;
+  state.rip = invalidationRip;
+  state.gregs[FEXCore::X86State::REG_RSP] = initialRsp;
+  FEXCORE_DIAG("INVALIDATION_FIRST_BEFORE");
+  context->ExecuteThread(thread);
+  FEXCORE_DIAG("INVALIDATION_FIRST_AFTER");
+  if (state.gregs[FEXCore::X86State::REG_RAX] != kInvalidationInitial) return Fail("invalidation-initial");
+
+  auto* invalidationImmediate = static_cast<uint8_t*>(codePage.Get()) + guestCode.InvalidationImmediateOffset;
+  std::memcpy(invalidationImmediate, &kInvalidationUpdated, sizeof(kInvalidationUpdated));
+  {
+    std::scoped_lock codeInvalidationLock {context->GetCodeInvalidationMutex()};
+    context->InvalidateCodeBuffersCodeRange(invalidationRip, 11);
+    context->InvalidateThreadCachedCodeRange(thread, invalidationRip, 11);
+  }
+  FEXCORE_DIAG("INVALIDATION_FLUSH_AFTER");
+  state.rip = invalidationRip;
+  state.gregs[FEXCore::X86State::REG_RSP] = initialRsp;
+  context->ExecuteThread(thread);
+  FEXCORE_DIAG("INVALIDATION_SECOND_AFTER");
+  if (state.gregs[FEXCore::X86State::REG_RAX] != kInvalidationUpdated) return Fail("invalidation");
+
+  std::printf("FEXCORE_SMOKE_OK revision=%.*s gpr=ok stack=ok fp=ok threads=ok tls=ok callback=ok invalidation=ok\n", static_cast<int>(kFexRevision.size()),
               kFexRevision.data());
   return 0;
 }

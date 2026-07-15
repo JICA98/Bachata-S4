@@ -56,7 +56,7 @@ if (JSON.stringify(needed) !== JSON.stringify(EXPECTED_NEEDED)) {
 }
 
 const stringTable = run("strings", [artifactPath]);
-for (const marker of [FEX_REVISION, "gpr=ok", "stack=ok", "fp=ok"]) {
+for (const marker of [FEX_REVISION, "gpr=ok", "stack=ok", "fp=ok", "threads=ok", "tls=ok", "callback=ok", "invalidation=ok"]) {
   if (!stringTable.includes(marker)) fail(`artifact strings are missing ${marker}`);
 }
 
@@ -80,5 +80,5 @@ if (forbiddenExecutables.length !== 0) {
 }
 
 console.log(
-  `fexcore smoke build verified: machine=AArch64 interpreter=/lib/ld-linux-aarch64.so.1 needed=${needed.join(",")} revision=${FEX_REVISION} gpr=present stack=present fp=present`,
+  `fexcore smoke build verified: machine=AArch64 interpreter=/lib/ld-linux-aarch64.so.1 needed=${needed.join(",")} revision=${FEX_REVISION} gpr=present stack=present fp=present threads=present tls=present callback=present invalidation=present`,
 );

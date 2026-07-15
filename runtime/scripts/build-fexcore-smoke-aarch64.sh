@@ -9,6 +9,20 @@ STAGE_DIR="${PROJECT_ROOT}/runtime/build/fexcore-smoke-stage"
 PATCH_PATH="${PROJECT_ROOT}/runtime/patches/fex-fexcore-only.patch"
 SMOKE_SOURCE="${PROJECT_ROOT}/runtime/probes/fexcore-smoke.cpp"
 VERIFIER="${PROJECT_ROOT}/runtime/tests/verify-fexcore-smoke-build.mjs"
+PATCH_APPLIED=0
+
+cleanup_patch() {
+  local status=$?
+  if [[ ${PATCH_APPLIED} -eq 1 ]] && ! git -C "${FEX_SOURCE}" apply -R "${PATCH_PATH}"; then
+    echo "failed to reverse temporary FEXCore build patch" >&2
+    if [[ ${status} -eq 0 ]]; then
+      status=1
+    fi
+  fi
+  trap - EXIT
+  exit "${status}"
+}
+trap cleanup_patch EXIT
 
 mapfile -t FEX_LOCK < <(node -e '
 const { readFileSync } = require("node:fs");
@@ -51,6 +65,7 @@ git -C "${FEX_SOURCE}" submodule foreach --quiet --recursive '
 
 git -C "${FEX_SOURCE}" apply --check "${PATCH_PATH}"
 git -C "${FEX_SOURCE}" apply "${PATCH_PATH}"
+PATCH_APPLIED=1
 
 cmake -S "${FEX_SOURCE}" -B "${BUILD_DIR}" -G Ninja \
   -DCMAKE_SYSTEM_NAME=Linux \

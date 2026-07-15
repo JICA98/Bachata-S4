@@ -34,8 +34,8 @@ test("FEXCore smoke owns a guarded call/return stack through thread destruction"
 
   const stackOwner = source.indexOf("CallRetStack callRetStack;");
   const createThread = source.indexOf("auto* thread = context->CreateThread(initialRip, initialRsp);");
-  const attachStack = source.indexOf("callRetStack.Initialize(thread);");
-  const threadScope = source.indexOf("ThreadScope threadScope {context.get(), thread};");
+  const attachStack = source.lastIndexOf("callRetStack.Initialize(thread);");
+  const threadScope = source.lastIndexOf("ThreadScope threadScope {context.get(), thread};");
 
   assert.notEqual(stackOwner, -1);
   assert.notEqual(createThread, -1);
