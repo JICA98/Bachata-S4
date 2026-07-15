@@ -20,9 +20,9 @@ function sha256(value) {
 }
 
 function readSanitized(path, label) {
-  const contents = readFileSync(path);
-  if (forbiddenText.test(contents.toString("utf8"))) fail(`${label} contains private or serial-bearing text`);
-  return contents;
+  const contents = readFileSync(path, "utf8");
+  if (forbiddenText.test(contents)) fail(`${label} contains private or serial-bearing text`);
+  return contents.replace(/\r\n?/g, "\n");
 }
 
 if (process.argv.length !== 6) {
