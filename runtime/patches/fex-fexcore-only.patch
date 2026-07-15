@@ -2,12 +2,13 @@ diff --git a/CMakeLists.txt b/CMakeLists.txt
 index 1d848401c..392a1deb6 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -9,2 +9,4 @@ option(BUILD_THUNKS "Build thunks" FALSE)
+@@ -9,2 +9,5 @@ option(BUILD_THUNKS "Build thunks" FALSE)
  option(BUILD_FEXCONFIG "Build FEXConfig" TRUE)
 +option(BUILD_FEXCORE_ONLY "Build only FEXCore and an embedding smoke executable" OFF)
 +set(FEXCORE_SMOKE_SOURCE "" CACHE FILEPATH "Embedding smoke executable source")
++set(FEXCORE_GUEST_HARNESS_SOURCES "" CACHE STRING "Semicolon-separated absolute guest harness sources")
  option(ENABLE_CLANG_THUNKS "Build thunks with clang" TRUE)
-@@ -601,4 +603,25 @@ add_subdirectory(FEXHeaderUtils/)
+@@ -601,4 +604,41 @@ add_subdirectory(FEXHeaderUtils/)
  add_subdirectory(CodeEmitter/)
 -add_subdirectory(FEXCore/)
 -
@@ -30,7 +31,23 @@ index 1d848401c..392a1deb6 100644
 +    "${CMAKE_SOURCE_DIR}/Source/Tools/CommonTools")
 +  target_link_libraries(fexcore-smoke PRIVATE
 +    FEXCore Common CommonTools JemallocLibs ${PTHREAD_LIB})
-+  install(TARGETS fexcore-smoke RUNTIME DESTINATION bin)
++  if (FEXCORE_GUEST_HARNESS_SOURCES)
++    foreach(source IN LISTS FEXCORE_GUEST_HARNESS_SOURCES)
++      if (NOT IS_ABSOLUTE "${source}")
++        message(FATAL_ERROR "fexcore-guest-harness source must be absolute: ${source}")
++      endif()
++    endforeach()
++    add_executable(fexcore-guest-harness ${FEXCORE_GUEST_HARNESS_SOURCES})
++    target_compile_features(fexcore-guest-harness PRIVATE cxx_std_20)
++    target_include_directories(fexcore-guest-harness PRIVATE
++      "${CMAKE_BINARY_DIR}/generated"
++      "${CMAKE_SOURCE_DIR}/Source/Tools/CommonTools")
++    target_link_libraries(fexcore-guest-harness PRIVATE
++      FEXCore Common CommonTools JemallocLibs ${PTHREAD_LIB})
++    install(TARGETS fexcore-smoke fexcore-guest-harness RUNTIME DESTINATION bin)
++  else()
++    install(TARGETS fexcore-smoke RUNTIME DESTINATION bin)
++  endif()
 +  return()
 +endif()
 +
