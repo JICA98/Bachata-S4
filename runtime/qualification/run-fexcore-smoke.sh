@@ -37,7 +37,7 @@ run_directory=$(mktemp -d "$build_directory/run.XXXXXX")
 "$adb_bin" -s "$serial" install -r "$apk" >"$run_directory/install-app.txt"
 "$adb_bin" -s "$serial" install -r -t "$test_apk" >"$run_directory/install-test.txt"
 
-logcat_start=$("$adb_bin" -s "$serial" shell date '+%m-%d %H:%M:%S.000' | tr -d '\r')
+logcat_start=$("$adb_bin" -s "$serial" shell "date '+%m-%d %H:%M:%S.000'" | tr -d '\r')
 started_ms=$(date +%s%3N)
 set +e
 timeout 45s "$adb_bin" -s "$serial" shell am instrument -w -r \
