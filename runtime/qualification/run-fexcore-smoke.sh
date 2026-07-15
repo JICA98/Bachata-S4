@@ -38,14 +38,14 @@ run_directory=$(mktemp -d "$build_directory/run.XXXXXX")
 "$adb_bin" -s "$serial" install -r -t "$test_apk" >"$run_directory/install-test.txt"
 
 logcat_start=$("$adb_bin" -s "$serial" shell "date '+%m-%d %H:%M:%S.000'" | tr -d '\r')
-started_ms=$(date +%s%3N)
+started_ns=$(date +%s%N)
 set +e
 timeout 45s "$adb_bin" -s "$serial" shell am instrument -w -r \
   -e class com.bachatas4.android.FexCoreSmokeDeviceTest \
   com.bachatas4.android.test/androidx.test.runner.AndroidJUnitRunner >"$run_directory/instrumentation.raw" 2>&1
 instrumentation_status=$?
 set -e
-finished_ms=$(date +%s%3N)
+finished_ns=$(date +%s%N)
 "$adb_bin" -s "$serial" logcat -d -T "$logcat_start" -s BachataFexSmoke:I '*:S' >"$run_directory/logcat.raw"
 
 if [[ $instrumentation_status -ne 0 ]]; then
@@ -57,7 +57,7 @@ if ! grep -F -- "$marker" "$run_directory/instrumentation.raw" "$run_directory/l
   exit 1
 fi
 
-duration_ms=$((finished_ms - started_ms))
+duration_ms=$(( (finished_ns - started_ns) / 1000000 ))
 if (( duration_ms < 1 )); then
   duration_ms=1
 fi
