@@ -222,16 +222,17 @@ Expected: only clean-branch commits are pushed. The legacy branch and its protec
 - [ ] **Step 1: Run focused source and Android launcher contracts**
 
 ```bash
-node --test runtime/tests/shadps4-baseline.test.mjs runtime/tests/fex-phase0-evidence.test.mjs runtime/tests/create-fex-phase0-evidence.test.mjs runtime/tests/run-fexcore-smoke-source.test.mjs runtime/tests/build-fexcore-smoke-cleanup-source.test.mjs
+node --test runtime/tests/shadps4-baseline.test.mjs runtime/tests/run-fexcore-smoke-source.test.mjs runtime/tests/build-fexcore-smoke-cleanup-source.test.mjs
 node runtime/tests/verify-runtime.mjs --locks-only
 cd android/BachataS4
 ANDROID_HOME="$HOME/Android/Sdk" ANDROID_SDK_ROOT="$HOME/Android/Sdk" ./gradlew :core:runtime:testDebugUnitTest --tests '*RuntimeProbeLauncherTest*'
 cd ../..
 ```
 
-Expected: all Node subtests and the lock verifier pass, and the Android launcher
-test reports 15 passing tests.  The binary artifact verifier runs after the
-clean runtime build in Step 2.
+Expected: the three APK-independent Node subtests and the lock verifier pass,
+and the Android launcher test reports 15 passing tests.  The binary artifact
+verifier runs after the clean runtime build in Step 2; the evidence tests run
+after Step 2 has assembled the APK they inspect.
 
 - [ ] **Step 2: Rebuild the runtime and Playstore APK before device installation**
 
@@ -245,9 +246,11 @@ ANDROID_HOME="$HOME/Android/Sdk" ANDROID_SDK_ROOT="$HOME/Android/Sdk" ./gradlew 
 cd ../..
 node runtime/tests/verify-apk-runtime.mjs android/BachataS4/app/build/outputs/apk/playstore/debug/app-playstore-debug.apk
 unzip -l android/BachataS4/app/build/outputs/apk/playstore/debug/app-playstore-debug.apk | grep -E 'assets/runtime/(manifest\.json|runtime\.zip)'
+node --test runtime/tests/fex-phase0-evidence.test.mjs runtime/tests/create-fex-phase0-evidence.test.mjs
 ```
 
-Expected: runtime/Gradle/APK verification exits 0 and the APK lists both managed runtime assets.
+Expected: runtime/Gradle/APK verification and the four APK-dependent evidence
+subtests exit 0, and the APK lists both managed runtime assets.
 
 - [ ] **Step 3: Replacement-install and run the clean-branch tablet qualification**
 
