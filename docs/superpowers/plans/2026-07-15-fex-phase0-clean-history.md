@@ -64,14 +64,17 @@ git push origin refs/tags/fex-phase0-legacy-c010d096
 
 Expected: the legacy status still reports only its protected submodule dirt; the clean worktree has no output; the remote tag resolves to the legacy proof commit.
 
-- [ ] **Step 4: Commit the migration plan on the legacy recovery branch**
+- [ ] **Step 4: Verify the committed legacy design and migration plan**
 
 ```bash
-git -C /home/jica/repo/Bachata-S4/.worktrees/fex-arm64-sonic add docs/superpowers/plans/2026-07-15-fex-phase0-clean-history.md
-git -C /home/jica/repo/Bachata-S4/.worktrees/fex-arm64-sonic commit -m 'docs(fex): plan clean phase0 history'
+git -C /home/jica/repo/Bachata-S4/.worktrees/fex-arm64-sonic show -s --format='%H %s' 924e99f5
+git -C /home/jica/repo/Bachata-S4/.worktrees/fex-arm64-sonic show -s --format='%H %s' a01f7fa4
+git ls-remote --heads origin feature/fex-arm64-sonic
 ```
 
-Expected: only the plan document is committed; no runtime, Android, FEX, or Box64 source file changes.
+Expected: the remote legacy branch contains both documentation commits; no
+runtime, Android, FEX, or Box64 source file changes are introduced by this
+step.
 
 ---
 
@@ -193,7 +196,7 @@ git diff --check 5623902477eacbe36b30266e673652c14de32fa8..HEAD
 
 Expected: every manifest path exactly matches the legacy proof tree before evidence regeneration; the Box64 diff and range-scoped whitespace checks exit 0.
 
-- [ ] **Step 5: Commit the reconstructed source range and push the branch**
+- [ ] **Step 5: Verify the reconstructed source range and push the branch**
 
 ```bash
 git status --short
@@ -216,18 +219,19 @@ Expected: only clean-branch commits are pushed. The legacy branch and its protec
 - Success marker: `FEXCORE_SMOKE_OK revision=f2b679f6028ce1c38875233aecfcf5d3f8ebecec gpr=ok stack=ok fp=ok threads=ok tls=ok callback=ok invalidation=ok`.
 - Evidence source revision: the clean branch `HEAD` at the time of the physical runner.
 
-- [ ] **Step 1: Run focused source, artifact, and Android launcher contracts**
+- [ ] **Step 1: Run focused source and Android launcher contracts**
 
 ```bash
 node --test runtime/tests/shadps4-baseline.test.mjs runtime/tests/fex-phase0-evidence.test.mjs runtime/tests/create-fex-phase0-evidence.test.mjs runtime/tests/run-fexcore-smoke-source.test.mjs runtime/tests/build-fexcore-smoke-cleanup-source.test.mjs
 node runtime/tests/verify-runtime.mjs --locks-only
-node runtime/tests/verify-fexcore-smoke-build.mjs runtime/build/fexcore-smoke-stage/bin/fexcore-smoke
 cd android/BachataS4
 ANDROID_HOME="$HOME/Android/Sdk" ANDROID_SDK_ROOT="$HOME/Android/Sdk" ./gradlew :core:runtime:testDebugUnitTest --tests '*RuntimeProbeLauncherTest*'
 cd ../..
 ```
 
-Expected: all Node subtests pass, the runtime/artifact verifiers exit 0, and the Android launcher test reports 15 passing tests.
+Expected: all Node subtests and the lock verifier pass, and the Android launcher
+test reports 15 passing tests.  The binary artifact verifier runs after the
+clean runtime build in Step 2.
 
 - [ ] **Step 2: Rebuild the runtime and Playstore APK before device installation**
 
@@ -235,6 +239,7 @@ Expected: all Node subtests pass, the runtime/artifact verifiers exit 0, and the
 runtime/scripts/build-runtime-debian.sh
 node runtime/tests/verify-runtime.mjs runtime/locks/components.lock.json
 node runtime/tests/verify-no-bundled-turnip.mjs runtime/build/rootfs
+node runtime/tests/verify-fexcore-smoke-build.mjs runtime/build/fexcore-smoke-stage/bin/fexcore-smoke
 cd android/BachataS4
 ANDROID_HOME="$HOME/Android/Sdk" ANDROID_SDK_ROOT="$HOME/Android/Sdk" ./gradlew clean test lintDebug assemblePlaystoreDebug assemblePlaystoreDebugAndroidTest
 cd ../..
