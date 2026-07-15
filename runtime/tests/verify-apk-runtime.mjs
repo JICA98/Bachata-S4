@@ -47,24 +47,25 @@ try {
     encoding: "utf8",
     maxBuffer: 16 * 1024 * 1024,
   }));
-  const runnerPath = "host/fexcore-smoke";
-  if (!runtimeEntries.includes(runnerPath)) throw new Error(`Nested runtime ZIP is missing ${runnerPath}`);
-  const declaredRunner = Array.isArray(manifest.files)
-    ? manifest.files.find((file) => file.path === runnerPath)
-    : undefined;
-  if (!declaredRunner) throw new Error(`Runtime manifest is missing ${runnerPath}`);
-  const runner = execFileSync("unzip", ["-p", runtimeZip, runnerPath], {
-    encoding: "buffer",
-    maxBuffer: 16 * 1024 * 1024,
-  });
-  if (runner.length < 20 || runner[0] !== 0x7f || runner.subarray(1, 4).toString() !== "ELF") {
-    throw new Error("Nested FEXCore smoke runner is not ELF");
+  for (const runnerPath of ["host/fexcore-smoke", "host/fexcore-guest-harness"]) {
+    if (!runtimeEntries.includes(runnerPath)) throw new Error(`Nested runtime ZIP is missing ${runnerPath}`);
+    const declaredRunner = Array.isArray(manifest.files)
+      ? manifest.files.find((file) => file.path === runnerPath)
+      : undefined;
+    if (!declaredRunner) throw new Error(`Runtime manifest is missing ${runnerPath}`);
+    const runner = execFileSync("unzip", ["-p", runtimeZip, runnerPath], {
+      encoding: "buffer",
+      maxBuffer: 16 * 1024 * 1024,
+    });
+    if (runner.length < 20 || runner[0] !== 0x7f || runner.subarray(1, 4).toString() !== "ELF") {
+      throw new Error(`Nested FEXCore runner is not ELF: ${runnerPath}`);
+    }
+    if (runner[4] !== 2) throw new Error(`Nested FEXCore runner is not ELF64: ${runnerPath}`);
+    if (runner[5] !== 1) throw new Error(`Nested FEXCore runner is not little-endian ELF: ${runnerPath}`);
+    if (runner.readUInt16LE(18) !== 183) throw new Error(`Nested FEXCore runner is not AArch64 ELF: ${runnerPath}`);
+    if (declaredRunner.size !== runner.length) throw new Error(`Runtime manifest size mismatch: ${runnerPath}`);
+    if (declaredRunner.sha256 !== sha256(runner)) throw new Error(`Runtime manifest SHA-256 mismatch: ${runnerPath}`);
   }
-  if (runner[4] !== 2) throw new Error("Nested FEXCore smoke runner is not ELF64");
-  if (runner[5] !== 1) throw new Error("Nested FEXCore smoke runner is not little-endian ELF");
-  if (runner.readUInt16LE(18) !== 183) throw new Error("Nested FEXCore smoke runner is not AArch64 ELF");
-  if (declaredRunner.size !== runner.length) throw new Error(`Runtime manifest size mismatch: ${runnerPath}`);
-  if (declaredRunner.sha256 !== sha256(runner)) throw new Error(`Runtime manifest SHA-256 mismatch: ${runnerPath}`);
   const nativeFexEntries = apkEntries.filter((entry) => entry.startsWith("lib/") && entry.toLowerCase().includes("fex"));
   if (nativeFexEntries.length) throw new Error(`APK packages FEXCore through jniLibs: ${nativeFexEntries.join(", ")}`);
   const offenders = [...forbidden(apkEntries), ...forbidden(runtimeEntries).map((entry) => `runtime.zip:${entry}`)];

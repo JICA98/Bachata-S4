@@ -17,6 +17,7 @@ const rootfs = resolve(projectRoot, "runtime/build/rootfs");
 const shadps4Stage = resolve(projectRoot, "runtime/build/shadps4-stage");
 const box64Stage = resolve(projectRoot, "runtime/build/box64-host-stage");
 const fexcoreSmokeStage = resolve(projectRoot, "runtime/build/fexcore-smoke-stage/bin/fexcore-smoke");
+const fexcoreGuestHarnessStage = resolve(projectRoot, "runtime/build/fexcore-smoke-stage/bin/fexcore-guest-harness");
 
 function isElf(file) {
   try { const fd = execFileSync("dd", ["if="+file, "bs=4", "count=1"], {stdio:["ignore","pipe","pipe"]}); return fd[0]==0x7f&&fd[1]==0x45&&fd[2]==0x4c&&fd[3]==0x46; } catch { return false; }
@@ -225,9 +226,13 @@ for (const [soname, info] of amd64Resolved) {
 const box64Bin = join(box64Stage, "box64");
 if (!existsSync(box64Bin)) fail("box64 not built. Run build-box64-host.sh first.");
 if (!existsSync(fexcoreSmokeStage)) fail("FEXCore smoke not built. Run build-fexcore-smoke-aarch64.sh first.");
+if (!existsSync(fexcoreGuestHarnessStage)) fail("FEXCore guest harness not built. Run build-fexcore-smoke-aarch64.sh first.");
 const fexcoreSmokeTarget = join(hostDir, "fexcore-smoke");
 copyFileSync(fexcoreSmokeStage, fexcoreSmokeTarget);
 chmodSync(fexcoreSmokeTarget, 0o755);
+const fexcoreGuestHarnessTarget = join(hostDir, "fexcore-guest-harness");
+copyFileSync(fexcoreGuestHarnessStage, fexcoreGuestHarnessTarget);
+chmodSync(fexcoreGuestHarnessTarget, 0o755);
 
 // Resolve closure from box64 host binary
 const arm64Resolved = resolveClosure([box64Bin], arm64Paths);
@@ -293,6 +298,7 @@ const checks = [
   ["host/libgcc_s.so.1", "arm64 libgcc_s"],
   ["host/libstdc++.so.6", "arm64 libstdc++"],
   ["host/fexcore-smoke", "FEXCore smoke runner"],
+  ["host/fexcore-guest-harness", "FEXCore guest harness"],
   ["host/libdl.so.2", "arm64 libdl"],
   ["host/libpthread.so.0", "arm64 libpthread"],
   ["host/libresolv.so.2", "arm64 libresolv"],

@@ -68,6 +68,7 @@ const REQUIRED_RUNTIME_PATHS = [
   "etc/ssl/certs/ca-certificates.crt",
   "host/box64",
   "host/fexcore-smoke",
+  "host/fexcore-guest-harness",
   "host/ld-linux-aarch64.so.1",
   "host/libvulkan.so.1",
   "host/libc.so.6",
@@ -313,6 +314,7 @@ const hostLoader = zipEntries.find((entry) => entry.path === "host/ld-linux-aarc
 const hostLibc = zipEntries.find((entry) => entry.path === "host/libc.so.6").bytes;
 const hostBox64 = zipEntries.find((entry) => entry.path === "host/box64").bytes;
 const hostFexcoreSmoke = zipEntries.find((entry) => entry.path === "host/fexcore-smoke").bytes;
+const hostFexcoreGuestHarness = zipEntries.find((entry) => entry.path === "host/fexcore-guest-harness").bytes;
 if (countArm64SetRobustListCalls(hostLoader) !== 0 || countArm64SetRobustListCalls(hostLibc) !== 0) {
   fail("Host glibc retains set_robust_list calls blocked by Android app seccomp");
 }
@@ -325,6 +327,13 @@ if (hostFexcoreSmoke.length < 20 || hostFexcoreSmoke[0] !== 0x7f || hostFexcoreS
 if (hostFexcoreSmoke.readUInt16LE(18) !== 183) fail("FEXCore smoke runner is not AArch64 ELF");
 for (const marker of [FEX_REVISION, "gpr=ok", "stack=ok", "fp=ok"]) {
   if (!hostFexcoreSmoke.includes(Buffer.from(marker))) fail(`FEXCore smoke runner lacks ${marker}`);
+}
+if (hostFexcoreGuestHarness.length < 20 || hostFexcoreGuestHarness[0] !== 0x7f || hostFexcoreGuestHarness.subarray(1, 4).toString() !== "ELF") {
+  fail("FEXCore guest harness is not ELF");
+}
+if (hostFexcoreGuestHarness.readUInt16LE(18) !== 183) fail("FEXCore guest harness is not AArch64 ELF");
+for (const marker of [FEX_REVISION, "FEXCORE_GUEST_ENGINE_OK", "bridge=ok", "teardown=ok"]) {
+  if (!hostFexcoreGuestHarness.includes(Buffer.from(marker))) fail(`FEXCore guest harness lacks ${marker}`);
 }
 if (sha256(readFileSync(nativeHostLoaderPath)) !== sha256(hostLoader)) fail("Native host loader differs from runtime host loader");
 if (sha256(readFileSync(nativeHostBox64Path)) !== sha256(hostBox64)) fail("Native host Box64 differs from runtime host Box64");

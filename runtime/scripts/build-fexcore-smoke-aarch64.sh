@@ -9,6 +9,9 @@ STAGE_DIR="${PROJECT_ROOT}/runtime/build/fexcore-smoke-stage"
 PATCH_PATH="${PROJECT_ROOT}/runtime/patches/fex-fexcore-only.patch"
 SMOKE_SOURCE="${PROJECT_ROOT}/runtime/probes/fexcore-smoke.cpp"
 VERIFIER="${PROJECT_ROOT}/runtime/tests/verify-fexcore-smoke-build.mjs"
+GUEST_ENGINE_SOURCE="${PROJECT_ROOT}/src/core/fex/fex_guest_engine.cpp"
+GUEST_HARNESS_SOURCE="${PROJECT_ROOT}/runtime/probes/fexcore-guest-harness.cpp"
+GUEST_HARNESS_VERIFIER="${PROJECT_ROOT}/runtime/tests/verify-fexcore-guest-harness-build.mjs"
 PATCH_APPLIED=0
 
 cleanup_patch() {
@@ -80,6 +83,7 @@ cmake -S "${FEX_SOURCE}" -B "${BUILD_DIR}" -G Ninja \
   -DCMAKE_INSTALL_PREFIX="${STAGE_DIR}" \
   -DBUILD_FEXCORE_ONLY=ON \
   -DFEXCORE_SMOKE_SOURCE="${SMOKE_SOURCE}" \
+  -DFEXCORE_GUEST_HARNESS_SOURCES="${GUEST_ENGINE_SOURCE};${GUEST_HARNESS_SOURCE}" \
   -DBUILD_TESTING=OFF \
   -DBUILD_FEX_LINUX_TESTS=OFF \
   -DBUILD_THUNKS=OFF \
@@ -93,9 +97,10 @@ cmake -S "${FEX_SOURCE}" -B "${BUILD_DIR}" -G Ninja \
   -DENABLE_ZYDIS=OFF \
   -DENABLE_FEXCORE_PROFILER=OFF
 
-cmake --build "${BUILD_DIR}" --target fexcore-smoke --parallel
+cmake --build "${BUILD_DIR}" --target fexcore-smoke fexcore-guest-harness --parallel
 rm -rf "${STAGE_DIR}"
 mkdir -p "${STAGE_DIR}"
 cmake --install "${BUILD_DIR}"
-aarch64-linux-gnu-strip "${STAGE_DIR}/bin/fexcore-smoke"
+aarch64-linux-gnu-strip "${STAGE_DIR}/bin/fexcore-smoke" "${STAGE_DIR}/bin/fexcore-guest-harness"
 node "${VERIFIER}" "${STAGE_DIR}/bin/fexcore-smoke"
+node "${GUEST_HARNESS_VERIFIER}" "${STAGE_DIR}/bin/fexcore-guest-harness"
