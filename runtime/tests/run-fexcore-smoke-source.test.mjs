@@ -17,6 +17,7 @@ test("FEX Phase 0 runner preserves app data and records bounded sanitized proof"
   assert.match(source, /FexCoreSmokeDeviceTest/);
   assert.match(source, /shell "date '\+%m-%d %H:%M:%S\.000'"/);
   assert.match(source, /logcat -d -T/);
+  assert.match(source, /if \(\( duration_ms < 1 \)\); then\s+duration_ms=1/);
   assert.match(source, /create-fex-phase0-evidence\.mjs/);
   assert.doesNotMatch(source, /\badb uninstall\b|\bpm clear\b|\bforce-stop\b/);
 });
