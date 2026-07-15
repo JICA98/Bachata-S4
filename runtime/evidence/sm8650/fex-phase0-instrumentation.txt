@@ -15,7 +15,7 @@ INSTRUMENTATION_STATUS: test=executesPinnedFexCoreOnDevice
 INSTRUMENTATION_STATUS_CODE: 0
 INSTRUMENTATION_RESULT: stream=
 
-Time: 0.617
+Time: 0.63
 
 OK (1 test)
 

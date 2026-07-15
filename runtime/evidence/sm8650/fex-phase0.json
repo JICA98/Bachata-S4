@@ -7,12 +7,12 @@
     "pageSize": 4096
   },
   "source": {
-    "projectRevision": "608d0391521b92123b987ad041d19ebe5f747db1",
+    "projectRevision": "e66d0a77da3e32879c664be6334d81af619bd6e9",
     "fexRevision": "f2b679f6028ce1c38875233aecfcf5d3f8ebecec"
   },
   "artifact": {
-    "apkSha256": "d690eaaa663c864099da5d558ae471b98291e7fed12faf4087d58ca73e3fa362",
-    "runnerSha256": "c2ecc8ca17e1e07d3a10842023ef371d51ecfc08567d8548e0d67eb7b867de26",
+    "apkSha256": "0b29031a96c41bc265cac87fc6e28dbefa8f10d7f182244939c164d4f8be122e",
+    "runnerSha256": "37fc9f817508e3f76749f4dd6102102f8fb64d5f8feb3e1774ea164dcd1c4329",
     "elfClass": "ELF64",
     "machine": "AArch64",
     "interpreter": "/lib/ld-linux-aarch64.so.1",
@@ -25,7 +25,7 @@
   },
   "run": {
     "exitCode": 0,
-    "durationMs": 1517,
+    "durationMs": 1420,
     "marker": "FEXCORE_SMOKE_OK revision=f2b679f6028ce1c38875233aecfcf5d3f8ebecec gpr=ok stack=ok fp=ok threads=ok tls=ok callback=ok invalidation=ok",
     "checks": {
       "gpr": "ok",
@@ -38,7 +38,7 @@
     }
   },
   "logs": {
-    "instrumentationSha256": "9d5ab66ec3af465807948bf34b81bbd783fc2bbcfa73df85b19fa4d1f20f9cc8",
-    "logcatSha256": "e0e86593a3215d5292de071cade5cb973f9477ed69b0d5547b0fb309ec7c1e12"
+    "instrumentationSha256": "b2f2752853059de139b3ace0f740fe51142563fea8a5c5692ea7dc9c97c5ee32",
+    "logcatSha256": "1134f0d09173964516b075fcc71a898512abbd5e682aa0b723e25b87651c17d7"
   }
 }
