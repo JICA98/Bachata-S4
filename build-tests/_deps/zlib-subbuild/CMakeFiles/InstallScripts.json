@@ -1,7 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/home/jica/repo/Bachata-S4/build-tests/_deps/zlib-subbuild/cmake_install.cmake"
-	],
-	"Parallel" : false
-}

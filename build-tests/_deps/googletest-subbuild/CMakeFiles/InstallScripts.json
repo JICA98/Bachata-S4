@@ -1,7 +1,0 @@
-{
-	"InstallScripts" : 
-	[
-		"/home/jica/repo/Bachata-S4/build-tests/_deps/googletest-subbuild/cmake_install.cmake"
-	],
-	"Parallel" : false
-}

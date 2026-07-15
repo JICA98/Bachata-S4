@@ -1,5 +1,0 @@
-if(EXISTS "/home/jica/repo/Bachata-S4/build-tests/tests/shadps4_http_test[1]_tests.cmake")
-  include("/home/jica/repo/Bachata-S4/build-tests/tests/shadps4_http_test[1]_tests.cmake")
-else()
-  add_test(shadps4_http_test_NOT_BUILT shadps4_http_test_NOT_BUILT)
-endif()
