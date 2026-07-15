@@ -58,6 +58,9 @@ if ! grep -F -- "$marker" "$run_directory/instrumentation.raw" "$run_directory/l
 fi
 
 duration_ms=$((finished_ms - started_ms))
+if (( duration_ms < 1 )); then
+  duration_ms=1
+fi
 node "$project_root/runtime/qualification/create-fex-phase0-evidence.mjs" \
   "$duration_ms" "$run_directory/instrumentation.raw" "$run_directory/logcat.raw" "$evidence"
 node "$project_root/runtime/tests/verify-fex-phase0-evidence.mjs" "$evidence"
