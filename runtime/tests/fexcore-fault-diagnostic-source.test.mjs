@@ -21,6 +21,18 @@ test("FEXCore diagnostic runner records fatal signal fault context only when ena
   assert.match(source, /\/proc\/self\/maps/);
   assert.match(source, /FEXCORE_DIAG:MAP %s\\n/);
   assert.match(source, /FEXCORE_DUMP_EXECUTABLE_MAPS\(\)/);
+  for (const marker of [
+    "THREADS_BEFORE",
+    "THREADS_AFTER",
+    "CALLBACK_BEFORE",
+    "CALLBACK_AFTER",
+    "INVALIDATION_FIRST_BEFORE",
+    "INVALIDATION_FIRST_AFTER",
+    "INVALIDATION_FLUSH_AFTER",
+    "INVALIDATION_SECOND_AFTER",
+  ]) {
+    assert.match(source, new RegExp(`FEXCORE_DIAG\\("${marker}"\\);`));
+  }
 
   assert.match(
     source,

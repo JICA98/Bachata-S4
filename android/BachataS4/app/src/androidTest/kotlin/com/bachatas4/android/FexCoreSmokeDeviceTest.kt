@@ -30,7 +30,7 @@ class FexCoreSmokeDeviceTest {
                 RuntimeInstaller(installRoot).install(bundle, manifest).getOrThrow()
             }
             val marker =
-                "FEXCORE_SMOKE_BOOTSTRAP_OK revision=f2b679f6028ce1c38875233aecfcf5d3f8ebecec gpr=ok stack=ok fp=ok"
+                "FEXCORE_SMOKE_OK revision=f2b679f6028ce1c38875233aecfcf5d3f8ebecec gpr=ok stack=ok fp=ok threads=ok tls=ok callback=ok invalidation=ok"
             val result = RuntimeProbeLauncher().run(
                 request = RuntimeProbeRequest(
                     nativeLibraryDir = File(targetContext.applicationInfo.nativeLibraryDir).toPath(),
