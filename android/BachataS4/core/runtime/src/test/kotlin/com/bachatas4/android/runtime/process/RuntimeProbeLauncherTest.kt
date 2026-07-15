@@ -108,6 +108,24 @@ class RuntimeProbeLauncherTest {
     }
 
     @Test
+    fun usesRequestedHostGlibcNativeProbe() {
+        val request = nativeProbeRequest()
+        val guestHarness = request.runtimeRoot.resolve("host/fexcore-guest-harness")
+        Files.write(guestHarness, byteArrayOf(7))
+        val guestRequest = request.copy(executable = guestHarness)
+
+        assertEquals(
+            listOf(
+                request.nativeLibraryDir.resolve("libbachata_host_loader.so").toRealPath().toString(),
+                "--library-path",
+                request.runtimeRoot.resolve("host").toRealPath().toString(),
+                guestHarness.toRealPath().toString(),
+            ),
+            RuntimeProbeLauncher().command(guestRequest),
+        )
+    }
+
+    @Test
     fun clearsInheritedEnvironmentAndCopiesOnlyAllowlist() {
         val request = nativeProbeRequest(
             environment = mapOf(

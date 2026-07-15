@@ -54,7 +54,7 @@ class RuntimeProbeLauncher {
         return when (request.executionMode) {
             RuntimeProbeExecutionMode.BOX64_APK_NATIVE -> apkNativeCommand(request, executable)
             RuntimeProbeExecutionMode.BOX64_HOST_GLIBC -> hostGlibcCommand(request, runtimeRoot, executable)
-            RuntimeProbeExecutionMode.HOST_GLIBC_NATIVE -> hostGlibcNativeCommand(request, runtimeRoot)
+            RuntimeProbeExecutionMode.HOST_GLIBC_NATIVE -> hostGlibcNativeCommand(request, runtimeRoot, executable)
         } + request.arguments
     }
 
@@ -88,19 +88,18 @@ class RuntimeProbeLauncher {
         )
     }
 
-    private fun hostGlibcNativeCommand(request: RuntimeProbeRequest, runtimeRoot: Path): List<String> {
+    private fun hostGlibcNativeCommand(request: RuntimeProbeRequest, runtimeRoot: Path, executable: Path): List<String> {
         val nativeLibraryDir = request.nativeLibraryDir.toRealPath()
         val loader = request.nativeLibraryDir.resolve(HOST_LOADER_LIBRARY).toRealPath()
         val hostDirectory = runtimeRoot.resolve(HOST_DIRECTORY).toRealPath()
-        val runner = hostDirectory.resolve(FEXCORE_SMOKE_RUNNER).toRealPath()
         validateNativeFile(nativeLibraryDir, loader, "Host glibc loader")
         validateContainedDirectory(runtimeRoot, hostDirectory, "Host runtime directory")
-        validateContainedFile(runtimeRoot, runner, "FEXCore smoke runner")
+        validateContainedFile(runtimeRoot, executable, "Host glibc native probe")
         return listOf(
             loader.toString(),
             "--library-path",
             hostDirectory.toString(),
-            runner.toString(),
+            executable.toString(),
         )
     }
 
@@ -194,7 +193,6 @@ class RuntimeProbeLauncher {
         const val HOST_DIRECTORY = "host"
         const val HOST_LOADER_LIBRARY = "libbachata_host_loader.so"
         const val HOST_BOX64_LIBRARY = "libbachata_host_box64.so"
-        const val FEXCORE_SMOKE_RUNNER = "fexcore-smoke"
         const val DEFAULT_TIMEOUT_SECONDS = 15L
         const val KILL_GRACE_SECONDS = 2L
         const val READER_JOIN_MILLIS = 1_000L
