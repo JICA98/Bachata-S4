@@ -237,6 +237,7 @@ after Step 2 has assembled the APK they inspect.
 - [ ] **Step 2: Rebuild the runtime and Playstore APK before device installation**
 
 ```bash
+git submodule update --init --recursive --jobs 8
 runtime/scripts/build-runtime-debian.sh
 node runtime/tests/verify-runtime.mjs runtime/locks/components.lock.json
 node runtime/tests/verify-no-bundled-turnip.mjs runtime/build/rootfs
@@ -249,8 +250,9 @@ unzip -l android/BachataS4/app/build/outputs/apk/playstore/debug/app-playstore-d
 node --test runtime/tests/fex-phase0-evidence.test.mjs runtime/tests/create-fex-phase0-evidence.test.mjs
 ```
 
-Expected: runtime/Gradle/APK verification and the four APK-dependent evidence
-subtests exit 0, and the APK lists both managed runtime assets.
+Expected: source submodule initialization, runtime/Gradle/APK verification,
+and the four APK-dependent evidence subtests exit 0, and the APK lists both
+managed runtime assets.
 
 - [ ] **Step 3: Replacement-install and run the clean-branch tablet qualification**
 
