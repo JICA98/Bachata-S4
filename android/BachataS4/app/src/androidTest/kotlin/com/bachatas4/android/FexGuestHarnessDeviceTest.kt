@@ -1,5 +1,6 @@
 package com.bachatas4.android
 
+import android.util.Log
 import androidx.test.platform.app.InstrumentationRegistry
 import com.bachatas4.android.runtime.install.RuntimeInstaller
 import com.bachatas4.android.runtime.install.RuntimeManifest
@@ -44,6 +45,7 @@ class FexGuestHarnessDeviceTest {
             val diagnostic = "FEXCore guest harness exit=${result.exitCode}\n${result.output}"
             assertEquals(diagnostic, 0, result.exitCode)
             assertEquals(diagnostic, marker, result.output.trim())
+            Log.i("BachataFexGuestHarness", marker)
             println(marker)
         } finally {
             cleanupUniqueChild(installRoot)
