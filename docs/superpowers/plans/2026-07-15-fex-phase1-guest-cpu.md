@@ -168,7 +168,7 @@ Create `runtime/tests/fex-guest-engine-source.test.mjs` to require the lifecycle
 assert.match(header, /class GuestBridge/);
 assert.match(header, /class GuestEngine/);
 assert.match(header, /using EngineResult = std::variant<T, EngineFailure>/);
-assert.match(header, /EngineResult<GuestEngine> Create\(GuestBridge& bridge\)/);
+assert.match(header, /EngineResult<std::unique_ptr<GuestEngine>> Create\(GuestBridge& bridge\)/);
 assert.match(source, /CreateNewContext/);
 assert.match(source, /CreateThread/);
 assert.match(source, /SetXMMRegistersFromState/);
@@ -193,6 +193,7 @@ Create `src/core/fex/fex_guest_engine.h` with these exact host-facing types. Do 
 
 ```cpp
 #include <cstdint>
+#include <memory>
 #include <variant>
 
 namespace Core::Fex {
@@ -208,7 +209,7 @@ public:
 struct HarnessResult { bool gpr; bool rflags; bool xmm; bool bridge; bool threads; bool tls; bool invalidation; bool teardown; };
 class GuestEngine final {
 public:
-    static EngineResult<GuestEngine> Create(GuestBridge& bridge);
+    static EngineResult<std::unique_ptr<GuestEngine>> Create(GuestBridge& bridge);
     GuestEngine(GuestEngine&&) noexcept;
     GuestEngine& operator=(GuestEngine&&) noexcept;
     ~GuestEngine();
