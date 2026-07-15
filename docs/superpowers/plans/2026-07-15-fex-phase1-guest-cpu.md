@@ -39,20 +39,20 @@
 | `android/.../FexGuestHarnessDeviceTest.kt` | Installs a unique runtime child and runs the new host binary through the Android loader. |
 | `runtime/qualification/*phase1*` | Replacement-install runner plus bounded, sanitized Phase 1 evidence schema and validator. |
 
-### Task 1: Add the dual-harness FEX build and artifact contracts
+### Task 1: Add the opt-in dual-harness FEX CMake contract
 
 **Files:**
 - Modify: `runtime/patches/fex-fexcore-only.patch`
-- Modify: `runtime/scripts/build-fexcore-smoke-aarch64.sh`
-- Modify: `runtime/scripts/stage-debian-runtime.mjs`
-- Modify: `runtime/tests/verify-runtime.mjs`
-- Modify: `runtime/tests/verify-apk-runtime.mjs`
-- Create: `runtime/tests/verify-fexcore-guest-harness-build.mjs`
 - Create: `runtime/tests/fexcore-guest-harness-build-source.test.mjs`
 
 **Interfaces:**
-- Consumes: the existing `BUILD_FEXCORE_ONLY` patch/build path and `host/fexcore-smoke` runtime layout.
-- Produces: a second staged AArch64 executable at `runtime/build/fexcore-smoke-stage/bin/fexcore-guest-harness` and packaged path `host/fexcore-guest-harness`.
+- Consumes: the existing `BUILD_FEXCORE_ONLY` patch and `FEXCORE_SMOKE_SOURCE` path.
+- Produces: an optional `FEXCORE_GUEST_HARNESS_SOURCES` CMake contract while an unmodified Phase 0 build still creates only `fexcore-smoke`.
+
+**Task-order correction (2026-07-15):** This task is limited to the opt-in
+CMake contract and its source test. The guest engine, its sources, the
+build-script argument, artifact verification, staging, and APK checks move to
+Task 2 because those steps cannot be buildable before the guest sources exist.
 
 - [ ] **Step 1: Write failing source/build-contract tests**
 
@@ -60,10 +60,9 @@ Create `runtime/tests/fexcore-guest-harness-build-source.test.mjs` that reads th
 
 ```js
 assert.match(patch, /set\(FEXCORE_GUEST_HARNESS_SOURCES "" CACHE STRING/);
+assert.match(patch, /if \(FEXCORE_GUEST_HARNESS_SOURCES\)/);
 assert.match(patch, /add_executable\(fexcore-guest-harness \$\{FEXCORE_GUEST_HARNESS_SOURCES\}\)/);
-assert.match(build, /--target fexcore-smoke fexcore-guest-harness/);
-assert.match(build, /fexcore-guest-harness/);
-assert.match(stage, /hostDir, "fexcore-guest-harness"/);
+assert.match(patch, /install\(TARGETS fexcore-smoke fexcore-guest-harness RUNTIME DESTINATION bin\)/);
 ```
 
 Run:
@@ -72,32 +71,39 @@ Run:
 node --test runtime/tests/fexcore-guest-harness-build-source.test.mjs
 ```
 
-Expected: FAIL because the second target and packaged path do not yet exist.
+Expected: FAIL because the FEX-only patch has no opt-in guest harness target.
 
-- [ ] **Step 2: Extend the temporary FEX CMake patch for two targets**
+- [ ] **Step 2: Extend the temporary FEX CMake patch with an optional target**
 
 In `runtime/patches/fex-fexcore-only.patch`, retain `FEXCORE_SMOKE_SOURCE` and add:
 
 ```cmake
 set(FEXCORE_GUEST_HARNESS_SOURCES "" CACHE STRING "Semicolon-separated absolute guest harness sources")
 
-function(add_fexcore_harness target)
-  foreach(source IN LISTS ARGN)
+add_executable(fexcore-smoke "${FEXCORE_SMOKE_SOURCE}")
+# Apply the same C++20 feature, include directories, and FEXCore libraries to
+# fexcore-smoke and, when present, fexcore-guest-harness.
+if (FEXCORE_GUEST_HARNESS_SOURCES)
+  foreach(source IN LISTS FEXCORE_GUEST_HARNESS_SOURCES)
     if (NOT IS_ABSOLUTE "${source}")
-      message(FATAL_ERROR "${target} source must be absolute: ${source}")
+      message(FATAL_ERROR "fexcore-guest-harness source must be absolute: ${source}")
     endif()
   endforeach()
-  add_executable(${target} ${ARGN})
-  target_compile_features(${target} PRIVATE cxx_std_20)
-  target_include_directories(${target} PRIVATE "${CMAKE_BINARY_DIR}/generated" "${CMAKE_SOURCE_DIR}/Source/Tools/CommonTools")
-  target_link_libraries(${target} PRIVATE FEXCore Common CommonTools JemallocLibs ${PTHREAD_LIB})
-  install(TARGETS ${target} RUNTIME DESTINATION bin)
-endfunction()
+  add_executable(fexcore-guest-harness ${FEXCORE_GUEST_HARNESS_SOURCES})
+  install(TARGETS fexcore-smoke fexcore-guest-harness RUNTIME DESTINATION bin)
+else()
+  install(TARGETS fexcore-smoke RUNTIME DESTINATION bin)
+endif()
 ```
 
-Use `add_fexcore_harness(fexcore-smoke "${FEXCORE_SMOKE_SOURCE}")`. Require a non-empty `FEXCORE_GUEST_HARNESS_SOURCES`, then use `add_fexcore_harness(fexcore-guest-harness ${FEXCORE_GUEST_HARNESS_SOURCES})`. Keep the `return()` in the FEX-only branch and do not alter upstream sources outside the temporary patch.
+Use the same include directories, compile feature, and libraries for both
+executables. Always create and install `fexcore-smoke`. Only when
+`FEXCORE_GUEST_HARNESS_SOURCES` is non-empty, validate every source is
+absolute, create `fexcore-guest-harness`, and install both targets in one
+command. Otherwise install only `fexcore-smoke`. Keep the `return()` in the
+FEX-only branch and do not alter upstream sources outside the temporary patch.
 
-- [ ] **Step 3: Build and verify both artifacts**
+- [ ] **Step 3: [SUPERSEDED — execute in Task 2] Build and verify both artifacts**
 
 In `runtime/scripts/build-fexcore-smoke-aarch64.sh`, define the exact sources:
 
@@ -126,11 +132,11 @@ gpr=ok rflags=ok xmm=ok bridge=ok threads=ok tls=ok invalidation=ok teardown=ok
 
 It must reject `box64`, `wine`, and any executable other than the inspected harness from the harness stage directory.
 
-- [ ] **Step 4: Package and assert the new host artifact**
+- [ ] **Step 4: [SUPERSEDED — execute in Task 2] Package and assert the new host artifact**
 
 Add `fexcoreGuestHarnessStage` in `stage-debian-runtime.mjs`, require it to exist, copy it to `join(hostDir, "fexcore-guest-harness")`, and chmod it `0o755`. Add `host/fexcore-guest-harness` to `REQUIRED_RUNTIME_PATHS` in `verify-runtime.mjs`. Extend `verify-apk-runtime.mjs` so the nested runtime ZIP and manifest contain both FEX paths, each is ELF64/AArch64, and each manifest size/SHA-256 matches. Retain its rule that no FEXCore library is shipped through APK `jniLibs`.
 
-- [ ] **Step 5: Run focused source checks and commit**
+- [ ] **Step 5: [SUPERSEDED — execute in Task 2] Run focused source checks and commit**
 
 Run:
 
@@ -155,6 +161,12 @@ git commit -m 'build(fex): add guest harness target'
 - Create: `src/core/fex/fex_guest_engine.cpp`
 - Create: `runtime/probes/fexcore-guest-harness.cpp`
 - Create: `runtime/tests/fex-guest-engine-source.test.mjs`
+- Modify: `runtime/scripts/build-fexcore-smoke-aarch64.sh`
+- Modify: `runtime/scripts/stage-debian-runtime.mjs`
+- Modify: `runtime/tests/verify-runtime.mjs`
+- Modify: `runtime/tests/verify-apk-runtime.mjs`
+- Modify: `runtime/tests/fexcore-guest-harness-build-source.test.mjs`
+- Create: `runtime/tests/verify-fexcore-guest-harness-build.mjs`
 
 **Interfaces:**
 - Consumes: the dual-target build interface from Task 1 and the pinned public FEXCore APIs already proven by `runtime/probes/fexcore-smoke.cpp`.
@@ -248,7 +260,19 @@ FEXCORE_GUEST_ENGINE_OK revision=f2b679f6028ce1c38875233aecfcf5d3f8ebecec gpr=ok
 
 On failure, print only `FEXCORE_GUEST_ENGINE_FAIL stage=<stage> error=<integer>` to stderr and return nonzero. Do not print paths, serials, mapped addresses, or guest bytes.
 
-- [ ] **Step 5: Build locally and run tests**
+- [ ] **Step 5: Wire, stage, and verify the new harness artifact**
+
+Extend `build-fexcore-smoke-aarch64.sh` with the absolute engine and harness
+source paths, pass them through `FEXCORE_GUEST_HARNESS_SOURCES`, build both
+targets, strip both staged executables, and run a new guest-harness verifier.
+Preserve `trap cleanup_patch EXIT` so the FEX source checkout is clean on both
+success and failure. Stage the executable as `host/fexcore-guest-harness`, add
+it to the runtime and APK-manifest verifiers, and retain the prohibition on
+shipping FEX through Android `jniLibs`. Extend the Task 1 source-contract test
+with these build, staging, and verification assertions only after the engine
+sources exist.
+
+- [ ] **Step 6: Build locally and run tests**
 
 Run:
 
