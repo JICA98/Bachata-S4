@@ -50,8 +50,8 @@ configuration initialization/shutdown, context, signal delegator, syscall
 handler, guest-thread state, code cache/invalidation, and destruction order.
 `FexHostBridge` is the only interface through which translated guest code can
 request a host/HLE operation. It receives an operation identifier and the
-guest CPU frame, returns a defined result, and never assumes a host ABI is
-identical to the x86-64 guest ABI.
+guest CPU frame, returns a typed C++20 success-or-failure result, and never
+assumes a host ABI is identical to the x86-64 guest ABI.
 
 The controlled harness owns its executable guest page, stack, and data page.
 It initializes RIP, RSP, GPRs, flags, segment state, and XMM state through the
