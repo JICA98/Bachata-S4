@@ -273,10 +273,14 @@ node runtime/tests/run-ctest-with-baseline.mjs runtime/build/shadps4-host-tests
 git diff --exit-code 5623902477eacbe36b30266e673652c14de32fa8 -- runtime/scripts/build-box64-host.sh runtime/patches/box64-*.patch
 git diff --check 5623902477eacbe36b30266e673652c14de32fa8..HEAD
 ! rg -qi box64 runtime/evidence/sm8650/fex-phase0-instrumentation.txt runtime/evidence/sm8650/fex-phase0-logcat.txt runtime/evidence/sm8650/fex-phase0.json
+git -C externals/sdl3 apply --reverse --check "$(realpath runtime/patches/sdl3-winlator-x11.patch)"
+for patch in runtime/patches/box64-cxa-quick-exit.patch runtime/patches/box64-vulkan-dispatch-tile-qcom.patch runtime/patches/box64-vex-write-opcode.patch runtime/patches/box64-native-write-opcode.patch runtime/patches/box64-bachata-thread-affinity.patch; do git -C runtime/sources/box64 apply --reverse --check "$(realpath "$patch")"; done
+git -C externals/sdl3 diff --check
+git -C runtime/sources/box64 diff --check
 git status --short
 ```
 
-Expected: CTest reports 382/382 executed tests, both Git audits exit 0, evidence contains no Box64 token, and the clean worktree has only the three regenerated evidence files before their commit.
+Expected: CTest reports 382/382 executed tests, both Git audits exit 0, evidence contains no Box64 token, and the SDL3 and Box64 patch reverse-checks and whitespace checks exit 0. Before the evidence commit, parent-repository changes are only the three regenerated evidence files; `externals/sdl3` and `runtime/sources/box64` remain dirty solely because the required runtime build applies their tracked patch sets.
 
 - [ ] **Step 5: Commit fresh evidence and record Phase 0 completion**
 
