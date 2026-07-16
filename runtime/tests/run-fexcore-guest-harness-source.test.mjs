@@ -17,6 +17,8 @@ test("FEX Phase 1 runner replacement-installs and captures bounded sanitized pro
   assert.match(source, /finished_ns=\$\(date \+%s%N\)/);
   assert.match(source, /\(finished_ns - started_ns\) \/ 1000000/);
   assert.match(source, /duration_ms < 1/);
+  assert.match(source, /grep -Fq 'FAILURES!!!' "\$run_directory\/instrumentation\.raw"/);
+  assert.match(source, /instrumentation reported test failure/);
   assert.match(generator, /sha256/);
   assert.match(source, /BachataFexGuestHarness/);
   assert.doesNotMatch(source, /adb uninstall|pm clear|force-stop/i);

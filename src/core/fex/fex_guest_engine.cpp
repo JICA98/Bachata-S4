@@ -295,16 +295,18 @@ GuestCode BuildGuestCode() {
   code.insert(code.end(), {0x48, 0xba}); // mov rdx, kXorRight
   AppendImmediate(code, kXorRight);
   code.insert(code.end(), {0x48, 0x31, 0xd1}); // xor rcx, rdx
+  code.insert(code.end(), {0x49, 0x89, 0xc9}); // mov r9, rcx
   code.insert(code.end(), {0xf2, 0x0f, 0x58, 0xc1}); // addsd xmm0, xmm1
 
-  code.push_back(0xe8); // call stack_test
-  const size_t callDisplacementOffset = code.size();
-  code.resize(code.size() + sizeof(int32_t));
   code.insert(code.end(), {0x48, 0xb8}); // mov rax, bridge operation
   AppendImmediate(code, bridgeOperation);
   code.insert(code.end(), {0x48, 0xbf}); // mov rdi, bridge argument
   AppendImmediate(code, bridgeArgument);
   code.insert(code.end(), {0x0f, 0x05}); // syscall
+
+  code.push_back(0xe8); // call stack_test
+  const size_t callDisplacementOffset = code.size();
+  code.resize(code.size() + sizeof(int32_t));
   code.push_back(0xf4); // hlt
 
   const size_t stackTestOffset = code.size();
@@ -387,7 +389,7 @@ public:
     auto& state = thread->CurrentFrame->State;
     GuestRunResult result;
     result.Gpr = state.gregs[FEXCore::X86State::REG_R8] == kAddLeft + kAddRight &&
-                 state.gregs[FEXCore::X86State::REG_RCX] == (kXorLeft ^ kXorRight) &&
+                 state.gregs[FEXCore::X86State::REG_R9] == (kXorLeft ^ kXorRight) &&
                  state.gregs[FEXCore::X86State::REG_RSI] == kStackSentinel &&
                  state.gregs[FEXCore::X86State::REG_RDI] == kStackSentinel &&
                  state.gregs[FEXCore::X86State::REG_RSP] == initialRsp;

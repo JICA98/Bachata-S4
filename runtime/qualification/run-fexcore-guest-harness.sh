@@ -54,6 +54,10 @@ if [[ $instrumentation_status -ne 0 ]]; then
   echo "FEX Phase 1 runner: instrumentation failed with status $instrumentation_status" >&2
   exit "$instrumentation_status"
 fi
+if grep -Fq 'FAILURES!!!' "$run_directory/instrumentation.raw"; then
+  echo "FEX Phase 1 runner: instrumentation reported test failure" >&2
+  exit 1
+fi
 if ! grep -F -- "$marker" "$run_directory/instrumentation.raw" "$run_directory/logcat.raw" >/dev/null; then
   echo "FEX Phase 1 runner: exact guest harness marker was not captured" >&2
   exit 1
