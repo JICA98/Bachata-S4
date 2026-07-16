@@ -15,7 +15,7 @@ INSTRUMENTATION_STATUS: test=executesControlledFexGuestOnDevice
 INSTRUMENTATION_STATUS_CODE: 0
 INSTRUMENTATION_RESULT: stream=
 
-Time: 0.635
+Time: 0.612
 
 OK (1 test)
 
