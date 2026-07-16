@@ -41,6 +41,11 @@ option(ENABLE_UPDATER "Enables the options to updater" ON)
 option(ENABLE_TESTS "Build unit tests (requires GTest)" OFF)
 option(ENABLE_BACHATA_RUNTIME "Build x86-64 Android-container runtime mode" OFF)
 option(ENABLE_SYSTEM_LIBRARIES "Enable building against system libraries" OFF)
+option(ENABLE_FEX_GUEST_CPU "Build the native ARM64 FEXCore guest CPU backend" OFF)
+set(FEXCORE_GUEST_CPU_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/runtime/sources/fex" CACHE PATH
+    "Checked-out FEX source directory for the FEXCore guest CPU backend")
+set(FEXCORE_GUEST_CPU_BUILD_DIR "${CMAKE_CURRENT_SOURCE_DIR}/runtime/build/fexcore-smoke-build" CACHE PATH
+    "AArch64 FEXCore build directory for the FEXCore guest CPU backend")
 
 if (ENABLE_BACHATA_RUNTIME)
     set(ENABLE_DISCORD_RPC OFF)
@@ -69,6 +74,31 @@ if (ARCHITECTURE STREQUAL "x86_64")
     # Target x86-64-v3 CPU architecture as this is a good balance between supporting performance critical
     # instructions like AVX2 and maintaining support for older CPUs.
     add_compile_options(-march=x86-64-v3)
+endif()
+
+if (ENABLE_FEX_GUEST_CPU)
+    if (NOT ARCHITECTURE STREQUAL "arm64")
+        message(FATAL_ERROR "ENABLE_FEX_GUEST_CPU requires an ARM64 shadPS4 host")
+    endif()
+    set(FEXCORE_GUEST_CPU_LIBRARIES
+        "${FEXCORE_GUEST_CPU_BUILD_DIR}/FEXCore/Source/libFEXCore.a"
+        "${FEXCORE_GUEST_CPU_BUILD_DIR}/Source/Common/libCommon.a"
+        "${FEXCORE_GUEST_CPU_BUILD_DIR}/Source/Tools/CommonTools/libCommonTools.a"
+        "${FEXCORE_GUEST_CPU_BUILD_DIR}/FEXCore/Source/libJemallocLibs.a"
+        "${FEXCORE_GUEST_CPU_BUILD_DIR}/Source/Common/cpp-optparse/libcpp-optparse.a"
+        "${FEXCORE_GUEST_CPU_BUILD_DIR}/External/tiny-json/libtiny-json.a"
+        "${FEXCORE_GUEST_CPU_BUILD_DIR}/FEXCore/Source/libFEXCore_Base.a"
+        "${FEXCORE_GUEST_CPU_BUILD_DIR}/External/fmt/libfmt.a"
+        "${FEXCORE_GUEST_CPU_BUILD_DIR}/External/xxhash/cmake_unofficial/libxxhash.a"
+        "${FEXCORE_GUEST_CPU_BUILD_DIR}/External/cephes/libcephes_128bit.a"
+        "${FEXCORE_GUEST_CPU_BUILD_DIR}/External/SoftFloat-3e/libsoftfloat_3e.a"
+        "${FEXCORE_GUEST_CPU_BUILD_DIR}/External/rpmalloc/librpmalloc.a"
+    )
+    foreach(fex_library IN LISTS FEXCORE_GUEST_CPU_LIBRARIES)
+        if (NOT EXISTS "${fex_library}")
+            message(FATAL_ERROR "FEXCore guest CPU library is missing: ${fex_library}. Run runtime/scripts/build-fexcore-smoke-aarch64.sh first.")
+        endif()
+    endforeach()
 endif()
 
 cmake_host_system_information(RESULT PROC_INFO QUERY PROCESSOR_DESCRIPTION)
@@ -902,13 +932,15 @@ set(CORE src/core/aerolib/stubs.cpp
          ${VDEC_LIB}
          ${VR_LIBS}
          ${CAMERA_LIBS}
-         ${COMPANION_LIBS}
-         ${DEV_TOOLS}
-         src/core/debug_state.cpp
-         src/core/debug_state.h
-         src/core/debugger.cpp
-         src/core/debugger.h
-         src/core/linker.cpp
+          ${COMPANION_LIBS}
+          ${DEV_TOOLS}
+          src/core/debug_state.cpp
+          src/core/debug_state.h
+          src/core/debugger.cpp
+          src/core/debugger.h
+          src/core/guest_cpu/guest_cpu.cpp
+          src/core/guest_cpu/guest_cpu.h
+          src/core/linker.cpp
          src/core/linker.h
          src/core/memory.cpp
          src/core/memory.h
@@ -936,6 +968,20 @@ if (ARCHITECTURE STREQUAL "x86_64")
              src/core/cpu_patches.cpp
              src/core/cpu_patches.h
              ${FIBER_LIB})
+endif()
+
+if (ENABLE_FEX_GUEST_CPU)
+    list(APPEND CORE
+        src/core/fex/fex_guest_engine.cpp
+        src/core/fex/fex_guest_engine.h
+        src/core/guest_cpu/fex_guest_cpu.cpp
+        src/core/guest_cpu/fex_guest_cpu.h
+        src/core/guest_cpu/fex_hle_bridge.cpp
+        src/core/guest_cpu/fex_hle_bridge.h
+        src/core/guest_cpu/guest_callback.h
+        src/core/guest_cpu/hle_call_adapter.cpp
+        src/core/guest_cpu/hle_call_adapter.h
+    )
 endif()
 
 set(SHADER_RECOMPILER src/shader_recompiler/profile.h
@@ -1218,6 +1264,43 @@ target_link_libraries(shadps4 PRIVATE magic_enum::magic_enum fmt::fmt toml11::to
 target_link_libraries(shadps4 PRIVATE Boost::headers GPUOpen::VulkanMemoryAllocator LibAtrac9 sirit Vulkan::Headers xxHash::xxhash Zydis::Zydis glslang::glslang SDL3::SDL3 pugixml::pugixml)
 target_link_libraries(shadps4 PRIVATE stb::headers lfreist-hwinfo::hwinfo nlohmann_json::nlohmann_json miniz::miniz fdk-aac CLI11::CLI11 OpenAL::OpenAL Cpp_Httplib miniupnpc::miniupnpc)
 target_link_libraries(shadps4 PRIVATE Freetype::Freetype)
+
+if (ENABLE_FEX_GUEST_CPU)
+    target_compile_definitions(shadps4 PRIVATE SHADPS4_ENABLE_FEX_GUEST_CPU=1)
+    target_include_directories(shadps4 PRIVATE
+        "${FEXCORE_GUEST_CPU_BUILD_DIR}"
+        "${FEXCORE_GUEST_CPU_SOURCE_DIR}"
+        "${FEXCORE_GUEST_CPU_SOURCE_DIR}/Source"
+        "${FEXCORE_GUEST_CPU_BUILD_DIR}/Source"
+        "${FEXCORE_GUEST_CPU_BUILD_DIR}/generated"
+        "${FEXCORE_GUEST_CPU_SOURCE_DIR}/Source/Tools/CommonTools"
+        "${FEXCORE_GUEST_CPU_BUILD_DIR}/FEXCore/Source"
+        "${FEXCORE_GUEST_CPU_SOURCE_DIR}/FEXCore/include"
+        "${FEXCORE_GUEST_CPU_BUILD_DIR}/include"
+        "${FEXCORE_GUEST_CPU_SOURCE_DIR}/External/unordered_dense/include"
+        "${FEXCORE_GUEST_CPU_SOURCE_DIR}/External/fmt/include"
+        "${FEXCORE_GUEST_CPU_SOURCE_DIR}/External/xxhash/cmake_unofficial/.."
+        "${FEXCORE_GUEST_CPU_SOURCE_DIR}/FEXHeaderUtils/."
+        "${FEXCORE_GUEST_CPU_SOURCE_DIR}/CodeEmitter/."
+        "${FEXCORE_GUEST_CPU_SOURCE_DIR}/External/cephes/include"
+        "${FEXCORE_GUEST_CPU_SOURCE_DIR}/External/SoftFloat-3e/include"
+        "${FEXCORE_GUEST_CPU_SOURCE_DIR}/External/SoftFloat-3e/include/SoftFloat-3e"
+        "${FEXCORE_GUEST_CPU_SOURCE_DIR}/Source/Common/cpp-optparse"
+        "${FEXCORE_GUEST_CPU_SOURCE_DIR}/External/tiny-json"
+        "${FEXCORE_GUEST_CPU_SOURCE_DIR}/External/range-v3/include"
+        "${FEXCORE_GUEST_CPU_SOURCE_DIR}/External/rpmalloc"
+    )
+    target_compile_definitions(shadps4 PRIVATE
+        FEXCORE_HAS_PRESERVE_ALL_ATTR=1
+        FEX_DISABLE_TELEMETRY=1
+        FEX_HAS_PRESERVE_ALL_ATTR=1
+    )
+    target_compile_options(shadps4 PRIVATE
+        "-DFEXCORE_PRESERVE_ALL_ATTR=__attribute__((preserve_all))"
+        "-DFEX_PRESERVE_ALL_ATTR=__attribute__((preserve_all))"
+    )
+    target_link_libraries(shadps4 PRIVATE ${FEXCORE_GUEST_CPU_LIBRARIES} pthread dl)
+endif()
 
 if (${CMAKE_SYSTEM_NAME} STREQUAL "FreeBSD")
     target_link_libraries(shadps4 PRIVATE "/usr/lib/libusb.so")

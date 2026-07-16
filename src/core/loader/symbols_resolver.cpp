@@ -8,11 +8,62 @@
 #include "core/aerolib/aerolib.h"
 #include "core/loader/symbols_resolver.h"
 
+#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU
+#include "core/guest_cpu/hle_call_adapter.h"
+#endif
+
 namespace Core::Loader {
+
+SymbolsResolver::SymbolsResolver() = default;
+SymbolsResolver::~SymbolsResolver() = default;
 
 void SymbolsResolver::AddSymbol(const SymbolResolver& s, u64 virtual_addr) {
     m_symbols.emplace_back(GenerateName(s), s.nidName, virtual_addr);
 }
+
+#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU
+void SymbolsResolver::AddFunction(const SymbolResolver& s,
+                                  std::shared_ptr<GuestCpu::HleCallAdapter> adapter) {
+    if (adapter == nullptr) {
+        return;
+    }
+    const std::string name = GenerateName(s);
+    adapter = GetHleCallRegistry().Register(std::move(adapter), name);
+    if (adapter == nullptr) {
+        return;
+    }
+    m_symbols.emplace_back(name, s.nidName, 0, std::move(adapter));
+}
+
+const std::shared_ptr<GuestCpu::HleCallAdapter>&
+SymbolsResolver::AddUnsupportedFunction(const SymbolResolver& s) {
+    const std::string name = GenerateName(s);
+    for (const auto& record : m_symbols) {
+        if (record.name == name && record.hle_adapter != nullptr) {
+            return record.hle_adapter;
+        }
+    }
+    AddFunction(s, GuestCpu::MakeUnsupportedHleCallAdapter());
+    ASSERT_MSG(!m_symbols.empty() && m_symbols.back().name == name &&
+                   m_symbols.back().hle_adapter != nullptr,
+               "Unable to register unsupported HLE function {}", name);
+    return m_symbols.back().hle_adapter;
+}
+
+std::shared_ptr<GuestCpu::HleCallAdapter> SymbolsResolver::FindFunction(u64 operation) const {
+    if (hle_registry == nullptr) {
+        return {};
+    }
+    return hle_registry->Find(operation);
+}
+
+GuestCpu::HleCallRegistry& SymbolsResolver::GetHleCallRegistry() {
+    if (hle_registry == nullptr) {
+        hle_registry = std::make_unique<GuestCpu::HleCallRegistry>();
+    }
+    return *hle_registry;
+}
+#endif
 
 std::string SymbolsResolver::GenerateName(const SymbolResolver& s) {
     return fmt::format("{}#{}#{}#{}#{}", s.name, s.library, s.library_version, s.module,

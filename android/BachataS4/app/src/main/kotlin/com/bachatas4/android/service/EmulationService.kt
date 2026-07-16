@@ -25,6 +25,7 @@ import com.bachatas4.android.runtime.input.ControllerSnapshot
 import com.bachatas4.android.runtime.process.RuntimeProcessHandle
 import com.bachatas4.android.runtime.process.RuntimeProcessLauncher
 import com.bachatas4.android.runtime.process.RuntimeProcessRequest
+import com.bachatas4.android.runtime.process.RuntimeGuestBackend
 import com.bachatas4.android.runtime.process.RuntimeVulkanDriver
 import com.bachatas4.android.runtime.process.VulkanDriverConfiguration
 import dagger.hilt.android.AndroidEntryPoint
@@ -162,24 +163,37 @@ class EmulationService : Service() {
                 installedRuntime,
                 filesDir.toPath(),
             )
+            val guestBackend = launchProfileProvider.guestBackend(gameId)
+            sessionLog.info("Runtime", "guestBackend=${guestBackend.name.lowercase()}")
             sessionLog.info("Vulkan", "driver=${launchProfile.driverId} box64Mode=${driverConfiguration.box64Mode}")
             val runtimeHome = filesDir.toPath().resolve("runtime-home")
             ShadPs4ConfigManager.write(runtimeHome, launchProfile)
             sessionLog.info("Vulkan", "persistent pipeline cache enabled home=$runtimeHome")
+            val backendEnvironment = if (guestBackend == RuntimeGuestBackend.BOX64) {
+                launchProfileProvider.box64Environment(launchProfile)
+            } else {
+                emptyMap()
+            }
             val environment = runtimeEnvironment(installedRuntime, runtimeHome, socketRoot, xServer.display) +
-                driverConfiguration.environment + launchProfileProvider.box64Environment(launchProfile)
+                driverConfiguration.environment + backendEnvironment
+            val shadPs4Executable = if (guestBackend == RuntimeGuestBackend.FEX) {
+                installedRuntime.resolve("host/shadps4-arm64-fex")
+            } else {
+                installedRuntime.resolve("bin/shadps4")
+            }
             process = RuntimeProcessLauncher().launch(
                 RuntimeProcessRequest(
                     nativeLibraryDir = nativeLibraryDir,
                     runtimeRoot = installedRuntime,
                     overrideRoot = gameRoot.toPath(),
                     storageRoot = filesDir.toPath(),
-                    shadPs4Executable = installedRuntime.resolve("bin/shadps4"),
+                    shadPs4Executable = shadPs4Executable,
                     socketPath = controlFile.path,
                     environment = environment,
                     arguments = listOf("-g", eboot.path),
                     outputPath = outputFile.toPath(),
                     box64Mode = driverConfiguration.box64Mode,
+                    guestBackend = guestBackend,
                 ),
             )
             sessionLog.info("Runtime", "backend process launched")

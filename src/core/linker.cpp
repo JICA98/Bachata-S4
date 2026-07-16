@@ -8,12 +8,18 @@
 #include "common/logging/formatter.h"
 #include "common/logging/log.h"
 #include "common/path_util.h"
+#include "common/singleton.h"
 #include "common/string_util.h"
 #include "common/thread.h"
 #include "core/aerolib/aerolib.h"
 #include "core/aerolib/stubs.h"
 #include "core/devtools/widget/module_list.h"
 #include "core/emulator_settings.h"
+#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU
+#include "core/guest_cpu/fex_guest_cpu.h"
+#include "core/guest_cpu/fex_hle_bridge.h"
+#include "core/guest_cpu/hle_call_adapter.h"
+#endif
 #include "core/libraries/kernel/kernel.h"
 #include "core/libraries/kernel/memory.h"
 #include "core/libraries/kernel/threads.h"
@@ -32,6 +38,56 @@ namespace Core {
 static PS4_SYSV_ABI void ProgramExitFunc() {
     LOG_ERROR(Core_Linker, "Exit function called");
 }
+
+#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU
+static bool ValidateGuestMemory(void* context, std::uintptr_t address, std::size_t size,
+                                bool writable) {
+    if (context == nullptr || address == 0 || size == 0 || address > UINTPTR_MAX - size) {
+        return false;
+    }
+    auto* memory = static_cast<MemoryManager*>(context);
+    const auto end = address + size;
+    auto cursor = address;
+    while (cursor < end) {
+        void* range_start{};
+        void* range_end{};
+        u32 protection{};
+        if (memory->QueryProtection(cursor, &range_start, &range_end, &protection) != ORBIS_OK) {
+            return false;
+        }
+        const auto mapped_end = reinterpret_cast<std::uintptr_t>(range_end);
+        const auto required = static_cast<u32>(MemoryProt::CpuRead) |
+                              (writable ? static_cast<u32>(MemoryProt::CpuWrite) : 0);
+        if (mapped_end <= cursor || (protection & required) != required) {
+            return false;
+        }
+        cursor = std::min(end, mapped_end);
+    }
+    return true;
+}
+
+static std::optional<GuestExecutionRange> QueryGuestExecutableMemory(void* context,
+                                                                     std::uintptr_t address) {
+    if (context == nullptr || address == 0) return std::nullopt;
+    auto* memory = static_cast<MemoryManager*>(context);
+    void* range_start{};
+    void* range_end{};
+    u32 protection{};
+    if (memory->QueryProtection(address, &range_start, &range_end, &protection) != ORBIS_OK ||
+        (protection & static_cast<u32>(MemoryProt::CpuExec)) == 0 ||
+        (protection & static_cast<u32>(MemoryProt::CpuWrite)) != 0) {
+        return std::nullopt;
+    }
+    const auto begin = reinterpret_cast<std::uintptr_t>(range_start);
+    const auto end = reinterpret_cast<std::uintptr_t>(range_end);
+    if (begin == 0 || end <= begin) return std::nullopt;
+    return GuestExecutionRange{begin, end - begin, true, false};
+}
+
+static void ReportGuestHleFailure(void*, const GuestCpu::HleCallFailure& failure) {
+    LOG_ERROR(Core_Linker, "FEX HLE call {} failed: {}", failure.name, failure.error);
+}
+#endif
 
 static PS4_SYSV_ABI void* RunMainEntry [[noreturn]] (EntryParams* params) {
 #ifdef ARCH_X86_64
@@ -55,13 +111,306 @@ static PS4_SYSV_ABI void* RunMainEntry [[noreturn]] (EntryParams* params) {
                  : "rax", "rsi", "rdi");
     UNREACHABLE();
 #else
-    UNREACHABLE_MSG("RunMainEntry unimplemented for current architecture.");
+#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU
+    auto* linker = Common::Singleton<Linker>::Instance();
+    const auto result = linker->RunGuestMain(params);
+    if (const auto* failure = std::get_if<GuestExecutionFailure>(&result)) {
+        LOG_CRITICAL(Core_Linker, "FEX main entry failed at stage {}: {}",
+                     static_cast<int>(failure->Stage), failure->Error);
+    } else {
+        LOG_CRITICAL(Core_Linker, "FEX main entry returned unexpectedly with {:#x}",
+                     std::get<u64>(result));
+    }
+    std::abort();
+#else
+    UNREACHABLE_MSG("RunMainEntry requires an x86-64 host or FEX guest CPU support.");
+#endif
 #endif
 }
 
-Linker::Linker() : memory{Memory::Instance()} {}
+Linker::Linker() : memory{Memory::Instance()} {
+#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU
+    m_hle_veneers = std::make_unique<GuestCpu::HleVeneerAllocator>();
+#endif
+}
 
 Linker::~Linker() = default;
+
+#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU
+namespace {
+
+constexpr std::size_t FexTemporaryStackSize = 1_MB;
+
+class GuestStackMapping final {
+public:
+    GuestStackMapping(MemoryManager& memory_, std::size_t size_, std::string_view name)
+        : memory{memory_}, size{size_} {
+        void* mapped{};
+        const auto result = memory.MapMemory(&mapped, 0, size, MemoryProt::CpuReadWrite,
+                                             MemoryMapFlags::NoFlags, VMAType::Stack, name);
+        if (result == ORBIS_OK) {
+            base = reinterpret_cast<VAddr>(mapped);
+        } else {
+            error = result;
+        }
+    }
+
+    GuestStackMapping(const GuestStackMapping&) = delete;
+    GuestStackMapping& operator=(const GuestStackMapping&) = delete;
+
+    ~GuestStackMapping() {
+        if (base != 0) {
+            const auto result = memory.UnmapMemory(base, size);
+            if (result != ORBIS_OK) {
+                LOG_ERROR(Core_Linker, "Unable to unmap FEX guest stack {:#x}: {}", base,
+                          result);
+            }
+        }
+    }
+
+    bool IsValid() const {
+        return base != 0;
+    }
+
+    VAddr Top() const {
+        return base + size;
+    }
+
+    int Error() const {
+        return error;
+    }
+
+private:
+    MemoryManager& memory;
+    std::size_t size;
+    VAddr base{};
+    int error{};
+};
+
+std::optional<GuestExecutionRange> QueryGuestMemoryRange(MemoryManager& memory,
+                                                         std::uintptr_t address,
+                                                         bool executable, bool writable) {
+    void* range_start{};
+    void* range_end{};
+    u32 protection{};
+    if (memory.QueryProtection(address, &range_start, &range_end, &protection) != ORBIS_OK) {
+        return std::nullopt;
+    }
+    if (executable && ((protection & static_cast<u32>(MemoryProt::CpuExec)) == 0 ||
+                       (protection & static_cast<u32>(MemoryProt::CpuWrite)) != 0)) {
+        return std::nullopt;
+    }
+    if (writable && ((protection & static_cast<u32>(MemoryProt::CpuWrite)) == 0 ||
+                     (protection & static_cast<u32>(MemoryProt::CpuExec)) != 0)) {
+        return std::nullopt;
+    }
+    const auto begin = reinterpret_cast<std::uintptr_t>(range_start);
+    const auto end = reinterpret_cast<std::uintptr_t>(range_end);
+    if (begin == 0 || end <= begin) return std::nullopt;
+    return GuestExecutionRange{begin, end - begin, executable, writable};
+}
+
+std::optional<GuestExecutionFailure> NormalizeGuestRanges(
+    std::vector<GuestExecutionRange>& ranges) {
+    std::ranges::sort(ranges, {}, &GuestExecutionRange::Begin);
+    for (std::size_t index = 0; index < ranges.size(); ++index) {
+        const auto& range = ranges[index];
+        if (range.Begin == 0 || range.Size == 0 || range.Begin + range.Size < range.Begin) {
+            return GuestExecutionFailure{GuestExecutionStage::Mapping, EINVAL};
+        }
+        if (index != 0) {
+            const auto& previous = ranges[index - 1];
+            if (previous.Begin + previous.Size > range.Begin) {
+                return GuestExecutionFailure{GuestExecutionStage::Mapping, EACCES};
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+void SetGuestIntegerArguments(GuestExecutionRequest& request,
+                              std::span<const u64> arguments) {
+    constexpr std::array<std::size_t, 6> registers{7, 6, 2, 1, 8, 9};
+    const auto count = std::min(arguments.size(), registers.size());
+    for (std::size_t index = 0; index < count; ++index) {
+        request.Gpr[registers[index]] = arguments[index];
+    }
+}
+
+} // namespace
+
+std::optional<GuestExecutionFailure> Linker::InitializeFexRuntime() {
+    std::scoped_lock lock{m_fex_runtime_mutex};
+    if (m_fex_backend != nullptr) return std::nullopt;
+
+    auto& registry = m_hle_symbols.GetHleCallRegistry();
+    if (m_fex_exit_veneer == 0) {
+        const auto adapter = registry.Register(GuestCpu::MakeHleCallAdapter(ProgramExitFunc),
+                                               "bachata.program_exit");
+        if (adapter == nullptr) {
+            return GuestExecutionFailure{GuestExecutionStage::Execute, EIO};
+        }
+        const auto veneer = m_hle_veneers->Allocate(*adapter);
+        if (const auto* failure = std::get_if<GuestCpu::HleVeneerFailure>(&veneer)) {
+            return GuestExecutionFailure{GuestExecutionStage::Mapping, failure->error};
+        }
+        m_fex_exit_veneer = std::get<u64>(veneer);
+    }
+
+    m_fex_bridge = std::make_unique<GuestCpu::HleGuestBridge>(
+        registry, ValidateGuestMemory, memory, ReportGuestHleFailure, nullptr,
+        QueryGuestExecutableMemory, memory);
+    auto backend = FexGuestCpuBackend::Create(*m_fex_bridge);
+    if (const auto* failure = std::get_if<GuestExecutionFailure>(&backend)) {
+        m_fex_bridge.reset();
+        return *failure;
+    }
+    m_fex_backend =
+        std::move(std::get<std::unique_ptr<FexGuestCpuBackend>>(backend));
+    return std::nullopt;
+}
+
+Linker::GuestFunctionResult Linker::RunGuestFunction(VAddr entry,
+                                                      std::span<const u64> arguments,
+                                                      VAddr stack_top) {
+    if (const auto failure = InitializeFexRuntime()) return *failure;
+
+    auto nested = m_fex_backend->CallGuest(entry, arguments);
+    if (const auto* state = std::get_if<GuestExecutionState>(&nested)) {
+        return state->Gpr[0];
+    }
+    const auto nestedFailure = std::get<GuestExecutionFailure>(nested);
+    if (nestedFailure.Stage != GuestExecutionStage::Thread || nestedFailure.Error != ENXIO) {
+        return nestedFailure;
+    }
+
+    std::optional<GuestStackMapping> temporaryStack;
+    if (stack_top == 0) {
+        temporaryStack.emplace(*memory, FexTemporaryStackSize, "FEX guest call stack");
+        if (!temporaryStack->IsValid()) {
+            return GuestExecutionFailure{GuestExecutionStage::Mapping,
+                                         temporaryStack->Error() == 0 ? ENOMEM
+                                                                      : temporaryStack->Error()};
+        }
+        stack_top = temporaryStack->Top();
+    }
+    if (arguments.size() > 32 || stack_top < 0x1000) {
+        return GuestExecutionFailure{GuestExecutionStage::Request, E2BIG};
+    }
+
+    const auto stackArgumentBytes =
+        (arguments.size() > 6 ? arguments.size() - 6 : 0) * sizeof(u64);
+    if (stack_top < stackArgumentBytes + sizeof(u64)) {
+        return GuestExecutionFailure{GuestExecutionStage::Request, EOVERFLOW};
+    }
+    const auto argumentTop = Common::AlignDown(stack_top - stackArgumentBytes, 16ULL);
+    const auto rsp = argumentTop - sizeof(u64);
+    const auto returnAddress = m_fex_backend->ReturnAddress();
+    if (!ValidateGuestMemory(memory, rsp, sizeof(u64) + stackArgumentBytes, true) ||
+        returnAddress == 0) {
+        return GuestExecutionFailure{GuestExecutionStage::Mapping, EFAULT};
+    }
+    std::memcpy(reinterpret_cast<void*>(rsp), &returnAddress, sizeof(returnAddress));
+    for (std::size_t index = 6; index < arguments.size(); ++index) {
+        std::memcpy(reinterpret_cast<void*>(rsp + sizeof(u64) * (index - 5)),
+                    &arguments[index], sizeof(u64));
+    }
+
+    const auto codeRange = QueryGuestMemoryRange(*memory, entry, true, false);
+    const auto stackRange = QueryGuestMemoryRange(*memory, rsp, false, true);
+    if (!codeRange || !stackRange) {
+        return GuestExecutionFailure{GuestExecutionStage::Mapping, EFAULT};
+    }
+
+    GuestExecutionRequest request;
+    request.Rip = entry;
+    request.Rsp = rsp;
+    request.Rflags = 1U << 1;
+    request.GsBase = reinterpret_cast<std::uintptr_t>(GetTcbBase());
+    SetGuestIntegerArguments(request, arguments);
+    request.MappedRanges = {*codeRange, *stackRange, m_fex_backend->ReturnRange(),
+                            m_fex_backend->CallbackReturnRange()};
+    const auto veneerRanges = m_hle_veneers->GetExecutableRanges();
+    request.MappedRanges.insert(request.MappedRanges.end(), veneerRanges.begin(),
+                                veneerRanges.end());
+    if (const auto failure = NormalizeGuestRanges(request.MappedRanges)) return *failure;
+
+    const auto result = m_fex_backend->Run(request);
+    if (const auto* failure = std::get_if<GuestExecutionFailure>(&result)) return *failure;
+    const auto& state = std::get<GuestExecutionState>(result);
+    if (state.StopReason != GuestStopReason::Halted ||
+        state.Rip < returnAddress || state.Rip >= returnAddress + 0x1000) {
+        return GuestExecutionFailure{GuestExecutionStage::Execute, EPROTO};
+    }
+    return state.Gpr[0];
+}
+
+Linker::GuestFunctionResult Linker::RunGuestMain(EntryParams* params) {
+    if (params == nullptr || params->entry_addr == 0 || params->argc < 0 || params->argc > 33) {
+        return GuestExecutionFailure{GuestExecutionStage::Request, EINVAL};
+    }
+    if (const auto failure = InitializeFexRuntime()) return *failure;
+
+    std::size_t stackSize = FexTemporaryStackSize;
+    if (const auto* proc = GetProcParam(); proc != nullptr && proc->main_thread_stack_size != nullptr) {
+        stackSize = std::clamp<std::size_t>(*proc->main_thread_stack_size, 64_KB, 64_MB);
+        stackSize = Common::AlignUp(stackSize, 16_KB);
+    }
+    GuestStackMapping stack{*memory, stackSize, "FEX main guest stack"};
+    if (!stack.IsValid()) {
+        return GuestExecutionFailure{GuestExecutionStage::Mapping,
+                                     stack.Error() == 0 ? ENOMEM : stack.Error()};
+    }
+
+    EntryParams guestParams = *params;
+    auto cursor = stack.Top();
+    for (int index = params->argc - 1; index >= 0; --index) {
+        if (params->argv[index] == nullptr) {
+            guestParams.argv[index] = nullptr;
+            continue;
+        }
+        const auto length = std::strlen(params->argv[index]) + 1;
+        if (cursor < length) {
+            return GuestExecutionFailure{GuestExecutionStage::Mapping, EOVERFLOW};
+        }
+        cursor -= length;
+        std::memcpy(reinterpret_cast<void*>(cursor), params->argv[index], length);
+        guestParams.argv[index] = reinterpret_cast<const char*>(cursor);
+    }
+    cursor = Common::AlignDown(cursor - sizeof(EntryParams), 16ULL);
+    std::memcpy(reinterpret_cast<void*>(cursor), &guestParams, sizeof(guestParams));
+    const auto guestParamsAddress = cursor;
+    if (cursor < 24) {
+        return GuestExecutionFailure{GuestExecutionStage::Mapping, EOVERFLOW};
+    }
+    const auto rsp = Common::AlignDown(cursor - 24, 16ULL) + 8;
+    std::memcpy(reinterpret_cast<void*>(rsp), &guestParams, 16);
+
+    const auto codeRange = QueryGuestMemoryRange(*memory, params->entry_addr, true, false);
+    const auto stackRange = QueryGuestMemoryRange(*memory, rsp, false, true);
+    if (!codeRange || !stackRange) {
+        return GuestExecutionFailure{GuestExecutionStage::Mapping, EFAULT};
+    }
+
+    GuestExecutionRequest request;
+    request.Rip = params->entry_addr;
+    request.Rsp = rsp;
+    request.Rflags = 1U << 1;
+    request.Gpr[7] = guestParamsAddress;
+    request.Gpr[6] = m_fex_exit_veneer;
+    request.GsBase = reinterpret_cast<std::uintptr_t>(GetTcbBase());
+    request.MappedRanges = {*codeRange, *stackRange, m_fex_backend->ReturnRange(),
+                            m_fex_backend->CallbackReturnRange()};
+    const auto veneerRanges = m_hle_veneers->GetExecutableRanges();
+    request.MappedRanges.insert(request.MappedRanges.end(), veneerRanges.begin(),
+                                veneerRanges.end());
+    if (const auto failure = NormalizeGuestRanges(request.MappedRanges)) return *failure;
+
+    const auto result = m_fex_backend->Run(request);
+    if (const auto* failure = std::get_if<GuestExecutionFailure>(&result)) return *failure;
+    return std::get<GuestExecutionState>(result).Gpr[0];
+}
+#endif
 
 void Linker::Execute(const std::vector<std::string>& args) {
     if (EmulatorSettings.IsDebugDump()) {
@@ -311,8 +660,23 @@ void Linker::Relocate(Module* module) {
             default:
                 UNREACHABLE_MSG("Unknown bind type {}", sym_bind);
             }
+#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU
+            if (rel_sym_type == Loader::SymbolType::Function && symrec.hle_adapter != nullptr) {
+                if (m_hle_veneers == nullptr) {
+                    m_hle_veneers = std::make_unique<GuestCpu::HleVeneerAllocator>();
+                }
+                const auto veneer = m_hle_veneers->Allocate(*symrec.hle_adapter);
+                if (const auto* failure = std::get_if<GuestCpu::HleVeneerFailure>(&veneer)) {
+                    LOG_ERROR(Core_Linker, "Unable to allocate FEX HLE veneer for {}: {}", symrec.name,
+                              failure->error);
+                } else {
+                    symbol_virtual_addr = std::get<u64>(veneer);
+                }
+            }
+#endif
             rel_is_resolved = (symbol_virtual_addr != 0);
-            rel_value = (rel_is_resolved ? symbol_virtual_addr + addend : 0);
+            const u64 resolved_base = rel_is_resolved ? symbol_virtual_addr : 0;
+            rel_value = resolved_base + addend;
             rel_name = symrec.name;
             break;
         }
@@ -376,6 +740,14 @@ bool Linker::Resolve(const std::string& name, Loader::SymbolType sym_type, Modul
     if (sym_type == Loader::SymbolType::Object) {
         return_info->name = aeronid ? aeronid->name : "Unknown object";
         return_info->virtual_address = 0;
+#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU
+    } else if (sym_type == Loader::SymbolType::Function) {
+        return_info->name = aeronid ? aeronid->name : "Unknown function";
+        return_info->virtual_address = 0;
+        return_info->hle_adapter = m_hle_symbols.AddUnsupportedFunction(sr);
+        LOG_WARNING(Core_Linker, "FEX: unresolved HLE {} will return ENOSYS", return_info->name);
+        return true;
+#endif
     } else if (aeronid) {
         return_info->name = aeronid->name;
         return_info->virtual_address = AeroLib::GetStub(aeronid->nid);

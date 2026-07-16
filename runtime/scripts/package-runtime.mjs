@@ -153,6 +153,7 @@ const projectRoot = resolve(scriptDir, "../..");
 const rootfs = resolve(projectRoot, "runtime/build/rootfs");
 const stagedRoot = resolve(projectRoot, "runtime/build/staged");
 const shadps4Stage = resolve(projectRoot, "runtime/build/shadps4-stage");
+const shadps4Arm64Stage = resolve(projectRoot, "runtime/build/shadps4-arm64-stage");
 const hostBox64Binary = resolve(projectRoot, "runtime/build/box64-host-stage/box64");
 const hostFexcoreSmoke = join(rootfs, "host/fexcore-smoke");
 const outputDir = resolve(process.argv[2] ?? resolve(projectRoot, "android/BachataS4/app/src/main/assets/runtime"));
@@ -236,6 +237,8 @@ if (existsSync(`${vulkanLibs}/libvulkan.so`) || existsSync("/usr/lib/x86_64-linu
 // Copy source-built binaries
 const shadps4Binary = join(shadps4Stage, "bin/shadps4");
 const shadps4Needed = join(shadps4Stage, "needed.txt");
+const shadps4Arm64Binary = join(shadps4Arm64Stage, "bin/shadps4-arm64");
+const shadps4Arm64Needed = join(shadps4Arm64Stage, "needed.txt");
 if (!existsSync(shadps4Binary)) fail(`shadPS4 not built: ${shadps4Binary}`);
 copy(shadps4Binary, join(rootfs, "bin/shadps4"), 0o755);
 
@@ -250,6 +253,18 @@ if (existsSync(shadps4Needed)) {
       : join(guestLibDir, lib);
     if (!existsSync(expected)) fail(`Missing shadPS4 dep: ${lib}`);
   }
+}
+
+if (!existsSync(shadps4Arm64Binary)) {
+  fail(`ARM64 FEX shadPS4 not built: ${shadps4Arm64Binary}`);
+}
+copy(shadps4Arm64Binary, join(hostDir, "shadps4-arm64-fex"), 0o755);
+if (!existsSync(shadps4Arm64Needed)) {
+  fail(`ARM64 FEX shadPS4 dependency list missing: ${shadps4Arm64Needed}`);
+}
+copyFileSync(shadps4Arm64Needed, join(provDir, "shadps4-arm64-fex-needed.txt"));
+for (const lib of readFileSync(shadps4Arm64Needed, "utf8").trim().split("\n")) {
+  if (!existsSync(join(hostDir, lib))) fail(`Missing ARM64 FEX shadPS4 dep: ${lib}`);
 }
 
 copy(hostBox64Binary, join(hostDir, "box64"), 0o755);

@@ -11,6 +11,7 @@ import com.bachatas4.android.runtime.settings.SettingKind
 import com.bachatas4.android.runtime.settings.ValueSource
 import com.bachatas4.android.runtime.driver.DriverRegistry
 import com.bachatas4.android.runtime.process.RuntimeVulkanDriver
+import com.bachatas4.android.runtime.process.RuntimeGuestBackend
 import com.bachatas4.android.runtime.process.VulkanDriverConfiguration
 import java.nio.file.Path
 import javax.inject.Inject
@@ -56,6 +57,13 @@ class RuntimeLaunchProfileProvider internal constructor(
     fun explicitSettingIds(profile: ResolvedRuntimeProfile): List<String> =
         profile.settings.values.filter { it.source != ValueSource.DEFAULT }.map { it.spec.id }.sorted()
 
+    fun guestBackend(gameId: String): RuntimeGuestBackend =
+        if (gameId.equals(FEX_SONIC_GAME_ID, ignoreCase = true)) {
+            RuntimeGuestBackend.FEX
+        } else {
+            RuntimeGuestBackend.BOX64
+        }
+
     fun vulkanConfiguration(profile: ResolvedRuntimeProfile, runtimeRoot: Path, filesDir: Path): VulkanDriverConfiguration {
         if (profile.driverId == "system") return VulkanDriverConfiguration.resolve(RuntimeVulkanDriver.SYSTEM, runtimeRoot)
         val driver = DriverRegistry(filesDir.resolve("vulkan-drivers/installed")).resolve(profile.driverId)
@@ -64,6 +72,8 @@ class RuntimeLaunchProfileProvider internal constructor(
     }
 
     private companion object {
+        const val FEX_SONIC_GAME_ID = "CUSA07023"
+
         fun androidCompatibilityConstraints() = mapOf(
             "general.dev_kit_mode" to CompatibilityConstraint(
                 JsonPrimitive(false),

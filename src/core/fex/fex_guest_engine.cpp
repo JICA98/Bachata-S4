@@ -2,6 +2,7 @@
 
 #include "fex_guest_engine.h"
 
+
 #include "Common/Config.h"
 #include "Common/HostFeatures.h"
 #include <FEXCore/Config/Config.h>
@@ -16,13 +17,21 @@
 #include <unistd.h>
 
 #include <array>
+#include <algorithm>
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
+#include <cstdio>
+#include <fstream>
 #include <limits>
 #include <mutex>
 #include <optional>
+#include <shared_mutex>
+#include <string>
 #include <thread>
+#include <tuple>
+#include <unordered_map>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -44,6 +53,108 @@ constexpr uint64_t kInvalidationUpdated = 0xfedc'ba98'7654'3210ULL;
 EngineFailure Failure(EngineStage stage, int error) {
   return {stage, error == 0 ? EIO : error};
 }
+
+bool Contains(const GuestExecutionRange& range, std::uintptr_t address, std::size_t size) {
+  if (range.Begin == 0 || range.Size == 0 || size == 0 || address < range.Begin) {
+    return false;
+  }
+  const auto rangeEnd = range.Begin + range.Size;
+  const auto addressEnd = address + size;
+  return rangeEnd >= range.Begin && addressEnd >= address && addressEnd <= rangeEnd;
+}
+
+bool RangesOverlap(const GuestExecutionRange& lhs, const GuestExecutionRange& rhs) {
+  const auto lhsEnd = lhs.Begin + lhs.Size;
+  const auto rhsEnd = rhs.Begin + rhs.Size;
+  return lhsEnd >= lhs.Begin && rhsEnd >= rhs.Begin && lhs.Begin < rhsEnd && rhs.Begin < lhsEnd;
+}
+
+EngineResult<bool> ValidateHostMapping(const GuestExecutionRange& range) {
+  std::ifstream maps {"/proc/self/maps"};
+  if (!maps.is_open()) return Failure(EngineStage::Mapping, errno == 0 ? EACCES : errno);
+
+  const auto rangeEnd = range.Begin + range.Size;
+  std::uintptr_t covered = range.Begin;
+  std::string line;
+  while (std::getline(maps, line)) {
+    unsigned long mapBegin {};
+    unsigned long mapEnd {};
+    char permissions[5] {};
+    if (std::sscanf(line.c_str(), "%lx-%lx %4s", &mapBegin, &mapEnd, permissions) != 3) continue;
+    const auto begin = static_cast<std::uintptr_t>(mapBegin);
+    const auto end = static_cast<std::uintptr_t>(mapEnd);
+    if (end <= covered) continue;
+    if (begin > covered) break;
+    if (range.Executable && (permissions[2] != 'x' || permissions[1] == 'w')) {
+      return Failure(EngineStage::Mapping, EACCES);
+    }
+    if (range.Writable && (permissions[1] != 'w' || permissions[2] == 'x')) {
+      return Failure(EngineStage::Mapping, EACCES);
+    }
+    covered = std::min(end, rangeEnd);
+    if (covered == rangeEnd) return true;
+  }
+  return Failure(EngineStage::Mapping, EFAULT);
+}
+
+EngineResult<bool> ValidateRequest(const GuestExecutionRequest& request) {
+  if (request.Rip == 0 || request.Rsp == 0 || request.MappedRanges.empty()) {
+    return Failure(EngineStage::Request, EINVAL);
+  }
+
+  bool executableRip = false;
+  bool writableStack = false;
+  for (size_t index = 0; index < request.MappedRanges.size(); ++index) {
+    const auto& range = request.MappedRanges[index];
+    if (range.Begin == 0 || range.Size == 0 || range.Begin % kRequiredPageSize != 0 ||
+        range.Size % kRequiredPageSize != 0 || range.Begin + range.Size < range.Begin) {
+      return Failure(EngineStage::Request, EINVAL);
+    }
+    if (range.Executable && range.Writable) {
+      return Failure(EngineStage::Mapping, EACCES);
+    }
+    for (size_t previous = 0; previous < index; ++previous) {
+      if (RangesOverlap(range, request.MappedRanges[previous])) {
+        return Failure(EngineStage::Mapping, EACCES);
+      }
+    }
+    const auto hostMapping = ValidateHostMapping(range);
+    if (const auto* failure = std::get_if<EngineFailure>(&hostMapping)) return *failure;
+    executableRip |= range.Executable && Contains(range, request.Rip, 1);
+    writableStack |= range.Writable && Contains(range, request.Rsp, 1);
+  }
+  if (!executableRip || !writableStack) {
+    return Failure(EngineStage::Request, EFAULT);
+  }
+  return true;
+}
+
+class FexConfigLease final {
+public:
+  static EngineResult<bool> Acquire() {
+    std::scoped_lock lock {Mutex};
+    if (Users == 0) {
+      FEX::Config::InitializeConfigs(FEX::Config::PortableInformation {});
+      FEXCore::Config::Initialize();
+      FEXCore::Config::Load();
+      FEXCore::Config::Set(FEXCore::Config::CONFIG_IS64BIT_MODE, "1");
+      FEXCore::Config::Set(FEXCore::Config::CONFIG_DISABLETELEMETRY, "1");
+    }
+    ++Users;
+    return true;
+  }
+
+  static EngineResult<bool> Release() {
+    std::scoped_lock lock {Mutex};
+    if (Users == 0) return Failure(EngineStage::Teardown, EINVAL);
+    if (--Users == 0) FEXCore::Config::Shutdown();
+    return true;
+  }
+
+private:
+  static inline std::mutex Mutex;
+  static inline size_t Users {};
+};
 
 class Mapping final {
 public:
@@ -191,40 +302,164 @@ public:
     return CallbackReturn;
   }
 
+  void SetThunkCallbackRET(uintptr_t callbackReturn) {
+    CallbackReturn = callbackReturn;
+  }
+
 private:
   uintptr_t CallbackReturn;
 };
 
+class CallbackReturnScope final {
+public:
+  CallbackReturnScope(BridgeSignalDelegator& delegator, uintptr_t callbackReturn)
+    : Delegator {delegator}
+    , Previous {delegator.GetThunkCallbackRET()} {
+    Delegator.SetThunkCallbackRET(callbackReturn);
+  }
+
+  CallbackReturnScope(const CallbackReturnScope&) = delete;
+  CallbackReturnScope& operator=(const CallbackReturnScope&) = delete;
+
+  ~CallbackReturnScope() {
+    Delegator.SetThunkCallbackRET(Previous);
+  }
+
+private:
+  BridgeSignalDelegator& Delegator;
+  uintptr_t Previous;
+};
+
 class BridgeSyscallHandler final : public FEXCore::HLE::SyscallHandler {
 public:
+  struct InvocationState final {
+    std::optional<EngineFailure> Failure;
+    uint64_t Result {};
+    bool WasInvoked {};
+    BridgeSyscallHandler* Owner {};
+    FEXCore::Core::InternalThreadState* Thread {};
+
+    void Reset() {
+      Failure.reset();
+      Result = 0;
+      WasInvoked = false;
+      Owner = nullptr;
+      Thread = nullptr;
+    }
+  };
+
+  class InvocationScope final {
+  public:
+    InvocationScope(BridgeSyscallHandler& owner, InvocationState& state,
+                    FEXCore::Core::InternalThreadState* thread)
+      : Previous {ActiveInvocation} {
+      state.Reset();
+      state.Owner = &owner;
+      state.Thread = thread;
+      ActiveInvocation = &state;
+    }
+
+    InvocationScope(const InvocationScope&) = delete;
+    InvocationScope& operator=(const InvocationScope&) = delete;
+
+    ~InvocationScope() {
+      ActiveInvocation = Previous;
+    }
+
+  private:
+    InvocationState* Previous;
+  };
+
   explicit BridgeSyscallHandler(GuestBridge& bridge)
     : Bridge {bridge} {
     OSABI = FEXCore::HLE::SyscallOSABI::OS_GENERIC;
   }
 
   uint64_t HandleSyscall(FEXCore::Core::CpuStateFrame* frame, FEXCore::HLE::SyscallArguments*) override {
+    auto* invocation = ActiveInvocation;
+    if (invocation == nullptr) return static_cast<uint64_t>(-EPERM);
     if (frame == nullptr) {
-      LastFailure = Failure(EngineStage::Bridge, EFAULT);
+      invocation->Failure = Failure(EngineStage::Bridge, EFAULT);
       return static_cast<uint64_t>(-EFAULT);
     }
 
-    const auto operation = frame->State.gregs[FEXCore::X86State::REG_RAX];
-    const auto argument = frame->State.gregs[FEXCore::X86State::REG_RDI];
-    auto result = Bridge.Invoke(operation, argument);
+    GuestCpu::HleCallFrame hleFrame{};
+    hleFrame.operation = frame->State.gregs[FEXCore::X86State::REG_RAX];
+    std::copy(std::begin(frame->State.gregs), std::end(frame->State.gregs), hleFrame.gpr.begin());
+    hleFrame.gpr[FEXCore::X86State::REG_RCX] = frame->State.gregs[FEXCore::X86State::REG_R10];
+    hleFrame.rsp = frame->State.gregs[FEXCore::X86State::REG_RSP];
+    for (size_t index = 0; index < hleFrame.xmm.size(); ++index) {
+      hleFrame.xmm[index] = {frame->State.xmm.sse.data[index][0], frame->State.xmm.sse.data[index][1]};
+    }
+    auto result = Bridge.Invoke(hleFrame);
     if (const auto* error = std::get_if<EngineFailure>(&result)) {
-      LastFailure = *error;
+      invocation->Failure = *error;
       frame->State.gregs[FEXCore::X86State::REG_RAX] = static_cast<uint64_t>(-error->Error);
       return frame->State.gregs[FEXCore::X86State::REG_RAX];
     }
 
-    LastResult = std::get<uint64_t>(result);
-    WasInvoked = true;
-    frame->State.gregs[FEXCore::X86State::REG_RAX] = LastResult;
-    return LastResult;
+    std::copy(hleFrame.gpr.begin(), hleFrame.gpr.end(), std::begin(frame->State.gregs));
+    for (size_t index = 0; index < hleFrame.xmm.size(); ++index) {
+      frame->State.xmm.sse.data[index][0] = hleFrame.xmm[index][0];
+      frame->State.xmm.sse.data[index][1] = hleFrame.xmm[index][1];
+    }
+    invocation->Result = frame->State.gregs[FEXCore::X86State::REG_RAX];
+    invocation->WasInvoked = true;
+    return invocation->Result;
   }
 
-  FEXCore::HLE::ExecutableRangeInfo QueryGuestExecutableRange(FEXCore::Core::InternalThreadState*, uint64_t) override {
-    return {0, std::numeric_limits<uint64_t>::max(), true};
+  EngineResult<bool> RegisterThread(FEXCore::Core::InternalThreadState* thread,
+                                    const std::vector<GuestExecutionRange>& ranges) {
+    if (thread == nullptr) return Failure(EngineStage::Thread, EINVAL);
+    std::scoped_lock lock {RangesMutex};
+    const auto [_, inserted] = ExecutableRanges.emplace(thread, ranges);
+    return inserted ? EngineResult<bool> {true} : EngineResult<bool> {Failure(EngineStage::Thread, EEXIST)};
+  }
+
+  void UnregisterThread(FEXCore::Core::InternalThreadState* thread) {
+    std::scoped_lock lock {RangesMutex};
+    ExecutableRanges.erase(thread);
+  }
+
+  FEXCore::HLE::ExecutableRangeInfo QueryGuestExecutableRange(FEXCore::Core::InternalThreadState* thread,
+                                                               uint64_t address) override {
+    {
+      std::scoped_lock lock {RangesMutex};
+      const auto ranges = ExecutableRanges.find(thread);
+      if (ranges != ExecutableRanges.end()) {
+        for (const auto& range : ranges->second) {
+          if (range.Executable && Contains(range, static_cast<std::uintptr_t>(address), 1)) {
+            return {range.Begin, range.Size, range.Writable};
+          }
+        }
+      }
+    }
+    const auto dynamicRange = Bridge.QueryExecutableRange(static_cast<std::uintptr_t>(address));
+    if (dynamicRange && dynamicRange->Executable && Contains(*dynamicRange, address, 1)) {
+      return {dynamicRange->Begin, dynamicRange->Size, dynamicRange->Writable};
+    }
+    return {};
+  }
+
+  FEXCore::Core::InternalThreadState* ActiveThread() const {
+    if (ActiveInvocation == nullptr || ActiveInvocation->Owner != this) return nullptr;
+    return ActiveInvocation->Thread;
+  }
+
+  const std::optional<EngineFailure>& ActiveFailure() const {
+    static const std::optional<EngineFailure> noFailure;
+    if (ActiveInvocation == nullptr || ActiveInvocation->Owner != this) return noFailure;
+    return ActiveInvocation->Failure;
+  }
+
+  bool IsWritableRange(FEXCore::Core::InternalThreadState* thread, std::uintptr_t address,
+                       std::size_t size) {
+    std::scoped_lock lock {RangesMutex};
+    const auto ranges = ExecutableRanges.find(thread);
+    if (ranges == ExecutableRanges.end()) return false;
+    return std::ranges::any_of(ranges->second, [&](const GuestExecutionRange& range) {
+      return range.Writable && Contains(range, address, size);
+    });
   }
 
   std::optional<FEXCore::ExecutableFileSectionInfo>
@@ -232,29 +467,44 @@ public:
     return std::nullopt;
   }
 
-  void Reset() {
-    LastFailure.reset();
-    LastResult = 0;
-    WasInvoked = false;
+  [[nodiscard]] const std::optional<EngineFailure>& FailureResult(const InvocationState& state) const {
+    return state.Failure;
   }
 
-  [[nodiscard]] const std::optional<EngineFailure>& FailureResult() const {
-    return LastFailure;
+  [[nodiscard]] uint64_t Result(const InvocationState& state) const {
+    return state.Result;
   }
 
-  [[nodiscard]] uint64_t Result() const {
-    return LastResult;
-  }
-
-  [[nodiscard]] bool Invoked() const {
-    return WasInvoked;
+  [[nodiscard]] bool Invoked(const InvocationState& state) const {
+    return state.WasInvoked;
   }
 
 private:
+  static thread_local InvocationState* ActiveInvocation;
+
   GuestBridge& Bridge;
-  std::optional<EngineFailure> LastFailure;
-  uint64_t LastResult {};
-  bool WasInvoked {};
+  std::mutex RangesMutex;
+  std::unordered_map<FEXCore::Core::InternalThreadState*, std::vector<GuestExecutionRange>> ExecutableRanges;
+};
+
+thread_local BridgeSyscallHandler::InvocationState* BridgeSyscallHandler::ActiveInvocation {};
+
+class ExecutableRangeScope final {
+public:
+  ExecutableRangeScope(BridgeSyscallHandler& handler, FEXCore::Core::InternalThreadState* thread)
+    : Handler {handler}
+    , Thread {thread} {}
+
+  ExecutableRangeScope(const ExecutableRangeScope&) = delete;
+  ExecutableRangeScope& operator=(const ExecutableRangeScope&) = delete;
+
+  ~ExecutableRangeScope() {
+    Handler.UnregisterThread(Thread);
+  }
+
+private:
+  BridgeSyscallHandler& Handler;
+  FEXCore::Core::InternalThreadState* Thread;
 };
 
 void AppendImmediate(std::vector<uint8_t>& code, uint64_t value) {
@@ -338,18 +588,43 @@ GuestCode BuildGuestCode() {
 
 } // namespace
 
+class GuestEngine::Thread final {
+public:
+  Thread(std::thread::id owner, GuestExecutionRequest request)
+    : Owner {owner}
+    , Request {std::move(request)} {}
+
+  std::thread::id Owner;
+  GuestExecutionRequest Request;
+  FEXCore::Core::InternalThreadState* Native {};
+  CallRetStack CallRet;
+  GuestSegmentState Segments;
+  BridgeSyscallHandler::InvocationState Invocation;
+  uint64_t FirstRip {};
+  uint64_t LastRip {};
+};
+
 class GuestEngine::Impl final {
 public:
   explicit Impl(GuestBridge& bridge)
     : Bridge {bridge} {}
 
   [[nodiscard]] EngineResult<GuestRunResult> Run() {
-    if (Context == nullptr || Code == nullptr || Syscalls == nullptr) {
+    if (Context == nullptr || SignalDelegator == nullptr || Syscalls == nullptr) {
       return Failure(EngineStage::Context, EINVAL);
     }
     if (Ran) {
       return Failure(EngineStage::Execute, EALREADY);
     }
+
+    GuestCode guest = BuildGuestCode();
+    if (guest.Bytes.size() > PageSize) return Failure(EngineStage::Mapping, E2BIG);
+    Mapping code {PageSize, PROT_READ | PROT_WRITE};
+    if (!code.IsValid()) return Failure(EngineStage::Mapping, code.Error());
+    std::memcpy(code.Get(), guest.Bytes.data(), guest.Bytes.size());
+    __builtin___clear_cache(reinterpret_cast<char*>(code.Get()), reinterpret_cast<char*>(code.Get()) + PageSize);
+    const auto codeProtection = code.Protect(PROT_READ | PROT_EXEC);
+    if (const auto* error = std::get_if<EngineFailure>(&codeProtection)) return *error;
 
     Mapping stackPage {PageSize, PROT_READ | PROT_WRITE};
     Mapping tlsPage {PageSize, PROT_READ | PROT_WRITE};
@@ -357,7 +632,8 @@ public:
     if (!tlsPage.IsValid()) return Failure(EngineStage::Mapping, tlsPage.Error());
     std::memcpy(tlsPage.Get(), &kThreadSentinelA, sizeof(kThreadSentinelA));
 
-    const uint64_t initialRip = reinterpret_cast<uint64_t>(Code->Get());
+    const uint64_t initialRip = reinterpret_cast<uint64_t>(code.Get());
+    CallbackReturnScope callbackReturn {*SignalDelegator, initialRip + guest.CallbackReturnOffset};
     const uint64_t initialRsp = reinterpret_cast<uint64_t>(stackPage.Get()) + PageSize - 16;
     CallRetStack callRetStack;
     if (!callRetStack.IsReserved()) return Failure(EngineStage::Mapping, callRetStack.Error());
@@ -367,6 +643,14 @@ public:
     auto* thread = Context->CreateThread(initialRip, initialRsp);
     if (thread == nullptr) return Failure(EngineStage::Thread, ENOMEM);
     ThreadScope threadScope {*Context, thread};
+    const std::vector<GuestExecutionRange> ranges {
+        {static_cast<std::uintptr_t>(initialRip), PageSize, true, false},
+    };
+    const auto registered = Syscalls->RegisterThread(thread, ranges);
+    if (const auto* failure = std::get_if<EngineFailure>(&registered)) return *failure;
+    ExecutableRangeScope rangeScope {*Syscalls, thread};
+    BridgeSyscallHandler::InvocationState invocation;
+    BridgeSyscallHandler::InvocationScope invocationScope {*Syscalls, invocation, thread};
     GuestSegmentState segmentState;
     segmentState.Initialize(thread->CurrentFrame->State);
     callRetStack.Initialize(thread);
@@ -382,9 +666,8 @@ public:
     std::memcpy(&initialXmm[1], &fpRightBits, sizeof(fpRightBits));
     Context->SetXMMRegistersFromState(thread, initialXmm.data(), HostFeatures.SupportsAVX ? initialYmmHigh.data() : nullptr);
 
-    Syscalls->Reset();
     Context->ExecuteThread(thread);
-    if (Syscalls->FailureResult()) return *Syscalls->FailureResult();
+    if (Syscalls->FailureResult(invocation)) return *Syscalls->FailureResult(invocation);
 
     auto& state = thread->CurrentFrame->State;
     GuestRunResult result;
@@ -395,7 +678,7 @@ public:
                  state.gregs[FEXCore::X86State::REG_RSP] == initialRsp;
     const auto rflags = Context->ReconstructCompactedEFLAGS(thread, false, nullptr, 0);
     result.Rflags = (rflags & ((1U << 0) | (1U << 1) | (1U << 6) | (1U << 11))) == (1U << 1);
-    result.Bridge = Syscalls->Invoked() && state.gregs[FEXCore::X86State::REG_RAX] == Syscalls->Result();
+    result.Bridge = Syscalls->Invoked(invocation) && state.gregs[FEXCore::X86State::REG_RAX] == Syscalls->Result(invocation);
 
     std::array<__uint128_t, FEXCore::Core::CPUState::NUM_XMMS> finalXmm {};
     std::array<__uint128_t, FEXCore::Core::CPUState::NUM_XMMS> finalYmmHigh {};
@@ -409,8 +692,8 @@ public:
 
     bool firstThread = false;
     bool secondThread = false;
-    std::thread firstHostThread {[&] { firstThread = ExecuteThreadTlsCheck(initialRip + Guest.ThreadOffset, kThreadSentinelA); }};
-    std::thread secondHostThread {[&] { secondThread = ExecuteThreadTlsCheck(initialRip + Guest.ThreadOffset, kThreadSentinelB); }};
+    std::thread firstHostThread {[&] { firstThread = ExecuteThreadTlsCheck(initialRip + guest.ThreadOffset, kThreadSentinelA); }};
+    std::thread secondHostThread {[&] { secondThread = ExecuteThreadTlsCheck(initialRip + guest.ThreadOffset, kThreadSentinelB); }};
     firstHostThread.join();
     secondHostThread.join();
     result.Threads = firstThread && secondThread;
@@ -419,25 +702,25 @@ public:
 
     state.gregs[FEXCore::X86State::REG_RDI] = kCallbackInput;
     state.gregs[FEXCore::X86State::REG_RSP] = initialRsp;
-    Context->HandleCallback(thread, initialRip + Guest.CallbackOffset);
+    Context->HandleCallback(thread, initialRip + guest.CallbackOffset);
     if (state.gregs[FEXCore::X86State::REG_RAX] != kCallbackInput + 5 || state.gregs[FEXCore::X86State::REG_RSP] != initialRsp) {
       return Failure(EngineStage::Execute, EPROTO);
     }
 
-    const uint64_t invalidationRip = initialRip + Guest.InvalidationOffset;
+    const uint64_t invalidationRip = initialRip + guest.InvalidationOffset;
     state.rip = invalidationRip;
     state.gregs[FEXCore::X86State::REG_RSP] = initialRsp;
     Context->ExecuteThread(thread);
     if (state.gregs[FEXCore::X86State::REG_RAX] != kInvalidationInitial) return Failure(EngineStage::Invalidate, EPROTO);
 
-    auto* invalidationImmediate = static_cast<uint8_t*>(Code->Get()) + Guest.InvalidationImmediateOffset;
+    auto* invalidationImmediate = static_cast<uint8_t*>(code.Get()) + guest.InvalidationImmediateOffset;
     {
       std::scoped_lock codeInvalidationLock {Context->GetCodeInvalidationMutex()};
-      const auto writable = Code->Protect(PROT_READ | PROT_WRITE);
+      const auto writable = code.Protect(PROT_READ | PROT_WRITE);
       if (const auto* error = std::get_if<EngineFailure>(&writable)) return *error;
       std::memcpy(invalidationImmediate, &kInvalidationUpdated, sizeof(kInvalidationUpdated));
-      __builtin___clear_cache(reinterpret_cast<char*>(Code->Get()), reinterpret_cast<char*>(Code->Get()) + PageSize);
-      const auto executable = Code->Protect(PROT_READ | PROT_EXEC);
+      __builtin___clear_cache(reinterpret_cast<char*>(code.Get()), reinterpret_cast<char*>(code.Get()) + PageSize);
+      const auto executable = code.Protect(PROT_READ | PROT_EXEC);
       if (const auto* error = std::get_if<EngineFailure>(&executable)) return *error;
       Context->InvalidateCodeBuffersCodeRange(invalidationRip, 11);
       Context->InvalidateThreadCachedCodeRange(thread, invalidationRip, 11);
@@ -453,16 +736,20 @@ public:
   }
 
   [[nodiscard]] EngineResult<bool> Shutdown() {
+    {
+      std::scoped_lock lock {ThreadsMutex};
+      if (!Threads.empty()) {
+        return Failure(EngineStage::Teardown, EBUSY);
+      }
+    }
     Context.reset();
     SignalDelegator.reset();
     Syscalls.reset();
-    if (Code != nullptr) {
-      auto released = Code->Release();
-      if (const auto* error = std::get_if<EngineFailure>(&released)) return *error;
-      Code.reset();
-    }
+    CallbackReturn.reset();
+    FunctionReturn.reset();
     if (ConfigInitialized) {
-      FEXCore::Config::Shutdown();
+      const auto configRelease = FexConfigLease::Release();
+      if (const auto* failure = std::get_if<EngineFailure>(&configRelease)) return *failure;
       ConfigInitialized = false;
     }
     return true;
@@ -481,6 +768,14 @@ public:
     auto* thread = Context->CreateThread(rip, initialRsp);
     if (thread == nullptr) return false;
     ThreadScope threadScope {*Context, thread};
+    const std::vector<GuestExecutionRange> ranges {
+        {static_cast<std::uintptr_t>(rip & ~(PageSize - 1)), PageSize, true, false},
+    };
+    const auto registered = Syscalls->RegisterThread(thread, ranges);
+    if (std::holds_alternative<EngineFailure>(registered)) return false;
+    ExecutableRangeScope rangeScope {*Syscalls, thread};
+    BridgeSyscallHandler::InvocationState invocation;
+    BridgeSyscallHandler::InvocationScope invocationScope {*Syscalls, invocation, thread};
     GuestSegmentState segmentState;
     segmentState.Initialize(thread->CurrentFrame->State);
     callRetStack.Initialize(thread);
@@ -493,13 +788,15 @@ public:
   GuestBridge& Bridge;
   FEXCore::HostFeatures HostFeatures {};
   fextl::unique_ptr<FEXCore::Context::Context> Context;
-  std::unique_ptr<Mapping> Code;
   std::unique_ptr<BridgeSignalDelegator> SignalDelegator;
   std::unique_ptr<BridgeSyscallHandler> Syscalls;
-  GuestCode Guest;
+  std::unique_ptr<Mapping> CallbackReturn;
+  std::unique_ptr<Mapping> FunctionReturn;
   size_t PageSize {};
   bool ConfigInitialized {};
   bool Ran {};
+  std::mutex ThreadsMutex;
+  std::unordered_set<Thread*> Threads;
 };
 
 GuestEngine::GuestEngine(std::unique_ptr<Impl> impl)
@@ -517,11 +814,8 @@ EngineResult<std::unique_ptr<GuestEngine>> GuestEngine::Create(GuestBridge& brid
 
   auto impl = std::make_unique<Impl>(bridge);
   impl->PageSize = static_cast<size_t>(pageSize);
-  FEX::Config::InitializeConfigs(FEX::Config::PortableInformation {});
-  FEXCore::Config::Initialize();
-  FEXCore::Config::Load();
-  FEXCore::Config::Set(FEXCore::Config::CONFIG_IS64BIT_MODE, "1");
-  FEXCore::Config::Set(FEXCore::Config::CONFIG_DISABLETELEMETRY, "1");
+  const auto configAcquire = FexConfigLease::Acquire();
+  if (const auto* failure = std::get_if<EngineFailure>(&configAcquire)) return *failure;
   impl->ConfigInitialized = true;
   const auto fail = [&impl](EngineFailure original) -> EngineResult<std::unique_ptr<GuestEngine>> {
     const auto teardown = impl->Shutdown();
@@ -529,29 +823,40 @@ EngineResult<std::unique_ptr<GuestEngine>> GuestEngine::Create(GuestBridge& brid
     return original;
   };
 
-  impl->Guest = BuildGuestCode();
-  if (impl->Guest.Bytes.size() > impl->PageSize) {
-    return fail(Failure(EngineStage::Mapping, E2BIG));
-  }
-  impl->Code = std::make_unique<Mapping>(impl->PageSize, PROT_READ | PROT_WRITE);
-  if (!impl->Code->IsValid()) {
-    const auto error = impl->Code->Error();
-    return fail(Failure(EngineStage::Mapping, error));
-  }
-  std::memcpy(impl->Code->Get(), impl->Guest.Bytes.data(), impl->Guest.Bytes.size());
-  __builtin___clear_cache(reinterpret_cast<char*>(impl->Code->Get()), reinterpret_cast<char*>(impl->Code->Get()) + impl->PageSize);
-  const auto codeProtection = impl->Code->Protect(PROT_READ | PROT_EXEC);
-  if (const auto* error = std::get_if<EngineFailure>(&codeProtection)) {
-    return fail(*error);
-  }
-
   impl->HostFeatures = FEX::FetchHostFeatures();
   impl->Context = FEXCore::Context::Context::CreateNewContext(impl->HostFeatures);
   if (impl->Context == nullptr) {
     return fail(Failure(EngineStage::Context, ENOMEM));
   }
-  const auto initialRip = reinterpret_cast<uintptr_t>(impl->Code->Get());
-  impl->SignalDelegator = std::make_unique<BridgeSignalDelegator>(initialRip + impl->Guest.CallbackReturnOffset);
+  impl->FunctionReturn =
+      std::make_unique<Mapping>(impl->PageSize, PROT_READ | PROT_WRITE);
+  if (!impl->FunctionReturn->IsValid()) {
+    return fail(Failure(EngineStage::Mapping, impl->FunctionReturn->Error()));
+  }
+  *static_cast<uint8_t*>(impl->FunctionReturn->Get()) = 0xf4;
+  __builtin___clear_cache(static_cast<char*>(impl->FunctionReturn->Get()),
+                          static_cast<char*>(impl->FunctionReturn->Get()) + impl->PageSize);
+  const auto functionProtection = impl->FunctionReturn->Protect(PROT_READ | PROT_EXEC);
+  if (const auto* failure = std::get_if<EngineFailure>(&functionProtection)) {
+    return fail(*failure);
+  }
+
+  impl->CallbackReturn =
+      std::make_unique<Mapping>(impl->PageSize, PROT_READ | PROT_WRITE);
+  if (!impl->CallbackReturn->IsValid()) {
+    return fail(Failure(EngineStage::Mapping, impl->CallbackReturn->Error()));
+  }
+  auto* callbackReturn = static_cast<uint8_t*>(impl->CallbackReturn->Get());
+  callbackReturn[0] = 0x0f;
+  callbackReturn[1] = 0x3e;
+  __builtin___clear_cache(static_cast<char*>(impl->CallbackReturn->Get()),
+                          static_cast<char*>(impl->CallbackReturn->Get()) + impl->PageSize);
+  const auto callbackProtection = impl->CallbackReturn->Protect(PROT_READ | PROT_EXEC);
+  if (const auto* failure = std::get_if<EngineFailure>(&callbackProtection)) {
+    return fail(*failure);
+  }
+  impl->SignalDelegator = std::make_unique<BridgeSignalDelegator>(
+      reinterpret_cast<std::uintptr_t>(impl->CallbackReturn->Get()));
   impl->Syscalls = std::make_unique<BridgeSyscallHandler>(impl->Bridge);
   impl->Context->SetSignalDelegator(impl->SignalDelegator.get());
   impl->Context->SetSyscallHandler(impl->Syscalls.get());
@@ -568,6 +873,211 @@ EngineResult<GuestRunResult> GuestEngine::RunControlledHarness() {
   return ImplState->Run();
 }
 
+EngineResult<GuestEngine::Thread*> GuestEngine::CreateThread(const GuestExecutionRequest& request) {
+  if (ImplState == nullptr || ImplState->Context == nullptr || ImplState->Syscalls == nullptr) {
+    return Failure(EngineStage::Teardown, ESHUTDOWN);
+  }
+  const auto validation = ValidateRequest(request);
+  if (const auto* failure = std::get_if<EngineFailure>(&validation)) {
+    return *failure;
+  }
+
+  auto thread = std::make_unique<Thread>(std::this_thread::get_id(), request);
+  if (!thread->CallRet.IsReserved()) {
+    return Failure(EngineStage::Mapping, thread->CallRet.Error());
+  }
+  const auto callRetWritable = thread->CallRet.MakeWritable();
+  if (const auto* failure = std::get_if<EngineFailure>(&callRetWritable)) {
+    return *failure;
+  }
+
+  thread->Native = ImplState->Context->CreateThread(request.Rip, request.Rsp);
+  if (thread->Native == nullptr) {
+    return Failure(EngineStage::Thread, ENOMEM);
+  }
+
+  auto& state = thread->Native->CurrentFrame->State;
+  thread->Segments.Initialize(state);
+  state.fs_cached = request.FsBase;
+  state.gs_cached = request.GsBase;
+  thread->CallRet.Initialize(thread->Native);
+  state.rip = request.Rip;
+  std::copy(request.Gpr.begin(), request.Gpr.end(), std::begin(state.gregs));
+  state.gregs[FEXCore::X86State::REG_RSP] = request.Rsp;
+  ImplState->Context->SetFlagsFromCompactedEFLAGS(thread->Native, static_cast<uint32_t>(request.Rflags));
+
+  std::array<__uint128_t, FEXCore::Core::CPUState::NUM_XMMS> xmm {};
+  std::array<__uint128_t, FEXCore::Core::CPUState::NUM_XMMS> ymmHigh {};
+  static_assert(std::tuple_size_v<decltype(request.Xmm)> == FEXCore::Core::CPUState::NUM_XMMS);
+  for (size_t index = 0; index < xmm.size(); ++index) {
+    std::memcpy(&xmm[index], request.Xmm[index].data(), sizeof(xmm[index]));
+  }
+  ImplState->Context->SetXMMRegistersFromState(thread->Native, xmm.data(),
+                                               ImplState->HostFeatures.SupportsAVX ? ymmHigh.data() : nullptr);
+  thread->FirstRip = request.Rip;
+  const auto registration = ImplState->Syscalls->RegisterThread(thread->Native, request.MappedRanges);
+  if (const auto* failure = std::get_if<EngineFailure>(&registration)) {
+    ImplState->Context->DestroyThread(thread->Native);
+    thread->Native = nullptr;
+    return *failure;
+  }
+  {
+    std::scoped_lock lock {ImplState->ThreadsMutex};
+    const auto [_, inserted] = ImplState->Threads.insert(thread.get());
+    if (!inserted) {
+      ImplState->Syscalls->UnregisterThread(thread->Native);
+      ImplState->Context->DestroyThread(thread->Native);
+      thread->Native = nullptr;
+      return Failure(EngineStage::Thread, EEXIST);
+    }
+  }
+  return thread.release();
+}
+
+EngineResult<GuestExecutionState> GuestEngine::Run(Thread& thread) {
+  if (ImplState == nullptr || ImplState->Context == nullptr || thread.Native == nullptr) {
+    return Failure(EngineStage::Teardown, ESHUTDOWN);
+  }
+  {
+    std::scoped_lock lock {ImplState->ThreadsMutex};
+    if (!ImplState->Threads.contains(&thread) || thread.Owner != std::this_thread::get_id()) {
+      return Failure(EngineStage::Thread, EPERM);
+    }
+  }
+
+  BridgeSyscallHandler::InvocationScope invocationScope {*ImplState->Syscalls, thread.Invocation,
+                                                          thread.Native};
+  ImplState->Context->ExecuteThread(thread.Native);
+  if (ImplState->Syscalls->FailureResult(thread.Invocation)) {
+    return *ImplState->Syscalls->FailureResult(thread.Invocation);
+  }
+
+  const auto& frame = thread.Native->CurrentFrame->State;
+  GuestExecutionState result;
+  result.FirstRip = thread.FirstRip;
+  result.Rip = frame.rip;
+  result.Rsp = frame.gregs[FEXCore::X86State::REG_RSP];
+  std::copy(std::begin(frame.gregs), std::end(frame.gregs), result.Gpr.begin());
+  result.Rflags = ImplState->Context->ReconstructCompactedEFLAGS(thread.Native, false, nullptr, 0);
+  std::array<__uint128_t, FEXCore::Core::CPUState::NUM_XMMS> xmm {};
+  std::array<__uint128_t, FEXCore::Core::CPUState::NUM_XMMS> ymmHigh {};
+  ImplState->Context->ReconstructXMMRegisters(thread.Native, xmm.data(),
+                                               ImplState->HostFeatures.SupportsAVX ? ymmHigh.data() : nullptr);
+  for (size_t index = 0; index < xmm.size(); ++index) {
+    std::memcpy(result.Xmm[index].data(), &xmm[index], sizeof(xmm[index]));
+  }
+  thread.LastRip = result.Rip;
+  result.LastRip = thread.LastRip;
+  // This Phase-1 context exits only because EnableExitOnHLT() is active.
+  result.StopReason = GuestStopReason::Halted;
+  return result;
+}
+
+EngineResult<GuestExecutionState> GuestEngine::CallGuest(
+    std::uintptr_t rip, std::span<const std::uint64_t> arguments) {
+  if (ImplState == nullptr || ImplState->Context == nullptr || ImplState->Syscalls == nullptr) {
+    return Failure(EngineStage::Teardown, ESHUTDOWN);
+  }
+  auto* thread = ImplState->Syscalls->ActiveThread();
+  if (thread == nullptr) return Failure(EngineStage::Thread, ENXIO);
+  const auto executable = ImplState->Syscalls->QueryGuestExecutableRange(thread, rip);
+  if (executable.Size == 0) return Failure(EngineStage::Mapping, EFAULT);
+  if (arguments.size() > 7) return Failure(EngineStage::Request, E2BIG);
+
+  auto& frame = thread->CurrentFrame->State;
+  constexpr std::array<size_t, 6> argumentRegisters {
+      FEXCore::X86State::REG_RDI, FEXCore::X86State::REG_RSI, FEXCore::X86State::REG_RDX,
+      FEXCore::X86State::REG_RCX, FEXCore::X86State::REG_R8, FEXCore::X86State::REG_R9,
+  };
+  const auto registerCount = std::min(arguments.size(), argumentRegisters.size());
+  for (size_t index = 0; index < registerCount; ++index) {
+    frame.gregs[argumentRegisters[index]] = arguments[index];
+  }
+  if (arguments.size() == 7) {
+    const auto rsp = frame.gregs[FEXCore::X86State::REG_RSP];
+    if (rsp < sizeof(uint64_t) ||
+        !ImplState->Syscalls->IsWritableRange(thread, rsp - sizeof(uint64_t),
+                                               sizeof(uint64_t))) {
+      return Failure(EngineStage::Mapping, EFAULT);
+    }
+    std::memcpy(reinterpret_cast<void*>(rsp - sizeof(uint64_t)), &arguments[6],
+                sizeof(uint64_t));
+  }
+
+  ImplState->Context->HandleCallback(thread, rip);
+  if (ImplState->Syscalls->ActiveFailure()) {
+    return *ImplState->Syscalls->ActiveFailure();
+  }
+  auto* invocation = ImplState->Syscalls->ActiveThread();
+  if (invocation != thread) return Failure(EngineStage::Thread, EFAULT);
+
+  GuestExecutionState result;
+  result.FirstRip = rip;
+  result.Rip = frame.rip;
+  result.LastRip = frame.rip;
+  result.Rsp = frame.gregs[FEXCore::X86State::REG_RSP];
+  std::copy(std::begin(frame.gregs), std::end(frame.gregs), result.Gpr.begin());
+  result.Rflags = ImplState->Context->ReconstructCompactedEFLAGS(thread, false, nullptr, 0);
+  std::array<__uint128_t, FEXCore::Core::CPUState::NUM_XMMS> xmm {};
+  std::array<__uint128_t, FEXCore::Core::CPUState::NUM_XMMS> ymmHigh {};
+  ImplState->Context->ReconstructXMMRegisters(
+      thread, xmm.data(), ImplState->HostFeatures.SupportsAVX ? ymmHigh.data() : nullptr);
+  for (size_t index = 0; index < xmm.size(); ++index) {
+    std::memcpy(result.Xmm[index].data(), &xmm[index], sizeof(xmm[index]));
+  }
+  result.StopReason = GuestStopReason::Returned;
+  return result;
+}
+
+EngineResult<bool> GuestEngine::Invalidate(Thread& thread, std::uintptr_t begin, std::size_t size) {
+  if (ImplState == nullptr || ImplState->Context == nullptr || thread.Native == nullptr) {
+    return Failure(EngineStage::Teardown, ESHUTDOWN);
+  }
+  {
+    std::scoped_lock lock {ImplState->ThreadsMutex};
+    if (!ImplState->Threads.contains(&thread) || thread.Owner != std::this_thread::get_id()) {
+      return Failure(EngineStage::Thread, EPERM);
+    }
+  }
+  if (begin == 0 || size == 0 || begin % kRequiredPageSize != 0 || size % kRequiredPageSize != 0) {
+    return Failure(EngineStage::Request, EINVAL);
+  }
+  const auto executable = std::any_of(thread.Request.MappedRanges.begin(), thread.Request.MappedRanges.end(),
+                                      [begin, size](const GuestExecutionRange& range) {
+                                        return range.Executable && !range.Writable && Contains(range, begin, size);
+                                      });
+  if (!executable) {
+    return Failure(EngineStage::Invalidate, EFAULT);
+  }
+
+  std::scoped_lock lock {ImplState->Context->GetCodeInvalidationMutex()};
+  ImplState->Context->InvalidateCodeBuffersCodeRange(begin, size);
+  ImplState->Context->InvalidateThreadCachedCodeRange(thread.Native, begin, size);
+  return true;
+}
+
+EngineResult<bool> GuestEngine::DestroyThread(Thread*& thread) {
+  if (ImplState == nullptr || ImplState->Context == nullptr || thread == nullptr || thread->Native == nullptr) {
+    return Failure(EngineStage::Teardown, ESHUTDOWN);
+  }
+  {
+    std::scoped_lock lock {ImplState->ThreadsMutex};
+    if (!ImplState->Threads.contains(thread) || thread->Owner != std::this_thread::get_id()) {
+      return Failure(EngineStage::Thread, EPERM);
+    }
+  }
+  ImplState->Syscalls->UnregisterThread(thread->Native);
+  ImplState->Context->DestroyThread(thread->Native);
+  thread->Native = nullptr;
+  {
+    std::scoped_lock lock {ImplState->ThreadsMutex};
+    ImplState->Threads.erase(thread);
+  }
+  delete thread;
+  thread = nullptr;
+  return true;
+}
+
 EngineResult<bool> GuestEngine::Shutdown() {
   if (ImplState == nullptr) return true;
   auto result = ImplState->Shutdown();
@@ -575,6 +1085,23 @@ EngineResult<bool> GuestEngine::Shutdown() {
     ImplState.reset();
   }
   return result;
+}
+
+std::uintptr_t GuestEngine::ReturnAddress() const {
+  if (ImplState == nullptr || ImplState->FunctionReturn == nullptr) return 0;
+  return reinterpret_cast<std::uintptr_t>(ImplState->FunctionReturn->Get());
+}
+
+GuestExecutionRange GuestEngine::ReturnRange() const {
+  if (ImplState == nullptr || ImplState->FunctionReturn == nullptr) return {};
+  return {reinterpret_cast<std::uintptr_t>(ImplState->FunctionReturn->Get()),
+          ImplState->PageSize, true, false};
+}
+
+GuestExecutionRange GuestEngine::CallbackReturnRange() const {
+  if (ImplState == nullptr || ImplState->CallbackReturn == nullptr) return {};
+  return {reinterpret_cast<std::uintptr_t>(ImplState->CallbackReturn->Get()),
+          ImplState->PageSize, true, false};
 }
 
 } // namespace Core::Fex

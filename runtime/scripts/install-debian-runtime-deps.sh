@@ -21,6 +21,7 @@ arch_tools=(
 
 arch_dev=(
     libc6-dev:amd64 libsdl2-dev:amd64 libvulkan-dev:amd64
+    libx11-dev:arm64 libxext-dev:arm64
 )
 
 arch_amd64=(
@@ -39,7 +40,7 @@ arch_amd64=(
 
 arch_arm64=(
     libc6:arm64 libgcc-s1:arm64 libstdc++6:arm64
-    libvulkan1:arm64 libudev1:arm64 libuuid1:arm64
+    libvulkan1:arm64 libudev1:arm64 libudev-dev:arm64 libuuid1:arm64 uuid-dev:arm64
     libx11-6:arm64 libx11-xcb1:arm64 libxcursor1:arm64
     libxext6:arm64 libxfixes3:arm64 libxi6:arm64 libxrandr2:arm64
     libxrender1:arm64 libxss1:arm64

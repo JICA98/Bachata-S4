@@ -2,7 +2,7 @@
 
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { closeSync, mkdtempSync, openSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -38,16 +38,25 @@ if (missing.length) throw new Error(`APK is missing managed runtime assets: ${mi
 const temporary = mkdtempSync(join(tmpdir(), "bachata-apk-runtime-"));
 try {
   const runtimeZip = join(temporary, "runtime.zip");
-  writeFileSync(runtimeZip, execFileSync("unzip", ["-p", apk, "assets/runtime/runtime.zip"], {
-    encoding: "buffer",
-    maxBuffer: 256 * 1024 * 1024,
-  }));
+  const runtimeZipFd = openSync(runtimeZip, "w");
+  try {
+    execFileSync("unzip", ["-p", apk, "assets/runtime/runtime.zip"], {
+      stdio: ["ignore", runtimeZipFd, "pipe"],
+      maxBuffer: 16 * 1024 * 1024,
+    });
+  } finally {
+    closeSync(runtimeZipFd);
+  }
   const runtimeEntries = listing(runtimeZip);
   const manifest = JSON.parse(execFileSync("unzip", ["-p", apk, "assets/runtime/manifest.json"], {
     encoding: "utf8",
     maxBuffer: 16 * 1024 * 1024,
   }));
-  for (const runnerPath of ["host/fexcore-smoke", "host/fexcore-guest-harness"]) {
+  for (const runnerPath of [
+    "host/fexcore-smoke",
+    "host/fexcore-guest-harness",
+    "host/shadps4-arm64-fex",
+  ]) {
     if (!runtimeEntries.includes(runnerPath)) throw new Error(`Nested runtime ZIP is missing ${runnerPath}`);
     const declaredRunner = Array.isArray(manifest.files)
       ? manifest.files.find((file) => file.path === runnerPath)
@@ -55,7 +64,7 @@ try {
     if (!declaredRunner) throw new Error(`Runtime manifest is missing ${runnerPath}`);
     const runner = execFileSync("unzip", ["-p", runtimeZip, runnerPath], {
       encoding: "buffer",
-      maxBuffer: 16 * 1024 * 1024,
+      maxBuffer: 128 * 1024 * 1024,
     });
     if (runner.length < 20 || runner[0] !== 0x7f || runner.subarray(1, 4).toString() !== "ELF") {
       throw new Error(`Nested FEXCore runner is not ELF: ${runnerPath}`);

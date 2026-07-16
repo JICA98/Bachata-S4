@@ -1,0 +1,72 @@
+import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import test from "node:test";
+
+const root = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const read = (relative) => readFileSync(resolve(root, relative), "utf8");
+
+test("FEX function imports use typed guest veneers rather than host addresses", () => {
+  const resolverHeader = read("src/core/loader/symbols_resolver.h");
+  const resolverSource = read("src/core/loader/symbols_resolver.cpp");
+  const registrations = read("src/core/libraries/libs.h");
+  const linker = read("src/core/linker.cpp");
+  const engine = read("src/core/fex/fex_guest_engine.cpp");
+  const bridgeHeader = read("src/core/guest_cpu/fex_hle_bridge.h");
+  const bridgeSource = read("src/core/guest_cpu/fex_hle_bridge.cpp");
+  const veneerHeader = read("src/core/guest_cpu/hle_call_adapter.h");
+  const veneerSource = read("src/core/guest_cpu/hle_call_adapter.cpp");
+  const smokeBuild = read("runtime/scripts/build-fexcore-smoke-aarch64.sh");
+  const fexPatch = read("runtime/patches/fex-fexcore-only.patch");
+  const harness = read("runtime/probes/fexcore-guest-harness.cpp");
+  const harnessVerifier = read("runtime/tests/verify-fexcore-guest-harness-build.mjs");
+
+  assert.match(resolverHeader, /class HleCallAdapter/);
+  assert.match(resolverHeader, /std::shared_ptr<GuestCpu::HleCallAdapter>/);
+  assert.match(resolverHeader, /AddFunction\(const SymbolResolver& s/);
+  assert.match(resolverHeader, /AddUnsupportedFunction/);
+  assert.match(resolverHeader, /SymbolsResolver\(\);/);
+  assert.match(resolverHeader, /~SymbolsResolver\(\);/);
+  assert.doesNotMatch(resolverHeader, /~SymbolsResolver\(\) = default/);
+  assert.match(resolverSource, /AddFunction\(const SymbolResolver& s/);
+  assert.match(resolverSource, /SymbolsResolver::~SymbolsResolver\(\) = default/);
+  assert.match(resolverSource, /HleCallRegistry/);
+  assert.match(registrations, /MakeHleCallAdapter\(function\)/);
+  assert.match(registrations, /#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU/);
+
+  assert.match(veneerHeader, /class HleCallAdapter/);
+  assert.match(veneerHeader, /MakeHleCallAdapter/);
+  assert.match(veneerHeader, /HleVeneerAllocator/);
+  assert.match(veneerSource, /mov rax, operation; syscall; ret/);
+  assert.match(veneerSource, /mov r10, rcx/);
+  assert.match(veneerSource, /mprotect/);
+  assert.match(veneerSource, /__builtin___clear_cache/);
+  assert.doesNotMatch(veneerSource, /PROT_WRITE\s*\|\s*PROT_EXEC/);
+  assert.match(veneerHeader, /DecodeArgument/);
+  assert.match(veneerHeader, /validate_range/);
+  assert.match(veneerHeader, /bool writable/);
+  assert.match(veneerHeader, /std::shared_mutex/);
+  assert.match(veneerHeader, /std::unordered_map<u64, u64>/);
+  assert.match(veneerHeader, /SysVIntegerArgs\{7, 6, 2, 1, 8, 9\}/);
+  assert.match(veneerHeader, /IsGuestFunctionPointer/);
+  assert.doesNotMatch(veneerHeader, /SysVIntegerArgs\{5, 4, 3, 2, 8, 9\}/);
+
+  const relocate = linker.slice(linker.indexOf("void Linker::Relocate"), linker.indexOf("bool Linker::Resolve"));
+  assert.match(relocate, /rel_sym_type == Loader::SymbolType::Function/);
+  assert.match(relocate, /HleVeneerAllocator/);
+  assert.doesNotMatch(relocate, /rel_value = symrec\.virtual_address \+ addend/);
+  assert.doesNotMatch(engine, /HleGuestBridge::Invoke/);
+  assert.match(bridgeHeader, /class HleGuestBridge/);
+  assert.match(bridgeSource, /HleGuestBridge::Invoke/);
+  assert.match(engine, /Bridge\.Invoke\(hleFrame\)/);
+  assert.match(engine, /frame->State\.xmm\.sse/);
+  assert.match(engine, /REG_RCX\] = frame->State\.gregs\[FEXCore::X86State::REG_R10\]/);
+  assert.match(smokeBuild, /HLE_CALL_ADAPTER_SOURCE/);
+  assert.match(smokeBuild, /FEX_HLE_BRIDGE_SOURCE/);
+  assert.match(smokeBuild, /FEXCORE_PROJECT_SOURCE_DIR/);
+  assert.match(fexPatch, /FEXCORE_PROJECT_SOURCE_DIR/);
+  assert.match(harness, /HleGuestBridge/);
+  assert.match(harness, /HLE_VENEER_OK scalar=ok pointer=ok function_pointer=ok vector=ok stack=ok mapping=ok/);
+  assert.match(harnessVerifier, /HLE_VENEER_OK scalar=ok pointer=ok function_pointer=ok vector=ok stack=ok mapping=ok/);
+});

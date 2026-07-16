@@ -69,6 +69,7 @@ const REQUIRED_RUNTIME_PATHS = [
   "host/box64",
   "host/fexcore-smoke",
   "host/fexcore-guest-harness",
+  "host/shadps4-arm64-fex",
   "host/ld-linux-aarch64.so.1",
   "host/libvulkan.so.1",
   "host/libc.so.6",
@@ -116,6 +117,7 @@ const REQUIRED_RUNTIME_PATHS = [
   "lib/x86_64-linux-gnu/libxkbcommon.so.0",
   "lib64/ld-linux-x86-64.so.2",
   "usr/share/bachata/shadps4-needed.txt",
+  "usr/share/bachata/shadps4-arm64-fex-needed.txt",
 ];
 
 function fail(message) {
@@ -315,6 +317,7 @@ const hostLibc = zipEntries.find((entry) => entry.path === "host/libc.so.6").byt
 const hostBox64 = zipEntries.find((entry) => entry.path === "host/box64").bytes;
 const hostFexcoreSmoke = zipEntries.find((entry) => entry.path === "host/fexcore-smoke").bytes;
 const hostFexcoreGuestHarness = zipEntries.find((entry) => entry.path === "host/fexcore-guest-harness").bytes;
+const hostFexShadPs4 = zipEntries.find((entry) => entry.path === "host/shadps4-arm64-fex").bytes;
 if (countArm64SetRobustListCalls(hostLoader) !== 0 || countArm64SetRobustListCalls(hostLibc) !== 0) {
   fail("Host glibc retains set_robust_list calls blocked by Android app seccomp");
 }
@@ -332,7 +335,21 @@ if (hostFexcoreGuestHarness.length < 20 || hostFexcoreGuestHarness[0] !== 0x7f |
   fail("FEXCore guest harness is not ELF");
 }
 if (hostFexcoreGuestHarness.readUInt16LE(18) !== 183) fail("FEXCore guest harness is not AArch64 ELF");
-for (const marker of [FEX_REVISION, "FEXCORE_GUEST_ENGINE_OK", "bridge=ok", "teardown=ok"]) {
+if (hostFexShadPs4.length < 20 || hostFexShadPs4[0] !== 0x7f ||
+    hostFexShadPs4.subarray(1, 4).toString() !== "ELF" || hostFexShadPs4.readUInt16LE(18) !== 183) {
+  fail("FEX shadPS4 is not AArch64 ELF");
+}
+for (const marker of [
+  FEX_REVISION,
+  "FEXCORE_GUEST_ENGINE_OK",
+  "bridge=ok",
+  "teardown=ok",
+  "FEXCORE_GUEST_CPU_OK",
+  "caller_mapping=ok",
+  "thread_lifetime=ok",
+  "thread_isolation=ok",
+  "overlap_rejected=ok",
+]) {
   if (!hostFexcoreGuestHarness.includes(Buffer.from(marker))) fail(`FEXCore guest harness lacks ${marker}`);
 }
 if (sha256(readFileSync(nativeHostLoaderPath)) !== sha256(hostLoader)) fail("Native host loader differs from runtime host loader");

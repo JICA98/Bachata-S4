@@ -3,7 +3,28 @@
 
 project(ImGui_Resources)
 
-add_executable(Dear_ImGui_FontEmbed ${CMAKE_SOURCE_DIR}/externals/dear_imgui/misc/fonts/binary_to_compressed_c.cpp)
+set(IMGUI_FONT_EMBED_EXECUTABLE "" CACHE FILEPATH
+    "Native Dear ImGui font embed executable required when cross-compiling")
+
+if (CMAKE_CROSSCOMPILING)
+    if (IMGUI_FONT_EMBED_EXECUTABLE STREQUAL "")
+        message(FATAL_ERROR
+            "IMGUI_FONT_EMBED_EXECUTABLE must name a native executable when cross-compiling")
+    endif()
+    if (NOT IS_ABSOLUTE "${IMGUI_FONT_EMBED_EXECUTABLE}")
+        message(FATAL_ERROR "IMGUI_FONT_EMBED_EXECUTABLE must be an absolute path")
+    endif()
+    if (NOT EXISTS "${IMGUI_FONT_EMBED_EXECUTABLE}")
+        message(FATAL_ERROR "IMGUI_FONT_EMBED_EXECUTABLE does not exist")
+    endif()
+    set(IMGUI_FONT_EMBED_COMMAND "${IMGUI_FONT_EMBED_EXECUTABLE}")
+    set(IMGUI_FONT_EMBED_DEPENDS)
+else()
+    add_executable(Dear_ImGui_FontEmbed
+        ${CMAKE_SOURCE_DIR}/externals/dear_imgui/misc/fonts/binary_to_compressed_c.cpp)
+    set(IMGUI_FONT_EMBED_COMMAND "$<TARGET_FILE:Dear_ImGui_FontEmbed>")
+    set(IMGUI_FONT_EMBED_DEPENDS Dear_ImGui_FontEmbed)
+endif()
 
 set(FONT_LIST
     NotoSansArabic-Regular.ttf
@@ -26,8 +47,8 @@ FOREACH (FONT_FILE ${FONT_LIST})
     add_custom_command(
         OUTPUT "${OUTPUT}.g.cpp"
         COMMAND ${CMAKE_COMMAND} -E make_directory "generated_fonts/imgui_fonts"
-        COMMAND $<TARGET_FILE:Dear_ImGui_FontEmbed> -nostatic "${CMAKE_CURRENT_SOURCE_DIR}/fonts/${FONT_FILE}" ${fontname_cpp} > "${OUTPUT}.g.cpp"
-        DEPENDS Dear_ImGui_FontEmbed "fonts/${FONT_FILE}"
+        COMMAND ${IMGUI_FONT_EMBED_COMMAND} -nostatic "${CMAKE_CURRENT_SOURCE_DIR}/fonts/${FONT_FILE}" ${fontname_cpp} > "${OUTPUT}.g.cpp"
+        DEPENDS ${IMGUI_FONT_EMBED_DEPENDS} "fonts/${FONT_FILE}"
         USES_TERMINAL
     )
     list(APPEND OutputList "${OUTPUT}.g.cpp")

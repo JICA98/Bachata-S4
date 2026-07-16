@@ -15,6 +15,36 @@ class RuntimeProcessLauncherTest {
     val temporaryFolder = TemporaryFolder()
 
     @Test
+    fun buildsNativeFexCommandWithoutBox64() {
+        val base = validRequest()
+        val fexShadPs4 = Files.write(
+            base.runtimeRoot.resolve("host/shadps4-arm64-fex"),
+            byteArrayOf(3),
+        )
+        val request = base.copy(
+            shadPs4Executable = fexShadPs4,
+            guestBackend = RuntimeGuestBackend.FEX,
+        )
+        val launcher = RuntimeProcessLauncher { FakeProcessHandle() }
+
+        assertEquals(
+            listOf(
+                request.nativeLibraryDir.resolve("libbachata_host_loader.so").toRealPath().toString(),
+                "--library-path",
+                request.runtimeRoot.resolve("host").toRealPath().toString(),
+                fexShadPs4.toRealPath().toString(),
+                "--override-root",
+                request.overrideRoot.toRealPath().toString(),
+                "--bachata-storage-root",
+                request.storageRoot.toRealPath().toString(),
+                "--bachata-socket",
+                request.socketPath,
+            ),
+            launcher.command(request),
+        )
+    }
+
+    @Test
     fun buildsExactShellFreeCommand() {
         val request = validRequest()
         val launcher = RuntimeProcessLauncher { FakeProcessHandle() }

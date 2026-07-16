@@ -17,7 +17,13 @@ data class RuntimeProcessRequest(
     val arguments: List<String> = emptyList(),
     val outputPath: Path? = null,
     val box64Mode: Box64Mode = Box64Mode.HOST_GLIBC,
+    val guestBackend: RuntimeGuestBackend = RuntimeGuestBackend.BOX64,
 )
+
+enum class RuntimeGuestBackend {
+    BOX64,
+    FEX,
+}
 
 interface RuntimeProcessHandle {
     val isAlive: Boolean
@@ -66,27 +72,30 @@ class RuntimeProcessLauncher(
         }
         request.arguments.forEach { require('\u0000' !in it) { "Runtime argument contains NUL" } }
 
-        val box64Command = when (request.box64Mode) {
-            Box64Mode.APK_NATIVE -> {
-                val box64 = request.nativeLibraryDir.resolve(BOX64_LIBRARY).toRealPath()
-                validateNativeExecutable(nativeLibraryDir, box64, "APK native Box64")
-                listOf(box64.toString())
-            }
-            Box64Mode.HOST_GLIBC -> {
-                // Host loader/Box64 must live in the APK nativeLibraryDir. Android denies
-                // execve (EACCES) for binaries under filesDir even with +x (see 0.1.3 logs).
-                // package-runtime / install-host-jnilibs.mjs installs:
-                //   libbachata_host_loader.so  (ld-linux-aarch64.so.1)
-                //   libbachata_host_box64.so   (box64)
-                // The runtime host/ tree still provides glibc + X11 libraries via --library-path.
+        val launchCommand = when (request.guestBackend) {
+            RuntimeGuestBackend.FEX -> {
                 val loader = request.nativeLibraryDir.resolve(HOST_LOADER_LIBRARY).toRealPath()
-                val box64 = request.nativeLibraryDir.resolve(HOST_BOX64_LIBRARY).toRealPath()
                 validateNativeFile(nativeLibraryDir, loader, "Host glibc loader")
-                validateNativeFile(nativeLibraryDir, box64, "Host Box64")
-                listOf(loader.toString(), "--library-path", hostDirectory.toString(), box64.toString())
+                val expected = hostDirectory.resolve(FEX_SHADPS4).toRealPath()
+                require(shadPs4 == expected) { "FEX executable must be the verified native runtime binary" }
+                listOf(loader.toString(), "--library-path", hostDirectory.toString())
+            }
+            RuntimeGuestBackend.BOX64 -> when (request.box64Mode) {
+                Box64Mode.APK_NATIVE -> {
+                    val box64 = request.nativeLibraryDir.resolve(BOX64_LIBRARY).toRealPath()
+                    validateNativeExecutable(nativeLibraryDir, box64, "APK native Box64")
+                    listOf(box64.toString())
+                }
+                Box64Mode.HOST_GLIBC -> {
+                    val loader = request.nativeLibraryDir.resolve(HOST_LOADER_LIBRARY).toRealPath()
+                    val box64 = request.nativeLibraryDir.resolve(HOST_BOX64_LIBRARY).toRealPath()
+                    validateNativeFile(nativeLibraryDir, loader, "Host glibc loader")
+                    validateNativeFile(nativeLibraryDir, box64, "Host Box64")
+                    listOf(loader.toString(), "--library-path", hostDirectory.toString(), box64.toString())
+                }
             }
         }
-        return box64Command + listOf(
+        return launchCommand + listOf(
             shadPs4.toString(),
             "--override-root",
             overrideRootArgument.toString(),
@@ -147,6 +156,7 @@ class RuntimeProcessLauncher(
         const val HOST_LOADER_LIBRARY = "libbachata_host_loader.so"
         const val HOST_BOX64_LIBRARY = "libbachata_host_box64.so"
         const val BOX64_LIBRARY = "libbox64.so"
+        const val FEX_SHADPS4 = "shadps4-arm64-fex"
         val NULL_DEVICE = File("/dev/null")
         val ALLOWED_ENVIRONMENT = setOf(
             "HOME",

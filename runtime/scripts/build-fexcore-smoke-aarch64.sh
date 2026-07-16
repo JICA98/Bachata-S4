@@ -10,6 +10,9 @@ PATCH_PATH="${PROJECT_ROOT}/runtime/patches/fex-fexcore-only.patch"
 SMOKE_SOURCE="${PROJECT_ROOT}/runtime/probes/fexcore-smoke.cpp"
 VERIFIER="${PROJECT_ROOT}/runtime/tests/verify-fexcore-smoke-build.mjs"
 GUEST_ENGINE_SOURCE="${PROJECT_ROOT}/src/core/fex/fex_guest_engine.cpp"
+FEX_GUEST_CPU_SOURCE="${PROJECT_ROOT}/src/core/guest_cpu/fex_guest_cpu.cpp"
+HLE_CALL_ADAPTER_SOURCE="${PROJECT_ROOT}/src/core/guest_cpu/hle_call_adapter.cpp"
+FEX_HLE_BRIDGE_SOURCE="${PROJECT_ROOT}/src/core/guest_cpu/fex_hle_bridge.cpp"
 GUEST_HARNESS_SOURCE="${PROJECT_ROOT}/runtime/probes/fexcore-guest-harness.cpp"
 GUEST_HARNESS_VERIFIER="${PROJECT_ROOT}/runtime/tests/verify-fexcore-guest-harness-build.mjs"
 PATCH_APPLIED=0
@@ -82,8 +85,9 @@ cmake -S "${FEX_SOURCE}" -B "${BUILD_DIR}" -G Ninja \
   -DTUNE_CPU=none \
   -DCMAKE_INSTALL_PREFIX="${STAGE_DIR}" \
   -DBUILD_FEXCORE_ONLY=ON \
+  -DFEXCORE_PROJECT_SOURCE_DIR="${PROJECT_ROOT}/src" \
   -DFEXCORE_SMOKE_SOURCE="${SMOKE_SOURCE}" \
-  -DFEXCORE_GUEST_HARNESS_SOURCES="${GUEST_ENGINE_SOURCE};${GUEST_HARNESS_SOURCE}" \
+  -DFEXCORE_GUEST_HARNESS_SOURCES="${GUEST_ENGINE_SOURCE};${FEX_GUEST_CPU_SOURCE};${HLE_CALL_ADAPTER_SOURCE};${FEX_HLE_BRIDGE_SOURCE};${GUEST_HARNESS_SOURCE}" \
   -DBUILD_TESTING=OFF \
   -DBUILD_FEX_LINUX_TESTS=OFF \
   -DBUILD_THUNKS=OFF \
@@ -97,6 +101,10 @@ cmake -S "${FEX_SOURCE}" -B "${BUILD_DIR}" -G Ninja \
   -DENABLE_ZYDIS=OFF \
   -DENABLE_FEXCORE_PROFILER=OFF
 
+# The guest harness sources live outside FEX's checkout. Force their target to
+# rebuild after configuration so an older external-source timestamp cannot leave
+# a stale ARM64 probe in the runtime package.
+ninja -C "${BUILD_DIR}" -t clean fexcore-guest-harness
 cmake --build "${BUILD_DIR}" --target fexcore-smoke fexcore-guest-harness --parallel
 rm -rf "${STAGE_DIR}"
 mkdir -p "${STAGE_DIR}"

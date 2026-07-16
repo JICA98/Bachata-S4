@@ -18,6 +18,13 @@ const REQUIRED_MARKERS = [
   "tls=ok",
   "invalidation=ok",
   "teardown=ok",
+  "FEXCORE_GUEST_CPU_OK",
+  "caller_mapping=ok",
+  "thread_lifetime=ok",
+  "thread_isolation=ok",
+  "overlap_rejected=ok",
+  "nested_callback=ok",
+  "HLE_VENEER_OK scalar=ok pointer=ok function_pointer=ok vector=ok stack=ok mapping=ok",
 ];
 
 function fail(message) {

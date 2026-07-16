@@ -29,8 +29,10 @@ class FexGuestHarnessDeviceTest {
             val installed = targetContext.assets.open("runtime/runtime.zip").use { bundle ->
                 RuntimeInstaller(installRoot).install(bundle, manifest).getOrThrow()
             }
-            val marker =
+            val phase1Marker =
                 "FEXCORE_GUEST_ENGINE_OK revision=f2b679f6028ce1c38875233aecfcf5d3f8ebecec gpr=ok rflags=ok xmm=ok bridge=ok threads=ok tls=ok invalidation=ok teardown=ok"
+            val marker =
+                "$phase1Marker\nFEXCORE_GUEST_CPU_OK caller_mapping=ok thread_lifetime=ok invalidation=ok thread_isolation=ok overlap_rejected=ok nested_callback=ok\nHLE_VENEER_OK scalar=ok pointer=ok function_pointer=ok vector=ok stack=ok mapping=ok"
             val result = RuntimeProbeLauncher().run(
                 request = RuntimeProbeRequest(
                     nativeLibraryDir = File(targetContext.applicationInfo.nativeLibraryDir).toPath(),

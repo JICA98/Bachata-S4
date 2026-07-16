@@ -1,13 +1,20 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include "../guest_cpu/guest_cpu.h"
+#include "../guest_cpu/hle_call_adapter.h"
+
+#include <cstddef>
 #include <cstdint>
 #include <memory>
+#include <optional>
+#include <span>
 #include <variant>
 
 namespace Core::Fex {
 
 enum class EngineStage {
+  Request,
   Config,
   Context,
   Mapping,
@@ -30,7 +37,10 @@ class GuestBridge {
 public:
   virtual ~GuestBridge() = default;
 
-  virtual EngineResult<uint64_t> Invoke(uint64_t operation, uint64_t argument) = 0;
+  virtual EngineResult<bool> Invoke(GuestCpu::HleCallFrame& frame) = 0;
+  virtual std::optional<GuestExecutionRange> QueryExecutableRange(std::uintptr_t) {
+    return std::nullopt;
+  }
 };
 
 struct GuestRunResult final {
@@ -45,6 +55,8 @@ struct GuestRunResult final {
 
 class GuestEngine final {
 public:
+  class Thread;
+
   static EngineResult<std::unique_ptr<GuestEngine>> Create(GuestBridge& bridge);
 
   GuestEngine(const GuestEngine&) = delete;
@@ -52,7 +64,16 @@ public:
   ~GuestEngine();
 
   EngineResult<GuestRunResult> RunControlledHarness();
+  EngineResult<Thread*> CreateThread(const GuestExecutionRequest& request);
+  EngineResult<GuestExecutionState> Run(Thread& thread);
+  EngineResult<GuestExecutionState> CallGuest(std::uintptr_t rip,
+                                               std::span<const std::uint64_t> arguments);
+  EngineResult<bool> Invalidate(Thread& thread, std::uintptr_t begin, std::size_t size);
+  EngineResult<bool> DestroyThread(Thread*& thread);
   EngineResult<bool> Shutdown();
+  std::uintptr_t ReturnAddress() const;
+  GuestExecutionRange ReturnRange() const;
+  GuestExecutionRange CallbackReturnRange() const;
 
 private:
   class Impl;

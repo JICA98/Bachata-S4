@@ -8,6 +8,7 @@ import com.bachatas4.android.runtime.settings.RuntimeSettingCatalog
 import com.bachatas4.android.runtime.settings.RuntimeSettingSpec
 import com.bachatas4.android.runtime.settings.SettingKind
 import com.bachatas4.android.runtime.settings.ValueSource
+import com.bachatas4.android.runtime.process.RuntimeGuestBackend
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
@@ -24,6 +25,15 @@ class RuntimeLaunchProfileProviderTest {
     private val devKit = spec("general.dev_kit_mode", "General.dev_kit_mode", SettingKind.BOOLEAN, JsonPrimitive(false))
     private val boxLog = spec("box64.log", "BOX64_LOG", SettingKind.ENUM, JsonPrimitive("0"), listOf("0", "1", "2"))
     private val catalog = RuntimeSettingCatalog(listOf(devKit), listOf(boxLog))
+
+    @Test
+    fun selectsFexOnlyForSonicCompatibilitySlice() {
+        val store = RuntimeProfileStore(temporaryFolder.root)
+        val provider = RuntimeLaunchProfileProvider(store, catalog, emptyMap())
+
+        assertEquals(RuntimeGuestBackend.FEX, provider.guestBackend("CUSA07023"))
+        assertEquals(RuntimeGuestBackend.BOX64, provider.guestBackend("CUSA00999"))
+    }
 
     @Test
     fun resolvesGameOverridesAndCompatibilityConstraints() = runTest {
