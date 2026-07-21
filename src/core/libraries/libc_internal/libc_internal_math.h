@@ -11,4 +11,7 @@ class SymbolsResolver;
 
 namespace Libraries::LibcInternal {
 void RegisterlibSceLibcInternalMath(Core::Loader::SymbolsResolver* sym);
+#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU
+void RegisterFexLibcMathAliases(Core::Loader::SymbolsResolver* sym);
+#endif
 } // namespace Libraries::LibcInternal

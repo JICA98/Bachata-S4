@@ -1043,6 +1043,33 @@ s64 MemoryManager::ProtectBytes(VAddr addr, VirtualMemoryArea& vma_base, u64 siz
     return adjusted_size;
 }
 
+s32 MemoryManager::SealGuestExecutable(VAddr addr, u64 size) {
+    if (size == 0) return ORBIS_OK;
+
+    std::scoped_lock lk{mutex, unmap_mutex};
+    if (!IsValidMapping(addr, size) || addr > std::numeric_limits<VAddr>::max() - size) {
+        return ORBIS_KERNEL_ERROR_EACCES;
+    }
+
+    const auto end = addr + size;
+    auto cursor = addr;
+    while (cursor < end) {
+        const auto it = FindVMA(cursor);
+        const auto& vma = it->second;
+        if (vma.base > cursor || vma.IsFree() || vma.type == VMAType::Reserved ||
+            vma.type == VMAType::PoolReserved || False(vma.prot & MemoryProt::CpuExec) ||
+            True(vma.prot & MemoryProt::CpuWrite)) {
+            return ORBIS_KERNEL_ERROR_EACCES;
+        }
+        const auto vma_end = vma.base + vma.size;
+        if (vma_end <= cursor) return ORBIS_KERNEL_ERROR_EACCES;
+        cursor = std::min(end, vma_end);
+    }
+
+    impl.Protect(addr, size, MemoryPermission::Read | MemoryPermission::Execute);
+    return ORBIS_OK;
+}
+
 s32 MemoryManager::Protect(VAddr addr, u64 size, MemoryProt prot) {
     // If size is zero, then there's nothing to protect
     if (size == 0) {

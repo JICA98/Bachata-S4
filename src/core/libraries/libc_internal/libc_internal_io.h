@@ -95,4 +95,7 @@ s32 PS4_SYSV_ABI internal_fclose(OrbisFILE* file);
 
 void RegisterlibSceLibcInternalIo(Core::Loader::SymbolsResolver* sym);
 void ForceRegisterlibSceLibcInternalIo(Core::Loader::SymbolsResolver* sym);
+#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU
+void RegisterFexLibcIoAliases(Core::Loader::SymbolsResolver* sym);
+#endif
 } // namespace Libraries::LibcInternal

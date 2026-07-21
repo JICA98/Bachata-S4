@@ -36,7 +36,14 @@ struct HleCallFrame final {
     bool (*validate_range)(void* context, std::uintptr_t address, std::size_t size,
                            bool writable){};
     void* validate_context{};
+    bool (*publish_host_range)(void* context, std::uintptr_t address, std::size_t size,
+                               bool writable){};
+    bool (*revoke_host_range)(void* context, std::uintptr_t address){};
+    void* host_range_context{};
 };
+
+[[nodiscard]] bool PublishHostRange(const void* pointer, std::size_t size, bool writable);
+[[nodiscard]] bool RevokeHostRange(const void* pointer);
 
 struct HleCallFailure final {
     int error{};

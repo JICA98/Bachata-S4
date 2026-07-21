@@ -77,6 +77,8 @@ test("FEX guest backend keeps production wiring and per-thread execution state",
 
   assert.match(engineSource, /RangesOverlap/);
   assert.match(engineSource, /ValidateHostMapping/);
+  assert.match(engineSource, /permissions\[0\] != 'r'/);
+  assert.doesNotMatch(engineSource, /permissions\[2\] != 'x'/);
   assert.match(engineSource, /thread_local InvocationState\* ActiveInvocation/);
   assert.match(engineSource, /RegisterThread\(FEXCore::Core::InternalThreadState\* thread/);
   assert.match(engineSource, /QueryGuestExecutableRange\(FEXCore::Core::InternalThreadState\* thread,[\s\S]*uint64_t address\)/);
@@ -90,4 +92,5 @@ test("FEX guest backend keeps production wiring and per-thread execution state",
   assert.match(backendSource, /DestroyThreadOrAbort/);
   assert.match(harness, /thread_isolation=ok/);
   assert.match(harness, /overlap_rejected=ok/);
+  assert.match(harness, /mprotect\(address, size, PROT_READ\)/);
 });

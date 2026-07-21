@@ -3,6 +3,7 @@
 #include "hle_call_adapter.h"
 
 #include <cerrno>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <sys/mman.h>
@@ -80,6 +81,10 @@ HleVeneerResult HleVeneerAllocator::Allocate(const HleCallAdapter& adapter) {
     allocations.emplace_back(page, size);
     executable_ranges.push_back({reinterpret_cast<std::uintptr_t>(page), size, true, false});
     const auto address = reinterpret_cast<u64>(page);
+    std::fprintf(stderr, "BACHATA_FEX_VENEER address=%#llx operation=%llu name=%.*s\n",
+                 static_cast<unsigned long long>(address),
+                 static_cast<unsigned long long>(adapter.Operation()),
+                 static_cast<int>(adapter.Name().size()), adapter.Name().data());
     veneers.emplace(adapter.Operation(), address);
     return address;
 }

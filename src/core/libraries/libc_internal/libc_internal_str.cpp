@@ -35,6 +35,10 @@ s32 PS4_SYSV_ABI internal_strncmp(const char* str1, const char* str2, size_t num
     return std::strncmp(str1, str2, num);
 }
 
+char* PS4_SYSV_ABI internal_strcpy(char* dest, const char* src) {
+    return std::strcpy(dest, src);
+}
+
 size_t PS4_SYSV_ABI internal_strlen(const char* str) {
     return std::strlen(str);
 }
@@ -71,5 +75,14 @@ void RegisterlibSceLibcInternalStr(Core::Loader::SymbolsResolver* sym) {
     LIB_FUNCTION("Ls4tzzhimqQ", "libSceLibcInternal", 1, "libSceLibcInternal", internal_strcat);
     LIB_FUNCTION("ob5xAW4ln-0", "libSceLibcInternal", 1, "libSceLibcInternal", internal_strchr);
 }
+
+#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU
+void RegisterFexLibcStrAliases(Core::Loader::SymbolsResolver* sym) {
+    LIB_FUNCTION("kiZSXIWd9vg", "libc", 1, "libc", internal_strcpy);
+    LIB_FUNCTION("Ls4tzzhimqQ", "libc", 1, "libc", internal_strcat);
+    LIB_FUNCTION("j4ViWNHEgww", "libc", 1, "libc", internal_strlen);
+    LIB_FUNCTION("Ovb2dSJOAuE", "libc", 1, "libc", internal_strcmp);
+}
+#endif
 
 } // namespace Libraries::LibcInternal

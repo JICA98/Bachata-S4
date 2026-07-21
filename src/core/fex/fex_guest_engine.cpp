@@ -12,12 +12,16 @@
 #include <FEXCore/Core/X86Enums.h>
 #include <FEXCore/Debug/InternalThreadState.h>
 #include <FEXCore/HLE/SyscallHandler.h>
+#include <FEXCore/Utils/ArchHelpers/Arm64.h>
+#include <FEXCore/Utils/LogManager.h>
 
 #include <sys/mman.h>
 #include <unistd.h>
+#include <ucontext.h>
 
 #include <array>
 #include <algorithm>
+#include <atomic>
 #include <cerrno>
 #include <cstdlib>
 #include <cstring>
@@ -39,16 +43,59 @@ namespace Core::Fex {
 namespace {
 
 constexpr long kRequiredPageSize = 4096;
+constexpr uint32_t kFexBlockTraceLimit = 256;
 constexpr uint64_t kAddLeft = 0x1122'3344'5566'7788ULL;
 constexpr uint64_t kAddRight = 0x0102'0304'0506'0708ULL;
 constexpr uint64_t kXorLeft = 0xfedc'ba98'7654'3210ULL;
 constexpr uint64_t kXorRight = 0x0f0f'0f0f'0f0f'0f0fULL;
 constexpr uint64_t kStackSentinel = 0xaabb'ccdd'eeff'0011ULL;
+constexpr uint64_t kUnalignedSentinel = 0x8877'6655'4433'2211ULL;
 constexpr uint64_t kThreadSentinelA = 0x1111'2222'3333'4444ULL;
 constexpr uint64_t kThreadSentinelB = 0x5555'6666'7777'8888ULL;
 constexpr uint64_t kCallbackInput = 0x1020'3040'5060'7080ULL;
 constexpr uint64_t kInvalidationInitial = 0x0123'4567'89ab'cdefULL;
 constexpr uint64_t kInvalidationUpdated = 0xfedc'ba98'7654'3210ULL;
+
+std::atomic_uint32_t FexBlockTraceCount {};
+
+struct ActiveFexExecutionState final {
+  FEXCore::Context::Context* Context {};
+  FEXCore::Core::InternalThreadState* Thread {};
+};
+
+thread_local ActiveFexExecutionState ActiveFexExecution;
+
+class FexExecutionSignalScope final {
+public:
+  FexExecutionSignalScope(FEXCore::Context::Context& context,
+                          FEXCore::Core::InternalThreadState* thread)
+    : Previous {ActiveFexExecution} {
+    ActiveFexExecution = {&context, thread};
+  }
+
+  FexExecutionSignalScope(const FexExecutionSignalScope&) = delete;
+  FexExecutionSignalScope& operator=(const FexExecutionSignalScope&) = delete;
+
+  ~FexExecutionSignalScope() {
+    ActiveFexExecution = Previous;
+  }
+
+private:
+  ActiveFexExecutionState Previous;
+};
+
+void FexMessageHandler(LogMan::DebugLevels level, const char* message) {
+  if (message == nullptr) return;
+  if (std::strstr(message, "Guest x86 Begin") != nullptr) {
+    const auto index = FexBlockTraceCount.fetch_add(1, std::memory_order_relaxed);
+    if (index < kFexBlockTraceLimit) {
+      std::fprintf(stderr, "BACHATA_FEX_BLOCK index=%u %s\n", index, message);
+    }
+  } else if (level <= LogMan::ERROR) {
+    std::fprintf(stderr, "BACHATA_FEX_ERROR level=%u %s\n", static_cast<unsigned>(level),
+                 message);
+  }
+}
 
 EngineFailure Failure(EngineStage stage, int error) {
   return {stage, error == 0 ? EIO : error};
@@ -71,7 +118,15 @@ bool RangesOverlap(const GuestExecutionRange& lhs, const GuestExecutionRange& rh
 
 EngineResult<bool> ValidateHostMapping(const GuestExecutionRange& range) {
   std::ifstream maps {"/proc/self/maps"};
-  if (!maps.is_open()) return Failure(EngineStage::Mapping, errno == 0 ? EACCES : errno);
+  if (!maps.is_open()) {
+    const auto error = errno == 0 ? EACCES : errno;
+    std::fprintf(stderr,
+                 "BACHATA_FEX_MAPPING_FAIL reason=proc_maps_open error=%d begin=%#lx size=%#lx "
+                 "executable=%d writable=%d\n",
+                 error, static_cast<unsigned long>(range.Begin),
+                 static_cast<unsigned long>(range.Size), range.Executable, range.Writable);
+    return Failure(EngineStage::Mapping, error);
+  }
 
   const auto rangeEnd = range.Begin + range.Size;
   std::uintptr_t covered = range.Begin;
@@ -85,15 +140,37 @@ EngineResult<bool> ValidateHostMapping(const GuestExecutionRange& range) {
     const auto end = static_cast<std::uintptr_t>(mapEnd);
     if (end <= covered) continue;
     if (begin > covered) break;
-    if (range.Executable && (permissions[2] != 'x' || permissions[1] == 'w')) {
+    // FEX translates guest instructions into its own executable code cache. Guest code only
+    // needs to be readable on the host, and must be sealed against writes before translation.
+    if (range.Executable && (permissions[0] != 'r' || permissions[1] == 'w')) {
+      std::fprintf(stderr,
+                   "BACHATA_FEX_MAPPING_FAIL reason=host_guest_code_permission error=%d "
+                   "begin=%#lx size=%#lx executable=%d writable=%d host_begin=%#lx "
+                   "host_end=%#lx host_permissions=%s\n",
+                   EACCES, static_cast<unsigned long>(range.Begin),
+                   static_cast<unsigned long>(range.Size), range.Executable, range.Writable,
+                   static_cast<unsigned long>(begin), static_cast<unsigned long>(end), permissions);
       return Failure(EngineStage::Mapping, EACCES);
     }
     if (range.Writable && (permissions[1] != 'w' || permissions[2] == 'x')) {
+      std::fprintf(stderr,
+                   "BACHATA_FEX_MAPPING_FAIL reason=host_write_permission error=%d begin=%#lx "
+                   "size=%#lx executable=%d writable=%d host_begin=%#lx host_end=%#lx "
+                   "host_permissions=%s\n",
+                   EACCES, static_cast<unsigned long>(range.Begin),
+                   static_cast<unsigned long>(range.Size), range.Executable, range.Writable,
+                   static_cast<unsigned long>(begin), static_cast<unsigned long>(end), permissions);
       return Failure(EngineStage::Mapping, EACCES);
     }
     covered = std::min(end, rangeEnd);
     if (covered == rangeEnd) return true;
   }
+  std::fprintf(stderr,
+               "BACHATA_FEX_MAPPING_FAIL reason=host_mapping_gap error=%d begin=%#lx size=%#lx "
+               "executable=%d writable=%d covered=%#lx\n",
+               EFAULT, static_cast<unsigned long>(range.Begin),
+               static_cast<unsigned long>(range.Size), range.Executable, range.Writable,
+               static_cast<unsigned long>(covered));
   return Failure(EngineStage::Mapping, EFAULT);
 }
 
@@ -111,10 +188,23 @@ EngineResult<bool> ValidateRequest(const GuestExecutionRequest& request) {
       return Failure(EngineStage::Request, EINVAL);
     }
     if (range.Executable && range.Writable) {
+      std::fprintf(stderr,
+                   "BACHATA_FEX_MAPPING_FAIL reason=guest_wx error=%d index=%zu begin=%#lx "
+                   "size=%#lx\n",
+                   EACCES, index, static_cast<unsigned long>(range.Begin),
+                   static_cast<unsigned long>(range.Size));
       return Failure(EngineStage::Mapping, EACCES);
     }
     for (size_t previous = 0; previous < index; ++previous) {
       if (RangesOverlap(range, request.MappedRanges[previous])) {
+        const auto& prior = request.MappedRanges[previous];
+        std::fprintf(stderr,
+                     "BACHATA_FEX_MAPPING_FAIL reason=guest_overlap error=%d previous=%zu "
+                     "previous_begin=%#lx previous_size=%#lx index=%zu begin=%#lx size=%#lx\n",
+                     EACCES, previous, static_cast<unsigned long>(prior.Begin),
+                     static_cast<unsigned long>(prior.Size), index,
+                     static_cast<unsigned long>(range.Begin),
+                     static_cast<unsigned long>(range.Size));
         return Failure(EngineStage::Mapping, EACCES);
       }
     }
@@ -139,6 +229,11 @@ public:
       FEXCore::Config::Load();
       FEXCore::Config::Set(FEXCore::Config::CONFIG_IS64BIT_MODE, "1");
       FEXCore::Config::Set(FEXCore::Config::CONFIG_DISABLETELEMETRY, "1");
+      const bool traceEnabled = std::getenv("BACHATA_FEX_TRACE") != nullptr;
+      FEXCore::Config::Set(FEXCore::Config::CONFIG_X86DISASSEMBLE,
+                           traceEnabled ? "1" : "0");
+      FexBlockTraceCount.store(0, std::memory_order_relaxed);
+      LogMan::Msg::InstallHandler(FexMessageHandler);
     }
     ++Users;
     return true;
@@ -147,7 +242,10 @@ public:
   static EngineResult<bool> Release() {
     std::scoped_lock lock {Mutex};
     if (Users == 0) return Failure(EngineStage::Teardown, EINVAL);
-    if (--Users == 0) FEXCore::Config::Shutdown();
+    if (--Users == 0) {
+      FEXCore::Config::Shutdown();
+      LogMan::Msg::UnInstallHandler();
+    }
     return true;
   }
 
@@ -553,6 +651,7 @@ GuestCode BuildGuestCode() {
   code.insert(code.end(), {0x48, 0xbf}); // mov rdi, bridge argument
   AppendImmediate(code, bridgeArgument);
   code.insert(code.end(), {0x0f, 0x05}); // syscall
+  code.insert(code.end(), {0x4d, 0x8b, 0x2c, 0x24}); // mov r13, [r12]
 
   code.push_back(0xe8); // call stack_test
   const size_t callDisplacementOffset = code.size();
@@ -587,6 +686,37 @@ GuestCode BuildGuestCode() {
 }
 
 } // namespace
+
+bool HandleGuestSignal(int signal, siginfo_t* info, void* rawContext) noexcept {
+#if defined(__aarch64__)
+  if (signal != SIGBUS || info == nullptr || info->si_code != BUS_ADRALN ||
+      rawContext == nullptr || ActiveFexExecution.Context == nullptr ||
+      ActiveFexExecution.Thread == nullptr) {
+    return false;
+  }
+
+  auto* context = reinterpret_cast<ucontext_t*>(rawContext);
+  const auto pc = static_cast<std::uintptr_t>(context->uc_mcontext.pc);
+  if (!ActiveFexExecution.Context->IsAddressInCodeBuffer(ActiveFexExecution.Thread, pc)) {
+    return false;
+  }
+
+  auto* registers = reinterpret_cast<std::uint64_t*>(context->uc_mcontext.regs);
+  const auto adjustment = FEXCore::ArchHelpers::Arm64::HandleUnalignedAccess(
+      ActiveFexExecution.Thread,
+      FEXCore::ArchHelpers::Arm64::UnalignedHandlerType::HalfBarrier, pc, registers);
+  if (!adjustment.has_value()) {
+    return false;
+  }
+  context->uc_mcontext.pc = pc + *adjustment;
+  return true;
+#else
+  static_cast<void>(signal);
+  static_cast<void>(info);
+  static_cast<void>(rawContext);
+  return false;
+#endif
+}
 
 class GuestEngine::Thread final {
 public:
@@ -623,7 +753,7 @@ public:
     if (!code.IsValid()) return Failure(EngineStage::Mapping, code.Error());
     std::memcpy(code.Get(), guest.Bytes.data(), guest.Bytes.size());
     __builtin___clear_cache(reinterpret_cast<char*>(code.Get()), reinterpret_cast<char*>(code.Get()) + PageSize);
-    const auto codeProtection = code.Protect(PROT_READ | PROT_EXEC);
+    const auto codeProtection = code.Protect(PROT_READ);
     if (const auto* error = std::get_if<EngineFailure>(&codeProtection)) return *error;
 
     Mapping stackPage {PageSize, PROT_READ | PROT_WRITE};
@@ -666,7 +796,14 @@ public:
     std::memcpy(&initialXmm[1], &fpRightBits, sizeof(fpRightBits));
     Context->SetXMMRegistersFromState(thread, initialXmm.data(), HostFeatures.SupportsAVX ? initialYmmHigh.data() : nullptr);
 
-    Context->ExecuteThread(thread);
+    std::memcpy(static_cast<uint8_t*>(stackPage.Get()) + 1, &kUnalignedSentinel,
+                sizeof(kUnalignedSentinel));
+    thread->CurrentFrame->State.gregs[FEXCore::X86State::REG_R12] =
+        reinterpret_cast<uint64_t>(stackPage.Get()) + 1;
+    {
+      FexExecutionSignalScope signalScope {*Context, thread};
+      Context->ExecuteThread(thread);
+    }
     if (Syscalls->FailureResult(invocation)) return *Syscalls->FailureResult(invocation);
 
     auto& state = thread->CurrentFrame->State;
@@ -679,6 +816,8 @@ public:
     const auto rflags = Context->ReconstructCompactedEFLAGS(thread, false, nullptr, 0);
     result.Rflags = (rflags & ((1U << 0) | (1U << 1) | (1U << 6) | (1U << 11))) == (1U << 1);
     result.Bridge = Syscalls->Invoked(invocation) && state.gregs[FEXCore::X86State::REG_RAX] == Syscalls->Result(invocation);
+    result.Unaligned =
+        state.gregs[FEXCore::X86State::REG_R13] == kUnalignedSentinel;
 
     std::array<__uint128_t, FEXCore::Core::CPUState::NUM_XMMS> finalXmm {};
     std::array<__uint128_t, FEXCore::Core::CPUState::NUM_XMMS> finalYmmHigh {};
@@ -702,7 +841,10 @@ public:
 
     state.gregs[FEXCore::X86State::REG_RDI] = kCallbackInput;
     state.gregs[FEXCore::X86State::REG_RSP] = initialRsp;
-    Context->HandleCallback(thread, initialRip + guest.CallbackOffset);
+    {
+      FexExecutionSignalScope signalScope {*Context, thread};
+      Context->HandleCallback(thread, initialRip + guest.CallbackOffset);
+    }
     if (state.gregs[FEXCore::X86State::REG_RAX] != kCallbackInput + 5 || state.gregs[FEXCore::X86State::REG_RSP] != initialRsp) {
       return Failure(EngineStage::Execute, EPROTO);
     }
@@ -710,7 +852,10 @@ public:
     const uint64_t invalidationRip = initialRip + guest.InvalidationOffset;
     state.rip = invalidationRip;
     state.gregs[FEXCore::X86State::REG_RSP] = initialRsp;
-    Context->ExecuteThread(thread);
+    {
+      FexExecutionSignalScope signalScope {*Context, thread};
+      Context->ExecuteThread(thread);
+    }
     if (state.gregs[FEXCore::X86State::REG_RAX] != kInvalidationInitial) return Failure(EngineStage::Invalidate, EPROTO);
 
     auto* invalidationImmediate = static_cast<uint8_t*>(code.Get()) + guest.InvalidationImmediateOffset;
@@ -720,14 +865,17 @@ public:
       if (const auto* error = std::get_if<EngineFailure>(&writable)) return *error;
       std::memcpy(invalidationImmediate, &kInvalidationUpdated, sizeof(kInvalidationUpdated));
       __builtin___clear_cache(reinterpret_cast<char*>(code.Get()), reinterpret_cast<char*>(code.Get()) + PageSize);
-      const auto executable = code.Protect(PROT_READ | PROT_EXEC);
+      const auto executable = code.Protect(PROT_READ);
       if (const auto* error = std::get_if<EngineFailure>(&executable)) return *error;
       Context->InvalidateCodeBuffersCodeRange(invalidationRip, 11);
       Context->InvalidateThreadCachedCodeRange(thread, invalidationRip, 11);
     }
     state.rip = invalidationRip;
     state.gregs[FEXCore::X86State::REG_RSP] = initialRsp;
-    Context->ExecuteThread(thread);
+    {
+      FexExecutionSignalScope signalScope {*Context, thread};
+      Context->ExecuteThread(thread);
+    }
     result.Invalidation = state.gregs[FEXCore::X86State::REG_RAX] == kInvalidationUpdated;
     if (!result.Invalidation) return Failure(EngineStage::Invalidate, EPROTO);
 
@@ -780,7 +928,10 @@ public:
     segmentState.Initialize(thread->CurrentFrame->State);
     callRetStack.Initialize(thread);
     thread->CurrentFrame->State.fs_cached = reinterpret_cast<uint64_t>(tlsPage.Get());
-    Context->ExecuteThread(thread);
+    {
+      FexExecutionSignalScope signalScope {*Context, thread};
+      Context->ExecuteThread(thread);
+    }
     return thread->CurrentFrame->State.gregs[FEXCore::X86State::REG_RAX] == sentinel &&
            thread->CurrentFrame->State.gregs[FEXCore::X86State::REG_RSP] == initialRsp;
   }
@@ -947,7 +1098,10 @@ EngineResult<GuestExecutionState> GuestEngine::Run(Thread& thread) {
 
   BridgeSyscallHandler::InvocationScope invocationScope {*ImplState->Syscalls, thread.Invocation,
                                                           thread.Native};
-  ImplState->Context->ExecuteThread(thread.Native);
+  {
+    FexExecutionSignalScope signalScope {*ImplState->Context, thread.Native};
+    ImplState->Context->ExecuteThread(thread.Native);
+  }
   if (ImplState->Syscalls->FailureResult(thread.Invocation)) {
     return *ImplState->Syscalls->FailureResult(thread.Invocation);
   }
@@ -1004,7 +1158,10 @@ EngineResult<GuestExecutionState> GuestEngine::CallGuest(
                 sizeof(uint64_t));
   }
 
-  ImplState->Context->HandleCallback(thread, rip);
+  {
+    FexExecutionSignalScope signalScope {*ImplState->Context, thread};
+    ImplState->Context->HandleCallback(thread, rip);
+  }
   if (ImplState->Syscalls->ActiveFailure()) {
     return *ImplState->Syscalls->ActiveFailure();
   }

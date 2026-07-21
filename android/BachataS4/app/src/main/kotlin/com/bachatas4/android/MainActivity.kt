@@ -1,5 +1,6 @@
 package com.bachatas4.android
 
+import android.annotation.SuppressLint
 import android.os.Bundle
 import android.os.Build
 import androidx.activity.ComponentActivity
@@ -23,6 +24,7 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     @Inject lateinit var legacyRuntimeSettingsMigration: LegacyRuntimeSettingsMigration
 
+    @SuppressLint("RestrictedApi")
     override fun dispatchKeyEvent(event: KeyEvent): Boolean =
         GamepadInputManager.dispatchKeyEvent(event) || super.dispatchKeyEvent(event)
 

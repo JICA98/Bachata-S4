@@ -6,7 +6,6 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
-import android.content.pm.ServiceInfo
 import android.net.Uri
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
@@ -31,6 +30,17 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/**
+ * Copies a user-selected game tree into app storage.
+ *
+ * Runs as a normal (non-foreground) service so the app does not need
+ * FOREGROUND_SERVICE / FOREGROUND_SERVICE_SPECIAL_USE. Progress still updates
+ * [ImportManager] for in-app UI; optional status-bar notifications use
+ * [NotificationManager] only (no startForeground).
+ *
+ * Trade-off: if the user backgrounds the app during a long import, the system
+ * may kill this service more readily than a foreground service would.
+ */
 @AndroidEntryPoint
 class ImportService : Service() {
     @Inject lateinit var contentImporter: ContentImporter
@@ -49,7 +59,7 @@ class ImportService : Service() {
             ImportManager.ACTION_CANCEL -> {
                 importJob?.cancel()
                 ImportManager.reset()
-                stopForeground(STOP_FOREGROUND_REMOVE)
+                getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
                 stopSelf()
                 return START_NOT_STICKY
             }
@@ -78,16 +88,7 @@ class ImportService : Service() {
 
     private suspend fun runImport(uriString: String) {
         try {
-            val notification = buildNotification("Preparing import…", 0, 0, true)
-            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                startForeground(
-                    NOTIFICATION_ID,
-                    notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE,
-                )
-            } else {
-                startForeground(NOTIFICATION_ID, notification)
-            }
+            updateNotification("Preparing import…", 0, 0, true)
 
             val uri = Uri.parse(uriString)
             contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
@@ -154,6 +155,7 @@ class ImportService : Service() {
         } catch (failure: Throwable) {
             if (failure is CancellationException) {
                 ImportManager.reset()
+                getSystemService(NotificationManager::class.java).cancel(NOTIFICATION_ID)
             } else {
                 val message = failure.message ?: failure.javaClass.simpleName
                 ImportManager.update(ImportProgress.Failed(message))
@@ -166,7 +168,6 @@ class ImportService : Service() {
                 getSystemService(NotificationManager::class.java).notify(NOTIFICATION_ID, errorNotification)
             }
         } finally {
-            stopForeground(STOP_FOREGROUND_DETACH)
             stopSelf()
         }
     }

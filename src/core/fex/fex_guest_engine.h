@@ -11,6 +11,10 @@
 #include <span>
 #include <variant>
 
+#ifndef _WIN32
+#include <signal.h>
+#endif
+
 namespace Core::Fex {
 
 enum class EngineStage {
@@ -50,8 +54,13 @@ struct GuestRunResult final {
   bool Bridge {};
   bool Threads {};
   bool Tls {};
+  bool Unaligned {};
   bool Invalidation {};
 };
+
+#ifndef _WIN32
+bool HandleGuestSignal(int signal, siginfo_t* info, void* rawContext) noexcept;
+#endif
 
 class GuestEngine final {
 public:

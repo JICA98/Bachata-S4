@@ -249,11 +249,17 @@ static void* RunThread(void* arg) {
     auto* const stack =
         (void*)(((size_t)curthread->attr.stackaddr_attr + curthread->attr.stacksize_attr) & (~15));
 #ifdef SHADPS4_ENABLE_FEX_GUEST_CPU
-    const std::array<u64, 1> start_arguments{reinterpret_cast<u64>(curthread->arg)};
-    const auto guest_result = Core::GuestCpu::RunGuestFunctionOrAbort(
-        reinterpret_cast<void*>(curthread->start_routine), start_arguments,
-        "pthread start", reinterpret_cast<VAddr>(stack));
-    void* ret = reinterpret_cast<void*>(guest_result);
+    void* ret{};
+    if (Core::GuestCpu::IsGuestFunctionAddress(
+            reinterpret_cast<const void*>(curthread->start_routine))) {
+        const std::array<u64, 1> start_arguments{reinterpret_cast<u64>(curthread->arg)};
+        const auto guest_result = Core::GuestCpu::RunGuestFunctionOrAbort(
+            reinterpret_cast<void*>(curthread->start_routine), start_arguments,
+            "pthread start", reinterpret_cast<VAddr>(stack));
+        ret = reinterpret_cast<void*>(guest_result);
+    } else {
+        ret = curthread->start_routine(curthread->arg);
+    }
 #else
     void* ret = _runOnAnotherStack(curthread->arg, (void*)curthread->start_routine, stack);
 #endif

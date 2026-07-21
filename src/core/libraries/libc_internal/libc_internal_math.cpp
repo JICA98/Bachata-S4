@@ -114,6 +114,21 @@ float PS4_SYSV_ABI internal_log10f(float x) {
     return log10f(x);
 }
 
+#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU
+float PS4_SYSV_ABI fex_libc_fsin(float arg, u32 m, s32 n) {
+    ASSERT(n == 0);
+    return m != 0 ? cosf(arg) : sinf(arg);
+}
+
+void RegisterFexLibcMathAliases(Core::Loader::SymbolsResolver* sym) {
+    LIB_FUNCTION("ZtjspkJQ+vw", "libc", 1, "libc", fex_libc_fsin);
+    LIB_FUNCTION("ZE6RNL+eLbk", "libc", 1, "libc", internal_tanf);
+    LIB_FUNCTION("GZWjF-YIFFk", "libc", 1, "libc", internal_asinf);
+    LIB_FUNCTION("QI-x0SL8jhw", "libc", 1, "libc", internal_acosf);
+    LIB_FUNCTION("EH-x713A99c", "libc", 1, "libc", internal_atan2f);
+}
+#endif
+
 void RegisterlibSceLibcInternalMath(Core::Loader::SymbolsResolver* sym) {
     LIB_FUNCTION("H8ya2H00jbI", "libSceLibcInternal", 1, "libSceLibcInternal", internal_sin);
     LIB_FUNCTION("Q4rRL34CEeE", "libSceLibcInternal", 1, "libSceLibcInternal", internal_sinf);

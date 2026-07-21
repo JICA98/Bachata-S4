@@ -12,7 +12,7 @@ test("FEX Phase 1 runner replacement-installs and captures bounded sanitized pro
   assert.match(source, /set -euo pipefail/);
   assert.match(source, /install -r -t/);
   assert.match(source, /FexGuestHarnessDeviceTest/);
-  assert.match(source, /FEXCORE_GUEST_ENGINE_OK revision=f2b679f6028ce1c38875233aecfcf5d3f8ebecec gpr=ok rflags=ok xmm=ok bridge=ok threads=ok tls=ok invalidation=ok teardown=ok/);
+  assert.match(source, /FEXCORE_GUEST_ENGINE_OK revision=f2b679f6028ce1c38875233aecfcf5d3f8ebecec gpr=ok rflags=ok xmm=ok bridge=ok threads=ok tls=ok unaligned=ok invalidation=ok teardown=ok/);
   assert.match(source, /started_ns=\$\(date \+%s%N\)/);
   assert.match(source, /finished_ns=\$\(date \+%s%N\)/);
   assert.match(source, /\(finished_ns - started_ns\) \/ 1000000/);

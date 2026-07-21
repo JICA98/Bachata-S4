@@ -4,11 +4,13 @@ import test from "node:test";
 
 const headerUrl = new URL("../../src/core/fex/fex_guest_engine.h", import.meta.url);
 const sourceUrl = new URL("../../src/core/fex/fex_guest_engine.cpp", import.meta.url);
+const signalsUrl = new URL("../../src/core/signals.cpp", import.meta.url);
 const harnessUrl = new URL("../probes/fexcore-guest-harness.cpp", import.meta.url);
 
 test("guest engine owns the FEX context and controlled bridge lifecycle", () => {
   const header = readFileSync(headerUrl, "utf8");
   const source = readFileSync(sourceUrl, "utf8");
+  const signals = readFileSync(signalsUrl, "utf8");
   const harness = readFileSync(harnessUrl, "utf8");
 
   assert.match(header, /namespace Core::Fex/);
@@ -37,10 +39,23 @@ test("guest engine owns the FEX context and controlled bridge lifecycle", () => 
   }
   assert.match(source, /mmap\(/);
   assert.match(source, /mprotect\(/);
+  assert.match(source, /CONFIG_X86DISASSEMBLE/);
+  assert.match(source, /getenv\("BACHATA_FEX_TRACE"\)/);
+  assert.match(source, /traceEnabled \? "1" : "0"/);
+  assert.match(source, /LogMan::Msg::InstallHandler/);
+  assert.match(source, /BACHATA_FEX_BLOCK/);
+  assert.match(source, /kFexBlockTraceLimit/);
+  assert.match(source, /HandleUnalignedAccess/);
+  assert.match(source, /IsAddressInCodeBuffer/);
+  assert.match(source, /UnalignedHandlerType::HalfBarrier/);
+  assert.match(source, /FexExecutionSignalScope/);
+  assert.match(signals, /Core::Fex::HandleGuestSignal\(sig, info, raw_context\)/);
+  assert.match(source, /\{0x4d, 0x8b, 0x2c, 0x24\}.*mov r13, \[r12\]/);
+  assert.match(header, /bool Unaligned/);
   assert.doesNotMatch(source, /box64|wine|system\s*\(/i);
 
   assert.match(harness, /FEXCORE_GUEST_ENGINE_OK/);
-  assert.match(harness, /gpr=ok rflags=ok xmm=ok bridge=ok threads=ok tls=ok invalidation=ok teardown=ok/);
+  assert.match(harness, /gpr=ok rflags=ok xmm=ok bridge=ok threads=ok tls=ok unaligned=ok invalidation=ok teardown=ok/);
   assert.doesNotMatch(harness, /box64|wine|system\s*\(/i);
 });
 

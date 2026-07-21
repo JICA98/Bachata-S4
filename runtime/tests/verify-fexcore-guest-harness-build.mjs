@@ -16,6 +16,7 @@ const REQUIRED_MARKERS = [
   "bridge=ok",
   "threads=ok",
   "tls=ok",
+  "unaligned=ok",
   "invalidation=ok",
   "teardown=ok",
   "FEXCORE_GUEST_CPU_OK",

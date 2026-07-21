@@ -12,15 +12,20 @@ test("FEX function imports use typed guest veneers rather than host addresses", 
   const resolverSource = read("src/core/loader/symbols_resolver.cpp");
   const registrations = read("src/core/libraries/libs.h");
   const linker = read("src/core/linker.cpp");
+  const memoryHeader = read("src/core/memory.h");
+  const memorySource = read("src/core/memory.cpp");
   const engine = read("src/core/fex/fex_guest_engine.cpp");
   const bridgeHeader = read("src/core/guest_cpu/fex_hle_bridge.h");
   const bridgeSource = read("src/core/guest_cpu/fex_hle_bridge.cpp");
+  const pthreadSource = read("src/core/libraries/kernel/threads/pthread.cpp");
   const veneerHeader = read("src/core/guest_cpu/hle_call_adapter.h");
   const veneerSource = read("src/core/guest_cpu/hle_call_adapter.cpp");
   const smokeBuild = read("runtime/scripts/build-fexcore-smoke-aarch64.sh");
   const fexPatch = read("runtime/patches/fex-fexcore-only.patch");
   const harness = read("runtime/probes/fexcore-guest-harness.cpp");
   const harnessVerifier = read("runtime/tests/verify-fexcore-guest-harness-build.mjs");
+  const libcMemory = read("src/core/libraries/libc_internal/libc_internal_memory.cpp");
+  const libcIo = read("src/core/libraries/libc_internal/libc_internal_io.cpp");
 
   assert.match(resolverHeader, /class HleCallAdapter/);
   assert.match(resolverHeader, /std::shared_ptr<GuestCpu::HleCallAdapter>/);
@@ -43,6 +48,7 @@ test("FEX function imports use typed guest veneers rather than host addresses", 
   assert.match(veneerSource, /mprotect/);
   assert.match(veneerSource, /__builtin___clear_cache/);
   assert.doesNotMatch(veneerSource, /PROT_WRITE\s*\|\s*PROT_EXEC/);
+  assert.match(veneerSource, /BACHATA_FEX_VENEER/);
   assert.match(veneerHeader, /DecodeArgument/);
   assert.match(veneerHeader, /validate_range/);
   assert.match(veneerHeader, /bool writable/);
@@ -50,6 +56,10 @@ test("FEX function imports use typed guest veneers rather than host addresses", 
   assert.match(veneerHeader, /std::unordered_map<u64, u64>/);
   assert.match(veneerHeader, /SysVIntegerArgs\{7, 6, 2, 1, 8, 9\}/);
   assert.match(veneerHeader, /IsGuestFunctionPointer/);
+  assert.match(veneerHeader, /publish_host_range/);
+  assert.match(veneerHeader, /revoke_host_range/);
+  assert.match(veneerHeader, /PublishHostRange/);
+  assert.match(veneerHeader, /RevokeHostRange/);
   assert.doesNotMatch(veneerHeader, /SysVIntegerArgs\{5, 4, 3, 2, 8, 9\}/);
 
   const relocate = linker.slice(linker.indexOf("void Linker::Relocate"), linker.indexOf("bool Linker::Resolve"));
@@ -59,13 +69,40 @@ test("FEX function imports use typed guest veneers rather than host addresses", 
   assert.doesNotMatch(engine, /HleGuestBridge::Invoke/);
   assert.match(bridgeHeader, /class HleGuestBridge/);
   assert.match(bridgeSource, /HleGuestBridge::Invoke/);
+  assert.match(bridgeSource, /BACHATA_FEX_HLE_BEGIN/);
+  assert.match(bridgeSource, /BACHATA_FEX_HLE_END/);
+  assert.match(bridgeHeader, /struct HostRange/);
+  assert.match(bridgeHeader, /std::shared_mutex host_range_mutex/);
+  assert.match(bridgeSource, /HleGuestBridge::PublishHostRange/);
+  assert.match(bridgeSource, /HleGuestBridge::RevokeHostRange/);
+  assert.match(bridgeSource, /ValidatePublishedHostRange/);
+  assert.match(libcMemory, /PublishHostRange\(ptr, std::max<u64>\(count, 1\), true\)/);
+  assert.match(libcMemory, /RevokeHostRange\(ptr\)/);
+  assert.match(libcIo, /PublishHostRange\(file, sizeof\(\*file\), true\)/);
+  assert.match(libcIo, /RevokeHostRange\(file\)/);
   assert.match(engine, /Bridge\.Invoke\(hleFrame\)/);
+  assert.match(engine, /BACHATA_FEX_MAPPING_FAIL/);
+  assert.match(linker, /FEX guest range overlap/);
+  assert.match(linker, /SealGuestExecutableMemory/);
+  assert.match(linker, /memory\.SealGuestExecutable\(begin, size\)/);
+  assert.match(memoryHeader, /s32 SealGuestExecutable\(VAddr addr, u64 size\)/);
+  assert.match(memorySource, /MemoryManager::SealGuestExecutable/);
+  assert.match(memorySource, /MemoryPermission::Read \| MemoryPermission::Execute/);
   assert.match(engine, /frame->State\.xmm\.sse/);
   assert.match(engine, /REG_RCX\] = frame->State\.gregs\[FEXCore::X86State::REG_R10\]/);
+  const threadStart = pthreadSource.slice(
+    pthreadSource.indexOf("static void* RunThread"),
+    pthreadSource.indexOf("int PS4_SYSV_ABI posix_pthread_create_name_np"),
+  );
+  assert.match(threadStart, /IsGuestFunctionAddress/);
+  assert.match(threadStart, /RunGuestFunctionOrAbort/);
+  assert.match(threadStart, /curthread->start_routine\(curthread->arg\)/);
   assert.match(smokeBuild, /HLE_CALL_ADAPTER_SOURCE/);
   assert.match(smokeBuild, /FEX_HLE_BRIDGE_SOURCE/);
   assert.match(smokeBuild, /FEXCORE_PROJECT_SOURCE_DIR/);
   assert.match(fexPatch, /FEXCORE_PROJECT_SOURCE_DIR/);
+  assert.doesNotMatch(fexPatch, /BACHATA_FEX_(?:COMPILE|LINK)/);
+  assert.doesNotMatch(fexPatch, /return HostCode/);
   assert.match(harness, /HleGuestBridge/);
   assert.match(harness, /HLE_VENEER_OK scalar=ok pointer=ok function_pointer=ok vector=ok stack=ok mapping=ok/);
   assert.match(harnessVerifier, /HLE_VENEER_OK scalar=ok pointer=ok function_pointer=ok vector=ok stack=ok mapping=ok/);

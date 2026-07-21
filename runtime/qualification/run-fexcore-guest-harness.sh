@@ -13,7 +13,7 @@ apk="$project_root/android/BachataS4/app/build/outputs/apk/playstore/debug/app-p
 test_apk="$project_root/android/BachataS4/app/build/outputs/apk/androidTest/playstore/debug/app-playstore-debug-androidTest.apk"
 build_directory="$project_root/runtime/build/fex-phase1-evidence"
 evidence="$project_root/runtime/evidence/sm8650/fex-phase1.json"
-marker="FEXCORE_GUEST_ENGINE_OK revision=f2b679f6028ce1c38875233aecfcf5d3f8ebecec gpr=ok rflags=ok xmm=ok bridge=ok threads=ok tls=ok invalidation=ok teardown=ok"
+marker="FEXCORE_GUEST_ENGINE_OK revision=f2b679f6028ce1c38875233aecfcf5d3f8ebecec gpr=ok rflags=ok xmm=ok bridge=ok threads=ok tls=ok unaligned=ok invalidation=ok teardown=ok"
 
 require_equal() {
   local actual=$1

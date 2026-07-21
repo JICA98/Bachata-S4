@@ -5,6 +5,8 @@
 #include "hle_call_adapter.h"
 
 #include <optional>
+#include <shared_mutex>
+#include <vector>
 
 namespace Core::GuestCpu {
 
@@ -25,6 +27,19 @@ public:
     std::optional<GuestExecutionRange> QueryExecutableRange(std::uintptr_t address) override;
 
 private:
+    struct HostRange final {
+        std::uintptr_t begin{};
+        std::uintptr_t end{};
+        bool writable{};
+    };
+
+    static bool ValidateRange(void* context, std::uintptr_t address, std::size_t size,
+                              bool writable);
+    static bool PublishHostRange(void* context, std::uintptr_t address, std::size_t size,
+                                 bool writable);
+    static bool RevokeHostRange(void* context, std::uintptr_t address);
+    bool ValidatePublishedHostRange(std::uintptr_t address, std::size_t size,
+                                    bool writable) const;
     void Report(const HleCallFailure& failure) const;
 
     HleCallRegistry& registry;
@@ -34,6 +49,8 @@ private:
     void* reporter_context;
     ExecutableRangeQuery executable_query;
     void* executable_query_context;
+    mutable std::shared_mutex host_range_mutex;
+    std::vector<HostRange> host_ranges;
 };
 
 } // namespace Core::GuestCpu

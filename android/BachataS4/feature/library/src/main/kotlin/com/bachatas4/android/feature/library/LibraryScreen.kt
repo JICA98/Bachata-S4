@@ -108,7 +108,7 @@ fun LibraryScreen(
     }
     val notificationPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
-    ) { /* nothing, just needed for import service foreground notification */ }
+    ) { /* optional: import progress notification when user grants POST_NOTIFICATIONS */ }
     LaunchedEffect(Unit) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {

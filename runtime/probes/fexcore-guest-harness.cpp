@@ -50,9 +50,9 @@ public:
   [[nodiscard]] void* Get() const { return address; }
   [[nodiscard]] size_t Size() const { return size; }
 
-  [[nodiscard]] bool MakeExecutable() {
+  [[nodiscard]] bool MakeGuestExecutable() {
     __builtin___clear_cache(static_cast<char*>(address), static_cast<char*>(address) + size);
-    return mprotect(address, size, PROT_READ | PROT_EXEC) == 0;
+    return mprotect(address, size, PROT_READ) == 0;
   }
 
 private:
@@ -223,7 +223,8 @@ int main() {
   auto runResult = engine->RunControlledHarness();
   if (const auto* failure = std::get_if<Core::Fex::EngineFailure>(&runResult)) return Fail(*failure);
   const auto result = std::get<Core::Fex::GuestRunResult>(runResult);
-  if (!result.Gpr || !result.Rflags || !result.Xmm || !result.Bridge || !result.Threads || !result.Tls || !result.Invalidation) {
+  if (!result.Gpr || !result.Rflags || !result.Xmm || !result.Bridge || !result.Threads ||
+      !result.Tls || !result.Unaligned || !result.Invalidation) {
     return Fail({Core::Fex::EngineStage::Execute, EPROTO});
   }
   Trace("controlled-engine-ok");
@@ -239,7 +240,7 @@ int main() {
   std::array<uint8_t, 11> code {0x48, 0xb8, 0, 0, 0, 0, 0, 0, 0, 0, 0xf4}; // mov rax, imm64; hlt
   std::memcpy(code.data() + 2, &kCallerMappedResult, sizeof(kCallerMappedResult));
   std::memcpy(codePage.Get(), code.data(), code.size());
-  if (!codePage.MakeExecutable()) return 1;
+  if (!codePage.MakeGuestExecutable()) return 1;
 
   auto backendResult = Core::FexGuestCpuBackend::Create(bridge);
   if (const auto* failure = std::get_if<Core::GuestExecutionFailure>(&backendResult)) return Fail(*failure);
@@ -321,7 +322,7 @@ int main() {
   std::memcpy(nestedBytes.data() + 2, &kNestedCallbackOperation,
               sizeof(kNestedCallbackOperation));
   std::memcpy(nestedCode.Get(), nestedBytes.data(), nestedBytes.size());
-  if (!nestedCode.MakeExecutable()) {
+  if (!nestedCode.MakeGuestExecutable()) {
     return Fail({Core::GuestExecutionStage::Mapping, errno});
   }
 
@@ -405,7 +406,9 @@ int main() {
   Mapping hleReturnPage{static_cast<size_t>(pageSize)};
   if (!hleReturnPage.IsValid()) return Fail({Core::GuestExecutionStage::Mapping, ENOMEM});
   *static_cast<uint8_t*>(hleReturnPage.Get()) = 0xf4;
-  if (!hleReturnPage.MakeExecutable()) return Fail({Core::GuestExecutionStage::Mapping, errno});
+  if (!hleReturnPage.MakeGuestExecutable()) {
+    return Fail({Core::GuestExecutionStage::Mapping, errno});
+  }
 
   RangeList activeRanges;
   HleFailureCapture hleFailure;
@@ -533,7 +536,7 @@ int main() {
     return Fail({Core::GuestExecutionStage::Execute, hleFailure.error == 0 ? EPROTO : hleFailure.error});
   }
 
-  std::printf("FEXCORE_GUEST_ENGINE_OK revision=%s gpr=ok rflags=ok xmm=ok bridge=ok threads=ok tls=ok invalidation=ok teardown=ok\n", kFexRevision);
+  std::printf("FEXCORE_GUEST_ENGINE_OK revision=%s gpr=ok rflags=ok xmm=ok bridge=ok threads=ok tls=ok unaligned=ok invalidation=ok teardown=ok\n", kFexRevision);
   std::printf("FEXCORE_GUEST_CPU_OK caller_mapping=ok thread_lifetime=ok invalidation=ok thread_isolation=ok overlap_rejected=ok nested_callback=ok\n");
   std::printf("HLE_VENEER_OK scalar=ok pointer=ok function_pointer=ok vector=ok stack=ok mapping=ok\n");
   return 0;

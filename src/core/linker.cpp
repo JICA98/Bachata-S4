@@ -66,6 +66,15 @@ static bool ValidateGuestMemory(void* context, std::uintptr_t address, std::size
     return true;
 }
 
+static bool SealGuestExecutableMemory(MemoryManager& memory, std::uintptr_t begin,
+                                      std::size_t size) {
+    const auto result = memory.SealGuestExecutable(begin, size);
+    if (result == ORBIS_OK) return true;
+    LOG_ERROR(Core_Linker, "Unable to seal FEX guest code begin={:#x} size={:#x}: {}", begin,
+              size, result);
+    return false;
+}
+
 static std::optional<GuestExecutionRange> QueryGuestExecutableMemory(void* context,
                                                                      std::uintptr_t address) {
     if (context == nullptr || address == 0) return std::nullopt;
@@ -81,6 +90,7 @@ static std::optional<GuestExecutionRange> QueryGuestExecutableMemory(void* conte
     const auto begin = reinterpret_cast<std::uintptr_t>(range_start);
     const auto end = reinterpret_cast<std::uintptr_t>(range_end);
     if (begin == 0 || end <= begin) return std::nullopt;
+    if (!SealGuestExecutableMemory(*memory, begin, end - begin)) return std::nullopt;
     return GuestExecutionRange{begin, end - begin, true, false};
 }
 
@@ -207,6 +217,9 @@ std::optional<GuestExecutionRange> QueryGuestMemoryRange(MemoryManager& memory,
     const auto begin = reinterpret_cast<std::uintptr_t>(range_start);
     const auto end = reinterpret_cast<std::uintptr_t>(range_end);
     if (begin == 0 || end <= begin) return std::nullopt;
+    if (executable && !SealGuestExecutableMemory(memory, begin, end - begin)) {
+        return std::nullopt;
+    }
     return GuestExecutionRange{begin, end - begin, executable, writable};
 }
 
@@ -216,11 +229,22 @@ std::optional<GuestExecutionFailure> NormalizeGuestRanges(
     for (std::size_t index = 0; index < ranges.size(); ++index) {
         const auto& range = ranges[index];
         if (range.Begin == 0 || range.Size == 0 || range.Begin + range.Size < range.Begin) {
+            LOG_ERROR(Core_Linker,
+                      "Invalid FEX guest range index={} begin={:#x} size={:#x} executable={} "
+                      "writable={}",
+                      index, range.Begin, range.Size, range.Executable, range.Writable);
             return GuestExecutionFailure{GuestExecutionStage::Mapping, EINVAL};
         }
         if (index != 0) {
             const auto& previous = ranges[index - 1];
             if (previous.Begin + previous.Size > range.Begin) {
+                LOG_ERROR(Core_Linker,
+                          "FEX guest range overlap previous_index={} previous_begin={:#x} "
+                          "previous_size={:#x} previous_executable={} previous_writable={} "
+                          "index={} begin={:#x} size={:#x} executable={} writable={}",
+                          index - 1, previous.Begin, previous.Size, previous.Executable,
+                          previous.Writable, index, range.Begin, range.Size, range.Executable,
+                          range.Writable);
                 return GuestExecutionFailure{GuestExecutionStage::Mapping, EACCES};
             }
         }

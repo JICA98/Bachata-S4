@@ -37,6 +37,20 @@ test -r "$arm64_xext_lib" || {
   exit 1
 }
 
+# Debian runtime images can have runtime libraries without their development
+# packages' unversioned linker names. Keep the cross build reproducible without
+# modifying the host filesystem.
+arm64_link_dir="$build_dir/cross-link"
+mkdir -p "$arm64_link_dir"
+for library in libuuid.so.1 libudev.so.1; do
+  source_library="/usr/lib/aarch64-linux-gnu/$library"
+  test -r "$source_library" || {
+    echo "ARM64 $library is required" >&2
+    exit 1
+  }
+  ln -sfn "$source_library" "$arm64_link_dir/${library%.1}"
+done
+
 cmake -S "$project_root" -B "$build_dir" -G Ninja \
   -DCMAKE_SYSTEM_NAME=Linux \
   -DCMAKE_SYSTEM_PROCESSOR=aarch64 \
@@ -45,6 +59,7 @@ cmake -S "$project_root" -B "$build_dir" -G Ninja \
   -DCMAKE_C_COMPILER_TARGET=aarch64-linux-gnu \
   -DCMAKE_CXX_COMPILER_TARGET=aarch64-linux-gnu \
   -DCMAKE_FIND_ROOT_PATH=/usr/aarch64-linux-gnu \
+  -DCMAKE_EXE_LINKER_FLAGS:STRING="-L$arm64_link_dir" \
   -DX11_Xext_LIB:FILEPATH="$arm64_xext_lib" \
   -DXEXT_LIB:FILEPATH="$arm64_xext_lib" \
   -DIMGUI_FONT_EMBED_EXECUTABLE="$host_font_embed" \

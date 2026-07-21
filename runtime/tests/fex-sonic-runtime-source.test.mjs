@@ -16,12 +16,22 @@ test("Sonic packages and selects the native ARM64 FEX runtime without replacing 
   const profile = read("android/BachataS4/app/src/main/kotlin/com/bachatas4/android/RuntimeLaunchProfileProvider.kt");
   const launcher = read("android/BachataS4/core/runtime/src/main/kotlin/com/bachatas4/android/runtime/process/RuntimeProcessLauncher.kt");
   const service = read("android/BachataS4/app/src/main/kotlin/com/bachatas4/android/service/EmulationService.kt");
+  const libcMemory = read("src/core/libraries/libc_internal/libc_internal_memory.cpp");
+  const libcInternal = read("src/core/libraries/libc_internal/libc_internal.cpp");
+  const libcMath = read("src/core/libraries/libc_internal/libc_internal_math.cpp");
+  const libcIo = read("src/core/libraries/libc_internal/libc_internal_io.cpp");
+  const libcStr = read("src/core/libraries/libc_internal/libc_internal_str.cpp");
+  const libcCxa = read("src/core/libraries/libc_internal/libc_internal_cxa.cpp");
+  const audioOut = read("src/core/libraries/audio/audioout.cpp");
 
   assert.match(build, /build-shadps4-arm64\.sh/);
   assert.match(dependencies, /libx11-dev:arm64/);
   assert.match(dependencies, /libxext-dev:arm64/);
   assert.match(arm64Build, /XEXT_LIB:FILEPATH/);
   assert.match(arm64Build, /SDL_VIDEO_DRIVER_X11_DYNAMIC_XEXT/);
+  assert.match(arm64Build, /libuuid\.so\.1/);
+  assert.match(arm64Build, /libudev\.so\.1/);
+  assert.match(arm64Build, /CMAKE_EXE_LINKER_FLAGS/);
   assert.match(pack, /shadps4-arm64-fex/);
   assert.match(verify, /host\/shadps4-arm64-fex/);
   assert.match(profile, /CUSA07023/);
@@ -31,4 +41,33 @@ test("Sonic packages and selects the native ARM64 FEX runtime without replacing 
   assert.match(service, /host\/shadps4-arm64-fex/);
   assert.match(pack, /bin\/shadps4/);
   assert.match(launcher, /RuntimeGuestBackend\.BOX64/);
+  assert.match(libcMemory, /void PS4_SYSV_ABI fex_libc_init_env\(\)/);
+  assert.match(libcMemory, /void\* PS4_SYSV_ABI fex_libc_operator_new\(u64 count\)/);
+  assert.match(libcMemory, /fex_libc_allocate\(count\)/);
+  assert.match(libcMemory, /void RegisterFexLibcMemoryAliases\(Core::Loader::SymbolsResolver\* sym\)/);
+  assert.match(libcInternal, /#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU[\s\S]*RegisterFexLibcMemoryAliases\(sym\);[\s\S]*RegisterFexLibcMathAliases\(sym\);[\s\S]*RegisterFexLibcIoAliases\(sym\);[\s\S]*RegisterFexLibcStrAliases\(sym\);[\s\S]*RegisterFexLibcCxaAliases\(sym\);[\s\S]*#endif/);
+  const fexAliases = libcMemory.slice(libcMemory.indexOf("#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU"));
+  assert.match(fexAliases, /LIB_FUNCTION\("bzQExy189ZI", "libc", 1, "libc", fex_libc_init_env\)/);
+  assert.match(fexAliases, /LIB_FUNCTION\("fJnpuVVBbKk", "libc", 1, "libc", fex_libc_operator_new\)/);
+  assert.match(fexAliases, /LIB_FUNCTION\("gQX\+4GDQjpM", "libc", 1, "libc", fex_libc_malloc\)/);
+  assert.match(fexAliases, /LIB_FUNCTION\("Q3VBxCXhUHs", "libc", 1, "libc", internal_memcpy\)/);
+  assert.match(fexAliases, /LIB_FUNCTION\("8zTFvBIAIN8", "libc", 1, "libc", internal_memset\)/);
+  assert.match(fexAliases, /LIB_FUNCTION\("cpCOXWMgha0", "libc", 1, "libc", fex_libc_rand\)/);
+  assert.match(libcMath, /float PS4_SYSV_ABI fex_libc_fsin\(float arg, u32 m, s32 n\)/);
+  for (const nid of ["ZtjspkJQ\\+vw", "ZE6RNL\\+eLbk", "GZWjF-YIFFk", "QI-x0SL8jhw", "EH-x713A99c"])
+    assert.match(libcMath, new RegExp(`LIB_FUNCTION\\("${nid}", "libc", 1, "libc",`));
+  assert.match(libcIo, /s64 PS4_SYSV_ABI fex_libc_ftell\(OrbisFILE\* file\)/);
+  for (const nid of ["xeYO4u7uyJ0", "rQFVBXp-Cxg", "Qazy8LmXTvw", "lbB\\+UlZqVG0"])
+    assert.match(libcIo, new RegExp(`LIB_FUNCTION\\("${nid}", "libc", 1, "libc",`));
+  assert.match(libcStr, /char\* PS4_SYSV_ABI internal_strcpy\(char\* dest, const char\* src\)/);
+  for (const nid of ["kiZSXIWd9vg", "Ls4tzzhimqQ", "j4ViWNHEgww", "Ovb2dSJOAuE"])
+    assert.match(libcStr, new RegExp(`LIB_FUNCTION\\("${nid}", "libc", 1, "libc",`));
+  assert.match(libcCxa, /int PS4_SYSV_ABI fex_libc_cxa_guard_acquire\(u64\* guard_object\)/);
+  assert.match(libcCxa, /std::condition_variable GuardCondition/);
+  for (const nid of ["3GPpjQdAMTw", "9rAeANT2tyE", "2emaaluWzUw"])
+    assert.match(libcCxa, new RegExp(`LIB_FUNCTION\\("${nid}", "libc", 1, "libc",`));
+  assert.match(audioOut, /s32 PS4_SYSV_ABI fex_sceAudioOutOpen\([\s\S]*u32 param_raw\)/);
+  assert.match(audioOut, /static_assert\(sizeof\(param_type\) == sizeof\(param_raw\)\)/);
+  assert.match(audioOut, /LIB_FUNCTION\("ekNvsT22rsY", "libSceAudioOut", 1, "libSceAudioOut",[\s\S]*fex_sceAudioOutOpen\)/);
+  assert.doesNotMatch(fexAliases, /AddUnsupported/);
 });
