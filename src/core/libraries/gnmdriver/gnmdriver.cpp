@@ -4,6 +4,8 @@
 #include "gnm_error.h"
 #include "gnmdriver.h"
 
+#include <atomic>
+
 #include "common/assert.h"
 #include "common/debug.h"
 #include "common/elf_info.h"
@@ -2085,6 +2087,8 @@ int PS4_SYSV_ABI sceGnmSqttWaitForEvent() {
     return ORBIS_GNM_ERROR_FAILURE;
 }
 
+static std::atomic_uint32_t next_flip_token{1};
+
 static inline s32 PatchFlipRequest(u32* cmdbuf, u32 size, u32 vo_handle, u32 buf_idx, u32 flip_mode,
                                    s64 flip_arg, void* unk) {
     // check for `prepareFlip` packet
@@ -2098,8 +2102,9 @@ static inline s32 PatchFlipRequest(u32* cmdbuf, u32 size, u32 vo_handle, u32 buf
                "Invalid flip packet");
     ASSERT_MSG(buf_idx != 0xffff'ffffu, "Invalid VO buffer index");
 
-    const s32 flip_result = VideoOut::sceVideoOutSubmitEopFlip(vo_handle, buf_idx, flip_mode,
-                                                               flip_arg, nullptr /*unk*/);
+    const u32 flip_token = next_flip_token.fetch_add(1, std::memory_order_relaxed);
+    const s32 flip_result = VideoOut::sceVideoOutSubmitEopFlip(
+        vo_handle, buf_idx, flip_mode, flip_arg, nullptr /*unk*/, flip_token);
     if (flip_result != 0) {
         if (flip_result == 0x80290012) {
             LOG_ERROR(Lib_GnmDriver, "Flip queue is full");
@@ -2165,6 +2170,8 @@ static inline s32 PatchFlipRequest(u32* cmdbuf, u32 size, u32 vo_handle, u32 buf
             write_eop->data_hi = 0u;
         }
     }
+
+    nop->data_block[1] = flip_token;
 
     return ORBIS_OK;
 }

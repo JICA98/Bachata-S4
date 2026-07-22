@@ -738,7 +738,11 @@ bool Linker::Resolve(const std::string& name, Loader::SymbolType sym_type, Modul
     sr.type = sym_type;
 
     const auto* record = m_hle_symbols.FindSymbol(sr);
-    if (record) {
+#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU
+    if (record != nullptr && !record->hle_fallback) {
+#else
+    if (record != nullptr) {
+#endif
         *return_info = *record;
         Core::Devtools::Widget::ModuleList::AddModule(sr.library);
         return true;
@@ -768,9 +772,14 @@ bool Linker::Resolve(const std::string& name, Loader::SymbolType sym_type, Modul
     } else if (sym_type == Loader::SymbolType::Function) {
         return_info->name = aeronid ? aeronid->name : "Unknown function";
         return_info->virtual_address = 0;
-        return_info->hle_adapter = m_hle_symbols.AddUnsupportedFunction(sr);
-        LOG_WARNING(Core_Linker, "FEX: unresolved HLE {} will return ENOSYS", return_info->name);
-        return true;
+        if (record != nullptr && record->hle_fallback) {
+            return_info->hle_adapter = record->hle_adapter;
+        } else {
+            return_info->hle_adapter = m_hle_symbols.AddUnsupportedFunction(sr);
+        }
+        LOG_WARNING(Core_Linker, "FEX: unresolved HLE {} uses temporary ENOSYS fallback",
+                    return_info->name);
+        return false;
 #endif
     } else if (aeronid) {
         return_info->name = aeronid->name;
@@ -811,7 +820,7 @@ void* Linker::TlsGetAddr(u64 module_index, u64 offset) {
     if (!addr) {
         // Module was just loaded by above code. Allocate TLS block for it.
         const u32 init_image_size = module->tls.init_image_size;
-        u8* dest = reinterpret_cast<u8*>(heap_api->heap_malloc(module->tls.image_size));
+        u8* dest = reinterpret_cast<u8*>(CallAppHeapMalloc(module->tls.image_size));
         const u8* src = reinterpret_cast<const u8*>(module->tls.image_virtual_addr);
         std::memcpy(dest, src, init_image_size);
         std::memset(dest + init_image_size, 0, module->tls.image_size - init_image_size);
@@ -819,6 +828,40 @@ void* Linker::TlsGetAddr(u64 module_index, u64 offset) {
         addr = dest;
     }
     return addr + offset;
+}
+
+void* Linker::CallAppHeapMalloc(u64 size) {
+    ASSERT_MSG(heap_api != nullptr && heap_api->heap_malloc != nullptr,
+               "Guest heap malloc callback is unavailable");
+#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU
+    const std::array<u64, 1> arguments{size};
+    const auto result =
+        RunGuestFunction(reinterpret_cast<VAddr>(heap_api->heap_malloc), arguments);
+    if (const auto* failure = std::get_if<GuestExecutionFailure>(&result)) {
+        LOG_CRITICAL(Core_Linker, "FEX guest heap malloc failed at stage {}: {}",
+                     static_cast<int>(failure->Stage), failure->Error);
+        std::abort();
+    }
+    return reinterpret_cast<void*>(std::get<u64>(result));
+#else
+    return heap_api->heap_malloc(size);
+#endif
+}
+
+void Linker::CallAppHeapFree(void* pointer) {
+    ASSERT_MSG(heap_api != nullptr && heap_api->heap_free != nullptr,
+               "Guest heap free callback is unavailable");
+#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU
+    const std::array<u64, 1> arguments{reinterpret_cast<u64>(pointer)};
+    const auto result = RunGuestFunction(reinterpret_cast<VAddr>(heap_api->heap_free), arguments);
+    if (const auto* failure = std::get_if<GuestExecutionFailure>(&result)) {
+        LOG_CRITICAL(Core_Linker, "FEX guest heap free failed at stage {}: {}",
+                     static_cast<int>(failure->Stage), failure->Error);
+        std::abort();
+    }
+#else
+    heap_api->heap_free(pointer);
+#endif
 }
 
 void* Linker::AllocateTlsForThread(bool is_primary) {
@@ -843,7 +886,7 @@ void* Linker::AllocateTlsForThread(bool is_primary) {
         ASSERT_MSG(ret == 0, "Unable to allocate TLS+TCB for the primary thread");
     } else {
         if (heap_api) {
-            addr_out = heap_api->heap_malloc(total_tls_size);
+            addr_out = CallAppHeapMalloc(total_tls_size);
         } else {
             addr_out = std::malloc(total_tls_size);
         }
@@ -853,7 +896,7 @@ void* Linker::AllocateTlsForThread(bool is_primary) {
 
 void Linker::FreeTlsForNonPrimaryThread(void* pointer) {
     if (heap_api) {
-        heap_api->heap_free(pointer);
+        CallAppHeapFree(pointer);
     } else {
         std::free(pointer);
     }

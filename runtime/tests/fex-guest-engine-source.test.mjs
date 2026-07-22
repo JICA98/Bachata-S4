@@ -74,3 +74,16 @@ test("guest bridge runs before the stack proof and preserves arithmetic state", 
   assert.match(gprCheck, /REG_R9.*kXorLeft \^ kXorRight/);
   assert.doesNotMatch(gprCheck, /REG_RCX/);
 });
+
+test("nested guest calls isolate bridge failures from the outer invocation", () => {
+  const source = readFileSync(sourceUrl, "utf8");
+  const callGuestStart = source.indexOf("EngineResult<GuestExecutionState> GuestEngine::CallGuest(");
+  const callGuestEnd = source.indexOf("EngineResult<bool> GuestEngine::Invalidate(", callGuestStart);
+  const callGuest = source.slice(callGuestStart, callGuestEnd);
+
+  assert.ok(callGuestStart >= 0 && callGuestEnd > callGuestStart);
+  assert.match(callGuest, /BridgeSyscallHandler::InvocationState invocation/);
+  assert.match(callGuest, /BridgeSyscallHandler::InvocationScope invocationScope/);
+  assert.match(callGuest, /FailureResult\(invocation\)/);
+  assert.doesNotMatch(callGuest, /ActiveFailure\(\)/);
+});

@@ -9,6 +9,7 @@ import java.nio.file.StandardCopyOption
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
@@ -68,10 +69,19 @@ object ShadPs4ConfigManager {
             .filter { it.spec.section != "Box64" && it.value != null }
             .sortedBy { it.spec.nativeKey }
             .forEach { setting ->
+                val value = requireNotNull(setting.value)
+                val nativeValue = if (setting.spec.nativeEnumOrdinal) {
+                    val choice = (value as? JsonPrimitive)?.content
+                    val ordinal = setting.spec.choices.indexOf(choice)
+                    require(ordinal >= 0) { "Invalid enum value for ${setting.spec.id}" }
+                    JsonPrimitive(ordinal)
+                } else {
+                    value
+                }
                 document = document.set(
                     setting.spec.section,
                     setting.spec.nativeKey.substringAfter('.'),
-                    requireNotNull(setting.value),
+                    nativeValue,
                 )
             }
         val temporary = config.resolveSibling("${config.fileName}.tmp")

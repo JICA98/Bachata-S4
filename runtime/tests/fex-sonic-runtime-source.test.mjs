@@ -23,6 +23,7 @@ test("Sonic packages and selects the native ARM64 FEX runtime without replacing 
   const libcStr = read("src/core/libraries/libc_internal/libc_internal_str.cpp");
   const libcCxa = read("src/core/libraries/libc_internal/libc_internal_cxa.cpp");
   const audioOut = read("src/core/libraries/audio/audioout.cpp");
+  const linker = read("src/core/linker.cpp");
 
   assert.match(build, /build-shadps4-arm64\.sh/);
   assert.match(dependencies, /libx11-dev:arm64/);
@@ -41,24 +42,20 @@ test("Sonic packages and selects the native ARM64 FEX runtime without replacing 
   assert.match(service, /host\/shadps4-arm64-fex/);
   assert.match(pack, /bin\/shadps4/);
   assert.match(launcher, /RuntimeGuestBackend\.BOX64/);
-  assert.match(libcMemory, /void PS4_SYSV_ABI fex_libc_init_env\(\)/);
-  assert.match(libcMemory, /void\* PS4_SYSV_ABI fex_libc_operator_new\(u64 count\)/);
-  assert.match(libcMemory, /fex_libc_allocate\(count\)/);
   assert.match(libcMemory, /void RegisterFexLibcMemoryAliases\(Core::Loader::SymbolsResolver\* sym\)/);
-  assert.match(libcInternal, /#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU[\s\S]*RegisterFexLibcMemoryAliases\(sym\);[\s\S]*RegisterFexLibcMathAliases\(sym\);[\s\S]*RegisterFexLibcIoAliases\(sym\);[\s\S]*RegisterFexLibcStrAliases\(sym\);[\s\S]*RegisterFexLibcCxaAliases\(sym\);[\s\S]*#endif/);
+  assert.match(libcInternal, /#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU[\s\S]*RegisterFexLibcMemoryAliases\(sym\);[\s\S]*RegisterFexLibcMathAliases\(sym\);[\s\S]*RegisterFexLibcStrAliases\(sym\);[\s\S]*RegisterFexLibcCxaAliases\(sym\);[\s\S]*#endif/);
+  assert.doesNotMatch(libcInternal, /RegisterFexLibcIoAliases\(sym\)/);
   const fexAliases = libcMemory.slice(libcMemory.indexOf("#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU"));
-  assert.match(fexAliases, /LIB_FUNCTION\("bzQExy189ZI", "libc", 1, "libc", fex_libc_init_env\)/);
-  assert.match(fexAliases, /LIB_FUNCTION\("fJnpuVVBbKk", "libc", 1, "libc", fex_libc_operator_new\)/);
-  assert.match(fexAliases, /LIB_FUNCTION\("gQX\+4GDQjpM", "libc", 1, "libc", fex_libc_malloc\)/);
+  assert.doesNotMatch(fexAliases, /fex_libc_(?:init_env|allocate|operator_new|malloc|free|rand)/);
+  assert.doesNotMatch(fexAliases, /LIB_FUNCTION\("(?:bzQExy189ZI|fJnpuVVBbKk|gQX\+4GDQjpM|tIhsqj0qsFE|z\+P\+xCnWLBk|cpCOXWMgha0)"/);
   assert.match(fexAliases, /LIB_FUNCTION\("Q3VBxCXhUHs", "libc", 1, "libc", internal_memcpy\)/);
   assert.match(fexAliases, /LIB_FUNCTION\("8zTFvBIAIN8", "libc", 1, "libc", internal_memset\)/);
-  assert.match(fexAliases, /LIB_FUNCTION\("cpCOXWMgha0", "libc", 1, "libc", fex_libc_rand\)/);
   assert.match(libcMath, /float PS4_SYSV_ABI fex_libc_fsin\(float arg, u32 m, s32 n\)/);
   for (const nid of ["ZtjspkJQ\\+vw", "ZE6RNL\\+eLbk", "GZWjF-YIFFk", "QI-x0SL8jhw", "EH-x713A99c"])
     assert.match(libcMath, new RegExp(`LIB_FUNCTION\\("${nid}", "libc", 1, "libc",`));
-  assert.match(libcIo, /s64 PS4_SYSV_ABI fex_libc_ftell\(OrbisFILE\* file\)/);
+  assert.doesNotMatch(libcIo, /fex_libc_(?:fopen|fclose|ftell)/);
   for (const nid of ["xeYO4u7uyJ0", "rQFVBXp-Cxg", "Qazy8LmXTvw", "lbB\\+UlZqVG0"])
-    assert.match(libcIo, new RegExp(`LIB_FUNCTION\\("${nid}", "libc", 1, "libc",`));
+    assert.doesNotMatch(libcIo, new RegExp(`LIB_FUNCTION\\("${nid}", "libc", 1, "libc",`));
   assert.match(libcStr, /char\* PS4_SYSV_ABI internal_strcpy\(char\* dest, const char\* src\)/);
   for (const nid of ["kiZSXIWd9vg", "Ls4tzzhimqQ", "j4ViWNHEgww", "Ovb2dSJOAuE"])
     assert.match(libcStr, new RegExp(`LIB_FUNCTION\\("${nid}", "libc", 1, "libc",`));
@@ -69,5 +66,12 @@ test("Sonic packages and selects the native ARM64 FEX runtime without replacing 
   assert.match(audioOut, /s32 PS4_SYSV_ABI fex_sceAudioOutOpen\([\s\S]*u32 param_raw\)/);
   assert.match(audioOut, /static_assert\(sizeof\(param_type\) == sizeof\(param_raw\)\)/);
   assert.match(audioOut, /LIB_FUNCTION\("ekNvsT22rsY", "libSceAudioOut", 1, "libSceAudioOut",[\s\S]*fex_sceAudioOutOpen\)/);
+  assert.match(linker, /void\* Linker::CallAppHeapMalloc\(u64 size\)/);
+  assert.match(linker, /RunGuestFunction\(reinterpret_cast<VAddr>\(heap_api->heap_malloc\), arguments\)/);
+  assert.match(linker, /void Linker::CallAppHeapFree\(void\* pointer\)/);
+  assert.match(linker, /RunGuestFunction\(reinterpret_cast<VAddr>\(heap_api->heap_free\), arguments\)/);
+  assert.match(linker, /u8\* dest = reinterpret_cast<u8\*>\(CallAppHeapMalloc\(module->tls.image_size\)\)/);
+  assert.match(linker, /addr_out = CallAppHeapMalloc\(total_tls_size\)/);
+  assert.match(linker, /CallAppHeapFree\(pointer\)/);
   assert.doesNotMatch(fexAliases, /AddUnsupported/);
 });

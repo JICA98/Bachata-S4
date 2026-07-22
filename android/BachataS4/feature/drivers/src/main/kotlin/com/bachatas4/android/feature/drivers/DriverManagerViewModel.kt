@@ -19,6 +19,11 @@ data class DriverManagerUiState(
     val available: List<TurnipReleaseAsset> = emptyList(),
     val scope: ProfileScope = ProfileScope.Global,
     val selectedDriverId: String = "system",
+    val capabilities: DriverManagerCapabilities = DriverManagerCapabilities(
+        remoteCatalogEnabled = false,
+        importEnabled = false,
+        deleteEnabled = false,
+    ),
     val loading: Boolean = false,
     val downloadAsset: String? = null,
     val downloaded: Long = 0,
@@ -32,10 +37,13 @@ class DriverManagerViewModel @Inject constructor(
     private val backend: DriverManagerBackend,
     private val profiles: RuntimeProfileStore,
 ) : ViewModel() {
-    private val mutableState = MutableStateFlow(DriverManagerUiState())
+    private val mutableState = MutableStateFlow(DriverManagerUiState(capabilities = backend.capabilities()))
     val state: StateFlow<DriverManagerUiState> = mutableState
 
-    init { selectScope(ProfileScope.Global); refresh(false) }
+    init {
+        selectScope(ProfileScope.Global)
+        refresh(false)
+    }
 
     fun selectScope(scope: ProfileScope) {
         viewModelScope.launch {
@@ -45,12 +53,37 @@ class DriverManagerViewModel @Inject constructor(
     }
 
     fun refresh(force: Boolean = true) = work(loading = true) {
+        val caps = backend.capabilities()
         val installed = backend.installed()
-        val releases = backend.releases(force)
-        mutableState.value = mutableState.value.copy(installed = installed, available = releases)
+        val releases = if (caps.remoteCatalogEnabled) backend.releases(force) else emptyList()
+        val scope = mutableState.value.scope
+        // Prefer persisted profile so Play migration remaps stale ids even before selectScope settles.
+        val selected = profiles.load(scope).driverId ?: "system"
+        if (selected != "system" && installed.none { it.metadata.id == selected }) {
+            val fallback = installed.firstOrNull()?.metadata?.id ?: "system"
+            profiles.update(scope) {
+                it.copy(driverId = fallback.takeUnless { value -> value == "system" })
+            }
+            mutableState.value = mutableState.value.copy(
+                capabilities = caps,
+                installed = installed,
+                available = releases,
+                selectedDriverId = fallback,
+            )
+        } else {
+            mutableState.value = mutableState.value.copy(
+                capabilities = caps,
+                installed = installed,
+                available = releases,
+                selectedDriverId = selected,
+            )
+        }
     }
 
     fun download(asset: TurnipReleaseAsset) = work(downloadAsset = asset.name) {
+        require(backend.capabilities().remoteCatalogEnabled) {
+            "Remote driver downloads are not available in this build"
+        }
         backend.download(asset) { copied, total ->
             mutableState.value = mutableState.value.copy(downloaded = copied, downloadTotal = total)
         }
@@ -58,6 +91,9 @@ class DriverManagerViewModel @Inject constructor(
     }
 
     fun importZip(bytes: ByteArray, assetName: String) = work(loading = true) {
+        require(backend.capabilities().importEnabled) {
+            "Driver ZIP import is not available in this build"
+        }
         backend.importZip(bytes, assetName)
         mutableState.value = mutableState.value.copy(installed = backend.installed())
     }
@@ -71,9 +107,15 @@ class DriverManagerViewModel @Inject constructor(
     }
 
     fun requestDelete(id: String) {
+        if (!backend.capabilities().deleteEnabled) {
+            mutableState.value = mutableState.value.copy(error = "The bundled Turnip driver cannot be removed")
+            return
+        }
         if (mutableState.value.selectedDriverId == id) {
             mutableState.value = mutableState.value.copy(pendingDeleteId = id)
-        } else delete(id)
+        } else {
+            delete(id)
+        }
     }
 
     fun confirmDelete() {
@@ -82,9 +124,12 @@ class DriverManagerViewModel @Inject constructor(
         delete(id)
     }
 
-    fun cancelDelete() { mutableState.value = mutableState.value.copy(pendingDeleteId = null) }
+    fun cancelDelete() {
+        mutableState.value = mutableState.value.copy(pendingDeleteId = null)
+    }
 
     private fun delete(id: String) = work(loading = true) {
+        require(backend.capabilities().deleteEnabled) { "Driver deletion is not available in this build" }
         backend.remove(id)
         mutableState.value = mutableState.value.copy(installed = backend.installed(), pendingDeleteId = null)
     }

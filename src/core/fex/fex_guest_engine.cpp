@@ -1158,15 +1158,18 @@ EngineResult<GuestExecutionState> GuestEngine::CallGuest(
                 sizeof(uint64_t));
   }
 
+  BridgeSyscallHandler::InvocationState invocation;
+  BridgeSyscallHandler::InvocationScope invocationScope {*ImplState->Syscalls, invocation, thread};
   {
     FexExecutionSignalScope signalScope {*ImplState->Context, thread};
     ImplState->Context->HandleCallback(thread, rip);
   }
-  if (ImplState->Syscalls->ActiveFailure()) {
-    return *ImplState->Syscalls->ActiveFailure();
+  if (ImplState->Syscalls->FailureResult(invocation)) {
+    return *ImplState->Syscalls->FailureResult(invocation);
   }
-  auto* invocation = ImplState->Syscalls->ActiveThread();
-  if (invocation != thread) return Failure(EngineStage::Thread, EFAULT);
+  if (ImplState->Syscalls->ActiveThread() != thread) {
+    return Failure(EngineStage::Thread, EFAULT);
+  }
 
   GuestExecutionState result;
   result.FirstRip = rip;

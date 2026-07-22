@@ -358,7 +358,8 @@ s32 PS4_SYSV_ABI sceVideoOutGetBufferLabelAddress(s32 handle, uintptr_t* label_a
     return 16;
 }
 
-s32 sceVideoOutSubmitEopFlip(s32 handle, u32 buf_id, u32 mode, s64 flip_arg, void** unk) {
+s32 sceVideoOutSubmitEopFlip(s32 handle, u32 buf_id, u32 mode, s64 flip_arg, void** unk,
+                             u32 flip_token) {
     if (eop_register_traces.fetch_add(1, std::memory_order_relaxed) < 32) {
         LOG_INFO(Lib_VideoOut,
                  "BACHATA_FLIP_TRACE stage=eop_register handle={} index={} mode={} arg={}", handle,
@@ -370,14 +371,17 @@ s32 sceVideoOutSubmitEopFlip(s32 handle, u32 buf_id, u32 mode, s64 flip_arg, voi
     }
 
     Platform::IrqC::Instance()->RegisterOnce(
-        Platform::InterruptId::GfxFlip, [=](Platform::InterruptId irq) {
+        Platform::InterruptId::GfxFlip, flip_token, [=](Platform::InterruptId irq) {
             if (eop_irq_traces.fetch_add(1, std::memory_order_relaxed) < 32) {
                 LOG_INFO(Lib_VideoOut,
                          "BACHATA_FLIP_TRACE stage=eop_irq index={} arg={} label={}", buf_id,
                          flip_arg, port->buffer_labels[buf_id]);
             }
             ASSERT_MSG(irq == Platform::InterruptId::GfxFlip, "An unexpected IRQ occured");
-            ASSERT_MSG(port->buffer_labels[buf_id] == 1, "Out of order flip IRQ");
+            ASSERT_MSG(port->buffer_labels[buf_id] == 1,
+                       "Out of order flip IRQ: index={} label={} prev_index={} pending={}", buf_id,
+                       port->buffer_labels[buf_id], port->prev_index,
+                       port->flip_status.flip_pending_num);
             const auto result = driver->SubmitFlip(port, buf_id, flip_arg, true);
             ASSERT_MSG(result, "EOP flip submission failed");
         });

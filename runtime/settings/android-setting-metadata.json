@@ -15,6 +15,7 @@
         "SDL",
         "OpenAL"
       ],
+      "nativeEnumOrdinal": true,
       "scope": "GLOBAL_AND_GAME",
       "restartRequired": true,
       "risk": "NORMAL",
@@ -966,6 +967,7 @@
         "1",
         "2"
       ],
+      "nativeEnumOrdinal": true,
       "scope": "GLOBAL_AND_GAME",
       "restartRequired": true,
       "risk": "NORMAL",

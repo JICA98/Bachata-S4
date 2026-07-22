@@ -17,9 +17,6 @@
 #include "core/libraries/libc_internal/libc_internal_threads.h"
 #include "core/libraries/libs.h"
 #include "printf.h"
-#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU
-#include "core/guest_cpu/hle_call_adapter.h"
-#endif
 
 namespace Libraries::LibcInternal {
 
@@ -319,21 +316,6 @@ s32 PS4_SYSV_ABI internal_fseek(OrbisFILE* file, s64 offset, s32 whence) {
     return result;
 }
 
-#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU
-s64 PS4_SYSV_ABI fex_libc_ftell(OrbisFILE* file) {
-    internal__Lockfilelock(file);
-    s64 result = Libraries::Kernel::posix_lseek(file->_Handle, 0, 1);
-    if (result >= 0 && (file->_Mode & 0x1000) != 0) {
-        u8* read_save = file->_Rsave != nullptr ? file->_Rsave : file->_Rend;
-        result -= internal__Nnl(file, file->_Rback, &file->_Cbuf);
-        result -= internal__Nnl(file, file->_Next, read_save);
-        result -= internal__Nnl(file, file->_Next, file->_WRend);
-    }
-    internal__Unlockfilelock(file);
-    return result;
-}
-#endif
-
 s32 PS4_SYSV_ABI internal__Frprep(OrbisFILE* file) {
     if (file->_Rend > file->_Next) {
         return 1;
@@ -480,35 +462,6 @@ s32 PS4_SYSV_ABI internal_fclose(OrbisFILE* file) {
     }
     return 0;
 }
-
-#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU
-OrbisFILE* PS4_SYSV_ABI fex_libc_fopen(const char* path, const char* mode) {
-    OrbisFILE* file = internal_fopen(path, mode);
-    if (file != nullptr && !Core::GuestCpu::PublishHostRange(file, sizeof(*file), true)) {
-        internal_fclose(file);
-        return nullptr;
-    }
-    return file;
-}
-
-s32 PS4_SYSV_ABI fex_libc_fclose(OrbisFILE* file) {
-    const s32 result = internal_fclose(file);
-    if (!Core::GuestCpu::RevokeHostRange(file)) {
-        LOG_ERROR(Lib_LibcInternal, "closed an unpublished FEX libc FILE {}",
-                  static_cast<void*>(file));
-        return -1;
-    }
-    return result;
-}
-
-void RegisterFexLibcIoAliases(Core::Loader::SymbolsResolver* sym) {
-    LIB_FUNCTION("xeYO4u7uyJ0", "libc", 1, "libc", fex_libc_fopen);
-    LIB_FUNCTION("rQFVBXp-Cxg", "libc", 1, "libc", internal_fseek);
-    LIB_FUNCTION("Qazy8LmXTvw", "libc", 1, "libc", fex_libc_ftell);
-    LIB_FUNCTION("lbB+UlZqVG0", "libc", 1, "libc", internal_fread);
-    LIB_FUNCTION("uodLYyUip20", "libc", 1, "libc", fex_libc_fclose);
-}
-#endif
 
 void RegisterlibSceLibcInternalIo(Core::Loader::SymbolsResolver* sym) {
     LIB_FUNCTION("eLdDw6l0-bU", "libSceLibcInternal", 1, "libSceLibcInternal", internal_snprintf);

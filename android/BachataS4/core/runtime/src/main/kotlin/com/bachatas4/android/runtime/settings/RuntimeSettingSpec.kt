@@ -16,11 +16,21 @@ data class RuntimeSettingSpec(
     val minimum: Double? = null,
     val maximum: Double? = null,
     val choices: List<String> = emptyList(),
+    val nativeEnumOrdinal: Boolean = false,
     val scope: SettingScope = SettingScope.GLOBAL_AND_GAME,
     val restartRequired: Boolean = true,
     val risk: SettingRisk = SettingRisk.NORMAL,
     val readOnlyReason: String? = null,
-)
+) {
+    init {
+        require(!nativeEnumOrdinal || kind == SettingKind.ENUM) {
+            "Native enum ordinal storage requires an enum setting"
+        }
+        require(!nativeEnumOrdinal || choices.isNotEmpty()) {
+            "Native enum ordinal storage requires choices"
+        }
+    }
+}
 
 @Serializable
 enum class SettingKind {

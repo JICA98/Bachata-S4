@@ -52,4 +52,25 @@ class ShadPs4JsonCodecTest {
         assertEquals(JsonPrimitive(7), profile.unknownShadPs4.getValue("GPU").jsonObject["future_gpu"])
         assertEquals("keep", profile.unknownShadPs4.getValue("Future").jsonObject["value"]?.jsonPrimitive?.content)
     }
+
+    @Test
+    fun rawJsonMapsNativeEnumOrdinalBackToProfileChoice() {
+        val spec = RuntimeSettingSpec(
+            id = "audio.audio_backend",
+            nativeKey = "Audio.audio_backend",
+            section = "Audio",
+            kind = SettingKind.ENUM,
+            defaultValue = JsonPrimitive("SDL"),
+            choices = listOf("SDL", "OpenAL"),
+            nativeEnumOrdinal = true,
+        )
+
+        val profile = ShadPs4JsonCodec.applyRawJson(
+            RuntimeProfile(),
+            """{"Audio":{"audio_backend":1}}""",
+            listOf(spec),
+        )
+
+        assertEquals(JsonPrimitive("OpenAL"), profile.values[spec.id])
+    }
 }

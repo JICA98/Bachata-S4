@@ -423,6 +423,9 @@ bool PersistentSrtInfo::Deserialize(Serialization::Archive& ar) {
     if (walker_func_size) {
         walker_func = RegisterWalkerCode(ar.CurrPtr(), walker_func_size);
         ar.Advance(walker_func_size);
+        if (!walker_func) {
+            return false;
+        }
     }
 
     return true;

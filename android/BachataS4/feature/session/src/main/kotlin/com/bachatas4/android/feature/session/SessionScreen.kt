@@ -61,6 +61,8 @@ import androidx.compose.ui.platform.LocalDensity
 fun SessionScreen(
     gameId: String,
     onOpenDrivers: () -> Unit = {},
+    /** Play builds omit Turnip recovery UI (driver is fixed to the bundled package). */
+    showDriverActions: Boolean = true,
     viewModel: SessionViewModel = hiltViewModel(),
 ) {
     SessionWindowModeEffect()
@@ -151,7 +153,10 @@ fun SessionScreen(
             )
         }
 
-        if ((state as? ManagedSessionState.Failed)?.detail?.contains("not installed") == true) {
+        if (
+            showDriverActions &&
+            (state as? ManagedSessionState.Failed)?.detail?.contains("not installed") == true
+        ) {
             Column(
                 modifier = Modifier.align(androidx.compose.ui.Alignment.BottomEnd).padding(12.dp),
                 horizontalAlignment = androidx.compose.ui.Alignment.End,

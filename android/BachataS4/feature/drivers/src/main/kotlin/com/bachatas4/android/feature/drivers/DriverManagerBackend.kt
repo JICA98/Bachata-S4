@@ -1,53 +1,41 @@
 package com.bachatas4.android.feature.drivers
 
-import android.content.Context
-import com.bachatas4.android.runtime.driver.DriverPackageSource
-import com.bachatas4.android.runtime.driver.DriverRegistry
 import com.bachatas4.android.runtime.driver.InstalledDriver
-import com.bachatas4.android.runtime.driver.TurnipDownloadManager
-import com.bachatas4.android.runtime.driver.TurnipPackageInstaller
 import com.bachatas4.android.runtime.driver.TurnipReleaseAsset
-import com.bachatas4.android.runtime.driver.TurnipReleaseClient
-import com.bachatas4.android.runtime.driver.UrlConnectionDriverAssetTransport
-import com.bachatas4.android.runtime.driver.UrlConnectionHttpTransport
-import dagger.Module
-import dagger.Provides
-import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
-import dagger.hilt.components.SingletonComponent
-import java.io.ByteArrayInputStream
+import com.bachatas4.android.runtime.process.VulkanDriverConfiguration
+import java.nio.file.Path
 
+data class DriverManagerCapabilities(
+    val remoteCatalogEnabled: Boolean,
+    val importEnabled: Boolean,
+    val deleteEnabled: Boolean,
+    /** Shown in the drivers screen header when non-null. */
+    val statusMessage: String? = null,
+)
+
+/**
+ * Driver catalogue / install backend.
+ *
+ * Play Store builds provide a backend that only surfaces the bundled Turnip package.
+ * Non-Play builds keep remote download + ZIP import.
+ */
 interface DriverManagerBackend {
+    fun capabilities(): DriverManagerCapabilities
     fun installed(): List<InstalledDriver>
     fun releases(force: Boolean): List<TurnipReleaseAsset>
     fun download(asset: TurnipReleaseAsset, progress: (Long, Long) -> Unit): InstalledDriver
     fun importZip(bytes: ByteArray, assetName: String): InstalledDriver
     fun remove(id: String): Boolean
-}
 
-private class DefaultDriverManagerBackend(context: Context) : DriverManagerBackend {
-    private val root = context.filesDir.toPath().resolve("vulkan-drivers/installed")
-    private val registry = DriverRegistry(root)
-    private val installer = TurnipPackageInstaller(root)
-    private val releaseClient = TurnipReleaseClient(
-        UrlConnectionHttpTransport(),
-        context.cacheDir.toPath().resolve("turnip-releases.json"),
-    )
-    private val downloader = TurnipDownloadManager(installer, UrlConnectionDriverAssetTransport())
+    /**
+     * Resolve Vulkan configuration for launch. Play backends may remap stale driver ids
+     * to the bundled package; non-Play backends load any installed id.
+     */
+    fun configurationFor(driverId: String, runtimeRoot: Path): VulkanDriverConfiguration
 
-    override fun installed() = registry.listInstalled()
-    override fun releases(force: Boolean) = releaseClient.listReleases(force)
-    override fun download(asset: TurnipReleaseAsset, progress: (Long, Long) -> Unit) = downloader.download(asset, progress)
-    override fun importZip(bytes: ByteArray, assetName: String) = installer.install(
-        ByteArrayInputStream(bytes),
-        DriverPackageSource(assetName = assetName),
-    )
-    override fun remove(id: String) = registry.remove(id)
-}
-
-@Module
-@InstallIn(SingletonComponent::class)
-object DriverManagerModule {
-    @Provides
-    fun backend(@ApplicationContext context: Context): DriverManagerBackend = DefaultDriverManagerBackend(context)
+    /**
+     * When non-null, setup should skip the driver picker and persist this id
+     * (Play: bundled Turnip). F-Droid returns null and shows the picker.
+     */
+    fun autoSelectDriverId(): String? = null
 }

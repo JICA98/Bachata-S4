@@ -22,8 +22,8 @@ const launchOwnedBox64 = new Set([
 const shadOverrides = {
   "General.trophy_notification_side": { kind: "ENUM", choices: ["right", "left"] },
   "Log.type": { kind: "ENUM", choices: ["wincolor", "sync", "async"] },
-  "Input.cursor_state": { kind: "ENUM", choices: ["0", "1", "2"] },
-  "Audio.audio_backend": { kind: "ENUM", choices: ["SDL", "OpenAL"] },
+  "Input.cursor_state": { kind: "ENUM", choices: ["0", "1", "2"], nativeEnumOrdinal: true },
+  "Audio.audio_backend": { kind: "ENUM", choices: ["SDL", "OpenAL"], nativeEnumOrdinal: true },
   "GPU.full_screen_mode": { kind: "ENUM", choices: ["Windowed", "Fullscreen", "Borderless"] },
   "GPU.present_mode": { kind: "ENUM", choices: ["Immediate", "Mailbox", "Fifo", "FifoRelaxed"] },
 };

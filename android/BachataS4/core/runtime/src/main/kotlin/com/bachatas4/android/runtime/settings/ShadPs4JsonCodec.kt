@@ -4,6 +4,8 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonObject
 
 data class ShadPs4JsonDocument(val root: JsonObject) {
@@ -61,7 +63,17 @@ object ShadPs4JsonCodec {
             val unknownSection = sectionElement.toMutableMap()
             sectionSpecs.forEach { spec ->
                 val key = spec.nativeKey.substringAfter('.')
-                sectionElement[key]?.let { values[spec.id] = it }
+                sectionElement[key]?.let { nativeValue ->
+                    values[spec.id] = if (spec.nativeEnumOrdinal) {
+                        val ordinal = (nativeValue as? JsonPrimitive)?.intOrNull
+                        require(ordinal != null && ordinal in spec.choices.indices) {
+                            "Invalid native enum ordinal for ${spec.id}"
+                        }
+                        JsonPrimitive(spec.choices[ordinal])
+                    } else {
+                        nativeValue
+                    }
+                }
                 unknownSection.remove(key)
             }
             if (unknownSection.isEmpty()) unknown.remove(section) else unknown[section] = JsonObject(unknownSection)

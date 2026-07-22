@@ -43,6 +43,18 @@ struct IrqController {
         ctx.one_time_subscribers.emplace(handler);
     }
 
+    void RegisterOnce(InterruptId irq, u32 token, IrqHandler handler) {
+        ASSERT_MSG(static_cast<u32>(irq) <= static_cast<u32>(InterruptId::InterruptIdMax),
+                   "Invalid IRQ number");
+        auto& ctx = irq_contexts.try_emplace(irq).first->second;
+        std::unique_lock lock{ctx.m_lock};
+        const auto [it, inserted] =
+            ctx.keyed_one_time_subscribers.try_emplace(token, std::move(handler));
+        ASSERT_MSG(inserted, "Duplicate one-time IRQ token: irq={} token={}",
+                   magic_enum::enum_name(irq), token);
+        ctx.last_registered_token = token;
+    }
+
     void Register(InterruptId irq, IrqHandler handler, void* uid) {
         ASSERT_MSG(static_cast<u32>(irq) <= static_cast<u32>(InterruptId::InterruptIdMax),
                    "Invalid IRQ number");
@@ -82,10 +94,36 @@ struct IrqController {
         }
     }
 
+    void Signal(InterruptId irq, u32 token) {
+        ASSERT_MSG(static_cast<u32>(irq) <= static_cast<u32>(InterruptId::InterruptIdMax),
+                   "Unexpected IRQ signaled");
+        auto& ctx = irq_contexts.try_emplace(irq).first->second;
+        std::unique_lock lock{ctx.m_lock};
+
+        LOG_TRACE(Core, "IRQ signaled: {} token={}", magic_enum::enum_name(irq), token);
+
+        for (auto& [uid, h] : ctx.persistent_handlers) {
+            h(irq);
+        }
+
+        const auto it = ctx.keyed_one_time_subscribers.find(token);
+        ASSERT_MSG(it != ctx.keyed_one_time_subscribers.end(),
+                   "Unknown one-time IRQ token: irq={} token={} last_registered={} "
+                   "last_completed={} pending={}",
+                   magic_enum::enum_name(irq), token, ctx.last_registered_token,
+                   ctx.last_completed_token, ctx.keyed_one_time_subscribers.size());
+        it->second(irq);
+        ctx.last_completed_token = token;
+        ctx.keyed_one_time_subscribers.erase(it);
+    }
+
 private:
     struct IrqContext {
         std::unordered_map<void*, IrqHandler> persistent_handlers{};
         std::queue<IrqHandler> one_time_subscribers{};
+        std::unordered_map<u32, IrqHandler> keyed_one_time_subscribers{};
+        u32 last_registered_token{};
+        u32 last_completed_token{};
         std::mutex m_lock{};
     };
     std::unordered_map<InterruptId, IrqContext> irq_contexts{};

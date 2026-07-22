@@ -83,6 +83,8 @@ import com.bachatas4.android.designsystem.theme.BachataPalette
 fun SettingsScreen(
     onBack: () -> Unit,
     onOpenDrivers: () -> Unit = {},
+    /** Play builds hide Turnip selection; F-Droid keeps the Drivers tab. */
+    showDriversTab: Boolean = true,
     initialGameId: String? = null,
     viewModel: SettingsViewModel = hiltViewModel(),
 ) {
@@ -114,6 +116,7 @@ fun SettingsScreen(
     SettingsContent(
         state = state,
         onBack = onBack,
+        showDriversTab = showDriversTab,
         activeTab = activeTab,
         onTabSelected = { activeTab = it },
         isSearchActive = isSearchActive,
@@ -136,6 +139,7 @@ fun SettingsScreen(
 private fun SettingsContent(
     state: SettingsUiState,
     onBack: () -> Unit,
+    showDriversTab: Boolean,
     activeTab: String,
     onTabSelected: (String) -> Unit,
     isSearchActive: Boolean,
@@ -214,17 +218,17 @@ private fun SettingsContent(
                     }
                 )
             }
-            val tabs: List<Pair<String, ImageVector>> = remember {
-                listOf(
-                    Pair("Runtime", Icons.Default.PlayArrow),
-                    Pair("CPU", Icons.Default.Build),
-                    Pair("Drivers", Icons.Default.Settings),
-                    Pair("RAW", Icons.Default.Info),
-                    Pair("Controllers", Icons.Default.List),
-                    Pair("Touch Input", Icons.Default.Create),
-                    Pair("Import", Icons.Default.Add),
-                    Pair("Export", Icons.Default.Share)
-                )
+            val tabs: List<Pair<String, ImageVector>> = remember(showDriversTab) {
+                buildList {
+                    add(Pair("Runtime", Icons.Default.PlayArrow))
+                    add(Pair("CPU", Icons.Default.Build))
+                    if (showDriversTab) add(Pair("Drivers", Icons.Default.Settings))
+                    add(Pair("RAW", Icons.Default.Info))
+                    add(Pair("Controllers", Icons.Default.List))
+                    add(Pair("Touch Input", Icons.Default.Create))
+                    add(Pair("Import", Icons.Default.Add))
+                    add(Pair("Export", Icons.Default.Share))
+                }
             }
 
             var focusArea by remember { mutableStateOf("tabs") }
@@ -486,11 +490,13 @@ private fun SettingsContent(
                 } else {
                     when (activeTab) {
                         "Drivers" -> {
-                            DriverManagerScreen(
-                                scope = state.scope,
-                                onBack = { onTabSelected("Runtime") },
-                                standalone = false,
-                            )
+                            if (showDriversTab) {
+                                DriverManagerScreen(
+                                    scope = state.scope,
+                                    onBack = { onTabSelected("Runtime") },
+                                    standalone = false,
+                                )
+                            }
                         }
                         "RAW" -> {
                             RawConfigScreen(

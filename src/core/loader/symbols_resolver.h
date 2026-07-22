@@ -34,6 +34,7 @@ struct SymbolRecord {
     u64 virtual_address;
 #ifdef SHADPS4_ENABLE_FEX_GUEST_CPU
     std::shared_ptr<GuestCpu::HleCallAdapter> hle_adapter;
+    bool hle_fallback{};
 #endif
 };
 

@@ -31,12 +31,14 @@ test("FEX function imports use typed guest veneers rather than host addresses", 
   assert.match(resolverHeader, /std::shared_ptr<GuestCpu::HleCallAdapter>/);
   assert.match(resolverHeader, /AddFunction\(const SymbolResolver& s/);
   assert.match(resolverHeader, /AddUnsupportedFunction/);
+  assert.match(resolverHeader, /bool hle_fallback\{\}/);
   assert.match(resolverHeader, /SymbolsResolver\(\);/);
   assert.match(resolverHeader, /~SymbolsResolver\(\);/);
   assert.doesNotMatch(resolverHeader, /~SymbolsResolver\(\) = default/);
   assert.match(resolverSource, /AddFunction\(const SymbolResolver& s/);
   assert.match(resolverSource, /SymbolsResolver::~SymbolsResolver\(\) = default/);
   assert.match(resolverSource, /HleCallRegistry/);
+  assert.match(resolverSource, /m_symbols\.back\(\)\.hle_fallback = true/);
   assert.match(registrations, /MakeHleCallAdapter\(function\)/);
   assert.match(registrations, /#ifdef SHADPS4_ENABLE_FEX_GUEST_CPU/);
 
@@ -66,6 +68,11 @@ test("FEX function imports use typed guest veneers rather than host addresses", 
   assert.match(relocate, /rel_sym_type == Loader::SymbolType::Function/);
   assert.match(relocate, /HleVeneerAllocator/);
   assert.doesNotMatch(relocate, /rel_value = symrec\.virtual_address \+ addend/);
+  const resolve = linker.slice(linker.indexOf("bool Linker::Resolve"), linker.indexOf("void Linker::UnLoadModule"));
+  assert.match(resolve, /record != nullptr && !record->hle_fallback/);
+  assert.match(resolve, /return_info->hle_adapter = record->hle_adapter/);
+  assert.match(resolve, /FEX: unresolved HLE .*temporary ENOSYS/);
+  assert.match(resolve, /return false;/);
   assert.doesNotMatch(engine, /HleGuestBridge::Invoke/);
   assert.match(bridgeHeader, /class HleGuestBridge/);
   assert.match(bridgeSource, /HleGuestBridge::Invoke/);
@@ -76,10 +83,8 @@ test("FEX function imports use typed guest veneers rather than host addresses", 
   assert.match(bridgeSource, /HleGuestBridge::PublishHostRange/);
   assert.match(bridgeSource, /HleGuestBridge::RevokeHostRange/);
   assert.match(bridgeSource, /ValidatePublishedHostRange/);
-  assert.match(libcMemory, /PublishHostRange\(ptr, std::max<u64>\(count, 1\), true\)/);
-  assert.match(libcMemory, /RevokeHostRange\(ptr\)/);
-  assert.match(libcIo, /PublishHostRange\(file, sizeof\(\*file\), true\)/);
-  assert.match(libcIo, /RevokeHostRange\(file\)/);
+  assert.doesNotMatch(libcMemory, /fex_libc_(?:allocate|operator_new|malloc|free)/);
+  assert.doesNotMatch(libcIo, /fex_libc_(?:fopen|fclose|ftell)/);
   assert.match(engine, /Bridge\.Invoke\(hleFrame\)/);
   assert.match(engine, /BACHATA_FEX_MAPPING_FAIL/);
   assert.match(linker, /FEX guest range overlap/);

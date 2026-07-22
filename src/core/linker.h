@@ -177,6 +177,8 @@ private:
 #ifdef SHADPS4_ENABLE_FEX_GUEST_CPU
     std::optional<GuestExecutionFailure> InitializeFexRuntime();
 #endif
+    void* CallAppHeapMalloc(u64 size);
+    void CallAppHeapFree(void* pointer);
     MemoryManager* memory;
     Libraries::Kernel::Thread main_thread;
     std::mutex mutex;

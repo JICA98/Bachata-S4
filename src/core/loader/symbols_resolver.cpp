@@ -47,6 +47,7 @@ SymbolsResolver::AddUnsupportedFunction(const SymbolResolver& s) {
     ASSERT_MSG(!m_symbols.empty() && m_symbols.back().name == name &&
                    m_symbols.back().hle_adapter != nullptr,
                "Unable to register unsupported HLE function {}", name);
+    m_symbols.back().hle_fallback = true;
     return m_symbols.back().hle_adapter;
 }
 

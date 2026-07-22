@@ -100,11 +100,20 @@ fun DriverManagerScreen(
                             color = BachataPalette.Primary,
                             fontWeight = FontWeight.Bold
                         )
-                        Text(
-                            text = "Trusted source: ${TurnipReleaseClient.REPOSITORY}",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = BachataPalette.Secondary
-                        )
+                        if (state.capabilities.remoteCatalogEnabled) {
+                            Text(
+                                text = "Trusted source: ${TurnipReleaseClient.REPOSITORY}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = BachataPalette.Secondary
+                            )
+                        }
+                        state.capabilities.statusMessage?.let { message ->
+                            Text(
+                                text = message,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = BachataPalette.Secondary
+                            )
+                        }
                         Text(
                             text = "Active Scope: ${if (state.scope is ProfileScope.Game) "Game (${(state.scope as ProfileScope.Game).gameId})" else "Global"}",
                             style = MaterialTheme.typography.labelSmall,
@@ -112,8 +121,11 @@ fun DriverManagerScreen(
                             fontWeight = FontWeight.SemiBold
                         )
                         if (state.selectedDriverId != "system") {
+                            val label = state.installed.firstOrNull { it.metadata.id == state.selectedDriverId }
+                                ?.metadata?.displayName
+                                ?: state.selectedDriverId
                             Text(
-                                text = "Selected Driver: ${state.selectedDriverId}",
+                                text = "Selected Driver: $label",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = BachataPalette.Primary
                             )
@@ -134,19 +146,23 @@ fun DriverManagerScreen(
                     contentPadding = PaddingValues(horizontal = 16.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    item {
-                        BachataPrimaryButton(
-                            onClick = { viewModel.refresh() },
-                            enabled = !state.loading
-                        ) {
-                            Text("Refresh Available")
+                    if (state.capabilities.remoteCatalogEnabled) {
+                        item {
+                            BachataPrimaryButton(
+                                onClick = { viewModel.refresh() },
+                                enabled = !state.loading
+                            ) {
+                                Text("Refresh Available")
+                            }
                         }
                     }
-                    item {
-                        BachataPrimaryButton(
-                            onClick = { importer.launch(arrayOf("application/zip", "application/x-zip-compressed")) }
-                        ) {
-                            Text("Import ZIP")
+                    if (state.capabilities.importEnabled) {
+                        item {
+                            BachataPrimaryButton(
+                                onClick = { importer.launch(arrayOf("application/zip", "application/x-zip-compressed")) }
+                            ) {
+                                Text("Import ZIP")
+                            }
                         }
                     }
                     if (state.selectedDriverId != "system") {
@@ -322,10 +338,12 @@ fun DriverManagerScreen(
                                     Text("Select")
                                 }
                             }
-                            TextButton(
-                                onClick = { viewModel.requestDelete(driver.metadata.id) }
-                            ) {
-                                Text("Delete", color = MaterialTheme.colorScheme.error)
+                            if (state.capabilities.deleteEnabled) {
+                                TextButton(
+                                    onClick = { viewModel.requestDelete(driver.metadata.id) }
+                                ) {
+                                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                                }
                             }
                         }
                     }
@@ -333,57 +351,59 @@ fun DriverManagerScreen(
             }
         }
 
-        item {
-            Text(
-                text = "Available Drivers",
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = BachataPalette.Primary
-            )
-        }
-
-        if (state.available.isEmpty()) {
+        if (state.capabilities.remoteCatalogEnabled) {
             item {
                 Text(
-                    text = "No available release packages. Click Refresh to load.",
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = BachataPalette.Secondary
+                    text = "Available Drivers",
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = BachataPalette.Primary
                 )
             }
-        } else {
-            items(state.available, key = { it.downloadUrl }) { asset ->
-                BachataPanel(
-                    modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
-                    color = BachataPalette.RaisedSurface
-                ) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(6.dp)
+
+            if (state.available.isEmpty()) {
+                item {
+                    Text(
+                        text = "No available release packages. Click Refresh to load.",
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = BachataPalette.Secondary
+                    )
+                }
+            } else {
+                items(state.available, key = { it.downloadUrl }) { asset ->
+                    BachataPanel(
+                        modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
+                        color = BachataPalette.RaisedSurface
                     ) {
-                        Text(
-                            text = asset.releaseTag,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = BachataPalette.Primary,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = "${asset.name} · ${(asset.size / 1024.0 / 1024.0).let { "%.2f".format(it) }} MiB",
-                            color = BachataPalette.Secondary,
-                            style = MaterialTheme.typography.bodySmall
-                        )
-                        Text(
-                            text = "Published: ${asset.publishedAt}",
-                            color = BachataPalette.Secondary,
-                            style = MaterialTheme.typography.labelSmall
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        BachataPrimaryButton(
-                            onClick = { viewModel.download(asset) },
-                            enabled = state.downloadAsset == null
+                        Column(
+                            modifier = Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Text("Download & Install")
+                            Text(
+                                text = asset.releaseTag,
+                                style = MaterialTheme.typography.titleMedium,
+                                color = BachataPalette.Primary,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Text(
+                                text = "${asset.name} · ${(asset.size / 1024.0 / 1024.0).let { "%.2f".format(it) }} MiB",
+                                color = BachataPalette.Secondary,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Text(
+                                text = "Published: ${asset.publishedAt}",
+                                color = BachataPalette.Secondary,
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                            Spacer(modifier = Modifier.height(4.dp))
+                            BachataPrimaryButton(
+                                onClick = { viewModel.download(asset) },
+                                enabled = state.downloadAsset == null
+                            ) {
+                                Text("Download & Install")
+                            }
                         }
                     }
                 }

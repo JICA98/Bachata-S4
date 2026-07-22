@@ -1,7 +1,14 @@
 // SPDX-FileCopyrightText: Copyright 2024-2026 shadPS4 Emulator Project
 // SPDX-License-Identifier: GPL-2.0-or-later
 
+#include <array>
+#include <atomic>
+#include <cerrno>
+#include <cstring>
+#include <memory>
+#include <mutex>
 #include <unordered_map>
+#include <vector>
 #include <boost/container/flat_map.hpp>
 #include <xbyak/xbyak.h>
 #include <xbyak/xbyak_util.h>
@@ -21,6 +28,12 @@
 #include "shader_recompiler/ir/reg.h"
 #include "shader_recompiler/ir/srt_gvn_table.h"
 #include "shader_recompiler/ir/value.h"
+
+#if defined(ARCH_ARM64) && defined(__linux__)
+#include <sys/mman.h>
+#include <sys/ucontext.h>
+#include <unistd.h>
+#endif
 
 #ifdef ARCH_X86_64
 
@@ -301,6 +314,327 @@ void FlattenExtendedUserdataPass(IR::Program& program) {
         readconst->SetFlags<u32>(original->Flags<u32>());
     }
 
+    info.RefreshFlatBuf();
+}
+
+} // namespace Shader::Optimization
+
+#elif defined(ARCH_ARM64) && defined(__linux__)
+
+namespace {
+
+constexpr u32 Arm64MovX2X0 = 0xaa0003e2;
+constexpr u32 Arm64PushX2 = 0xf81f0fe2;
+constexpr u32 Arm64PopX2 = 0xf84107e2;
+constexpr u32 Arm64LoadPointer = 0xf8646842;
+constexpr u32 Arm64MaskPointer = 0xd340bc42;
+constexpr u32 Arm64LoadDataRegisterOffset = 0xb8646843;
+constexpr u32 Arm64StoreDataRegisterOffset = 0xb8256823;
+constexpr u32 Arm64Ret = 0xd65f03c0;
+constexpr size_t MaxSrtCodeRanges = 32768;
+
+struct SrtCodeRange {
+    uintptr_t begin{};
+    uintptr_t end{};
+};
+
+struct SrtCodeMapping {
+    u8* data{};
+    size_t size{};
+
+    ~SrtCodeMapping() {
+        if (data != nullptr) {
+            munmap(data, size);
+        }
+    }
+};
+
+std::array<SrtCodeRange, MaxSrtCodeRanges> g_srt_code_ranges{};
+std::atomic_size_t g_srt_code_range_count{};
+std::mutex g_srt_code_mutex;
+std::vector<std::unique_ptr<SrtCodeMapping>> g_srt_code_mappings;
+std::once_flag g_srt_signal_once;
+
+bool IsSrtCodeAddress(uintptr_t pc) {
+    const size_t count = g_srt_code_range_count.load(std::memory_order_acquire);
+    for (size_t index = 0; index < count; ++index) {
+        const auto& range = g_srt_code_ranges[index];
+        if (pc >= range.begin && pc < range.end) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool SrtWalkerSignalHandler(void* context, void* fault_address) {
+    const auto pc = reinterpret_cast<uintptr_t>(Common::GetRip(context));
+    if (!IsSrtCodeAddress(pc)) {
+        return false;
+    }
+
+    u32 instruction{};
+    std::memcpy(&instruction, reinterpret_cast<const void*>(pc), sizeof(instruction));
+    auto* signal_context = static_cast<ucontext_t*>(context);
+    if (instruction == Arm64LoadPointer) {
+        signal_context->uc_mcontext.regs[2] = 0;
+    } else if ((instruction & 0xffc003ffu) == 0xb9400043u ||
+               instruction == Arm64LoadDataRegisterOffset) {
+        signal_context->uc_mcontext.regs[3] = 0;
+    } else {
+        return false;
+    }
+    Common::IncrementRip(context, sizeof(u32));
+    return true;
+}
+
+bool IsArm64SrtWalker(const u8* ptr, size_t size) {
+    if (ptr == nullptr || size < sizeof(u32) * 2 || size % sizeof(u32) != 0) {
+        return false;
+    }
+    u32 first{};
+    u32 last{};
+    std::memcpy(&first, ptr, sizeof(first));
+    std::memcpy(&last, ptr + size - sizeof(last), sizeof(last));
+    return first == Arm64MovX2X0 && last == Arm64Ret;
+}
+
+class Arm64SrtEmitter {
+public:
+    void Begin() {
+        Emit(Arm64MovX2X0);
+    }
+
+    void PushPointer(u32 offset_dw) {
+        Emit(Arm64PushX2);
+        MoveImmediate(4, static_cast<u64>(offset_dw) * sizeof(u32));
+        Emit(Arm64LoadPointer);
+        Emit(Arm64MaskPointer);
+    }
+
+    void PopPointer() {
+        Emit(Arm64PopX2);
+    }
+
+    void CopyDword(u32 source_offset_dw, u32 destination_offset_dw) {
+        if (source_offset_dw <= 0xfff) {
+            Emit(0xb9400043u | (source_offset_dw << 10));
+        } else {
+            MoveImmediate(4, static_cast<u64>(source_offset_dw) * sizeof(u32));
+            Emit(Arm64LoadDataRegisterOffset);
+        }
+
+        if (destination_offset_dw <= 0xfff) {
+            Emit(0xb9000023u | (destination_offset_dw << 10));
+        } else {
+            MoveImmediate(5, static_cast<u64>(destination_offset_dw) * sizeof(u32));
+            Emit(Arm64StoreDataRegisterOffset);
+        }
+    }
+
+    void End() {
+        Emit(Arm64Ret);
+    }
+
+    const u8* Data() const {
+        return reinterpret_cast<const u8*>(code.data());
+    }
+
+    size_t Size() const {
+        return code.size() * sizeof(u32);
+    }
+
+private:
+    void Emit(u32 instruction) {
+        code.push_back(instruction);
+    }
+
+    void MoveImmediate(u32 reg, u64 value) {
+        Emit(0xd2800000u | reg | (static_cast<u32>(value & 0xffff) << 5));
+        for (u32 halfword = 1; halfword < 4; ++halfword) {
+            const u32 part = static_cast<u32>((value >> (halfword * 16)) & 0xffff);
+            if (part != 0) {
+                Emit(0xf2800000u | reg | (halfword << 21) | (part << 5));
+            }
+        }
+    }
+
+    std::vector<u32> code;
+};
+
+using namespace Shader;
+
+struct PassInfo {
+    using PtrUserList = boost::container::flat_map<u32, Shader::IR::Inst*>;
+
+    Optimization::SrtGvnTable gvn_table;
+    std::unordered_map<IR::Inst*, PtrUserList> pointer_uses;
+    boost::container::small_flat_map<IR::ScalarReg, IR::Inst*, 1> srt_roots;
+    std::unordered_map<u32, IR::Inst*> vn_to_inst;
+    u32 dst_off_dw;
+
+    PtrUserList* GetUsesAsPointer(IR::Inst* inst) {
+        auto it = pointer_uses.find(inst);
+        return it != pointer_uses.end() ? &it->second : nullptr;
+    }
+
+    IR::Inst* DeduplicateInstruction(IR::Inst* inst) {
+        auto it = vn_to_inst.try_emplace(gvn_table.GetValueNumber(inst), inst);
+        return it.first->second;
+    }
+};
+
+} // namespace
+
+namespace Shader {
+
+PFN_SrtWalker RegisterWalkerCode(const u8* ptr, size_t size) {
+    if (!IsArm64SrtWalker(ptr, size)) {
+        LOG_WARNING(Render_Recompiler,
+                    "Ignoring incompatible cached SRT walker; shader will be recompiled");
+        return nullptr;
+    }
+
+    std::lock_guard lock{g_srt_code_mutex};
+    const size_t range_index = g_srt_code_range_count.load(std::memory_order_relaxed);
+    if (range_index >= g_srt_code_ranges.size()) {
+        LOG_CRITICAL(Render_Recompiler, "ARM64 SRT walker range table is full");
+        std::abort();
+    }
+
+    const long page_size_result = sysconf(_SC_PAGESIZE);
+    if (page_size_result <= 0) {
+        LOG_CRITICAL(Render_Recompiler, "Unable to query host page size for ARM64 SRT walker");
+        std::abort();
+    }
+    const size_t page_size = static_cast<size_t>(page_size_result);
+    const size_t mapping_size = (size + page_size - 1) & ~(page_size - 1);
+    auto mapping = std::make_unique<SrtCodeMapping>();
+    mapping->data = static_cast<u8*>(
+        mmap(nullptr, mapping_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0));
+    mapping->size = mapping_size;
+    if (mapping->data == MAP_FAILED) {
+        mapping->data = nullptr;
+        LOG_CRITICAL(Render_Recompiler, "Unable to allocate ARM64 SRT walker: errno {}", errno);
+        std::abort();
+    }
+    std::memcpy(mapping->data, ptr, size);
+    __builtin___clear_cache(reinterpret_cast<char*>(mapping->data),
+                            reinterpret_cast<char*>(mapping->data + size));
+    if (mprotect(mapping->data, mapping_size, PROT_READ | PROT_EXEC) != 0) {
+        LOG_CRITICAL(Render_Recompiler, "Unable to protect ARM64 SRT walker: errno {}", errno);
+        std::abort();
+    }
+
+    std::call_once(g_srt_signal_once, [] {
+        constexpr u32 priority = 1;
+        Core::Signals::Instance()->RegisterAccessViolationHandler(SrtWalkerSignalHandler, priority);
+    });
+
+    const auto begin = reinterpret_cast<uintptr_t>(mapping->data);
+    auto* function = reinterpret_cast<PFN_SrtWalker>(mapping->data);
+    g_srt_code_mappings.push_back(std::move(mapping));
+    g_srt_code_ranges[range_index] = {begin, begin + size};
+    g_srt_code_range_count.store(range_index + 1, std::memory_order_release);
+    return function;
+}
+
+} // namespace Shader
+
+namespace Shader::Optimization {
+
+namespace {
+
+void VisitPointer(u32 offset_dw, IR::Inst* subtree, PassInfo& pass_info,
+                  Arm64SrtEmitter& emitter) {
+    emitter.PushPointer(offset_dw);
+    PassInfo::PtrUserList* use_list = pass_info.GetUsesAsPointer(subtree);
+    ASSERT(use_list);
+
+    for (auto [source_offset_dw, use] : *use_list) {
+        emitter.CopyDword(source_offset_dw, pass_info.dst_off_dw);
+        use->SetFlags<u32>(pass_info.dst_off_dw++);
+    }
+
+    for (const auto [source_offset_dw, use] : *use_list) {
+        if (pass_info.GetUsesAsPointer(use)) {
+            VisitPointer(source_offset_dw, use, pass_info, emitter);
+        }
+    }
+    emitter.PopPointer();
+}
+
+void GenerateSrtProgram(Info& info, PassInfo& pass_info) {
+    if (pass_info.srt_roots.empty()) {
+        return;
+    }
+
+    Arm64SrtEmitter emitter;
+    emitter.Begin();
+    pass_info.dst_off_dw = NUM_USER_DATA_REGS;
+    ASSERT(pass_info.dst_off_dw == info.srt_info.flattened_bufsize_dw);
+    for (const auto& [sgpr_base, root] : pass_info.srt_roots) {
+        VisitPointer(static_cast<u32>(sgpr_base), root, pass_info, emitter);
+    }
+    emitter.End();
+
+    info.srt_info.walker_func = RegisterWalkerCode(emitter.Data(), emitter.Size());
+    ASSERT(info.srt_info.walker_func != nullptr);
+    info.srt_info.walker_func_size = emitter.Size();
+    info.srt_info.flattened_bufsize_dw = pass_info.dst_off_dw;
+}
+
+} // namespace
+
+void FlattenExtendedUserdataPass(IR::Program& program) {
+    Shader::Info& info = program.info;
+    PassInfo pass_info;
+    boost::container::small_vector<IR::Inst*, 32> all_readconsts;
+
+    for (auto r_it = program.post_order_blocks.rbegin(); r_it != program.post_order_blocks.rend();
+         ++r_it) {
+        IR::Block* block = *r_it;
+        for (IR::Inst& inst : *block) {
+            if (inst.GetOpcode() != IR::Opcode::ReadConst) {
+                continue;
+            }
+            if (!inst.Arg(1).IsImmediate()) {
+                LOG_WARNING(Render_Recompiler, "ReadConst has non-immediate offset");
+                continue;
+            }
+
+            all_readconsts.push_back(&inst);
+            if (pass_info.DeduplicateInstruction(&inst) != &inst) {
+                continue;
+            }
+
+            IR::Inst* ptr_composite = inst.Arg(0).InstRecursive();
+            const auto pred = [](IR::Inst* candidate) -> std::optional<IR::Inst*> {
+                if (candidate->GetOpcode() == IR::Opcode::GetUserData ||
+                    candidate->GetOpcode() == IR::Opcode::ReadConst) {
+                    return candidate;
+                }
+                return std::nullopt;
+            };
+            auto base0 = IR::BreadthFirstSearch(ptr_composite->Arg(0), pred);
+            auto base1 = IR::BreadthFirstSearch(ptr_composite->Arg(1), pred);
+            ASSERT_MSG(base0 && base1, "ReadConst not from constant memory");
+
+            IR::Inst* ptr_lo = pass_info.DeduplicateInstruction(base0.value());
+            auto [uses, inserted] =
+                pass_info.pointer_uses.try_emplace(ptr_lo, PassInfo::PtrUserList{});
+            uses->second[inst.Arg(1).U32()] = &inst;
+            if (ptr_lo->GetOpcode() == IR::Opcode::GetUserData) {
+                pass_info.srt_roots[ptr_lo->Arg(0).ScalarReg()] = ptr_lo;
+            }
+        }
+    }
+
+    GenerateSrtProgram(info, pass_info);
+    for (IR::Inst* readconst : all_readconsts) {
+        ASSERT(pass_info.vn_to_inst.contains(pass_info.gvn_table.GetValueNumber(readconst)));
+        IR::Inst* original = pass_info.DeduplicateInstruction(readconst);
+        readconst->SetFlags<u32>(original->Flags<u32>());
+    }
     info.RefreshFlatBuf();
 }
 

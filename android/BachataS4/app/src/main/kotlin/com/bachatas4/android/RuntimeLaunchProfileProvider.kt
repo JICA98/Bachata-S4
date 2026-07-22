@@ -1,6 +1,7 @@
 package com.bachatas4.android
 
 import com.bachatas4.android.data.RuntimeProfileStore
+import com.bachatas4.android.feature.drivers.DriverManagerBackend
 import com.bachatas4.android.runtime.settings.Box64EnvironmentCodec
 import com.bachatas4.android.runtime.settings.CompatibilityConstraint
 import com.bachatas4.android.runtime.settings.ProfileScope
@@ -9,8 +10,6 @@ import com.bachatas4.android.runtime.settings.RuntimeProfileResolver
 import com.bachatas4.android.runtime.settings.RuntimeSettingCatalog
 import com.bachatas4.android.runtime.settings.SettingKind
 import com.bachatas4.android.runtime.settings.ValueSource
-import com.bachatas4.android.runtime.driver.DriverRegistry
-import com.bachatas4.android.runtime.process.RuntimeVulkanDriver
 import com.bachatas4.android.runtime.process.RuntimeGuestBackend
 import com.bachatas4.android.runtime.process.VulkanDriverConfiguration
 import java.nio.file.Path
@@ -22,20 +21,33 @@ class RuntimeLaunchProfileProvider internal constructor(
     private val store: RuntimeProfileStore,
     private val catalog: RuntimeSettingCatalog,
     constraints: Map<String, CompatibilityConstraint>,
+    private val driverBackend: DriverManagerBackend,
 ) {
-    private val resolver = RuntimeProfileResolver(catalog.shadPs4 + catalog.box64, constraints)
+    private val specs = catalog.shadPs4 + catalog.box64
+    private val compatibilityConstraints = constraints
 
     @Inject
-    constructor(store: RuntimeProfileStore) : this(
+    constructor(
+        store: RuntimeProfileStore,
+        driverBackend: DriverManagerBackend,
+    ) : this(
         store,
         RuntimeSettingCatalog.loadFromResources(),
         androidCompatibilityConstraints(),
+        driverBackend,
     )
 
-    suspend fun resolve(gameId: String): ResolvedRuntimeProfile = resolver.resolve(
-        store.load(ProfileScope.Global),
-        store.load(ProfileScope.Game(gameId)),
-    )
+    suspend fun resolve(gameId: String): ResolvedRuntimeProfile {
+        val constraints = if (guestBackend(gameId) == RuntimeGuestBackend.FEX) {
+            compatibilityConstraints + FEX_COMPATIBILITY_CONSTRAINTS
+        } else {
+            compatibilityConstraints
+        }
+        return RuntimeProfileResolver(specs, constraints).resolve(
+            store.load(ProfileScope.Global),
+            store.load(ProfileScope.Game(gameId)),
+        )
+    }
 
     fun box64Environment(profile: ResolvedRuntimeProfile): Map<String, String> {
         val environment = profile.unknownBox64.toMutableMap()
@@ -64,15 +76,21 @@ class RuntimeLaunchProfileProvider internal constructor(
             RuntimeGuestBackend.BOX64
         }
 
-    fun vulkanConfiguration(profile: ResolvedRuntimeProfile, runtimeRoot: Path, filesDir: Path): VulkanDriverConfiguration {
-        if (profile.driverId == "system") return VulkanDriverConfiguration.resolve(RuntimeVulkanDriver.SYSTEM, runtimeRoot)
-        val driver = DriverRegistry(filesDir.resolve("vulkan-drivers/installed")).resolve(profile.driverId)
-            ?: throw MissingRuntimeDriverException(profile.driverId)
-        return VulkanDriverConfiguration.resolve(driver, runtimeRoot)
-    }
+    fun vulkanConfiguration(profile: ResolvedRuntimeProfile, runtimeRoot: Path, filesDir: Path): VulkanDriverConfiguration =
+        try {
+            driverBackend.configurationFor(profile.driverId, runtimeRoot)
+        } catch (error: IllegalStateException) {
+            throw MissingRuntimeDriverException(profile.driverId, error)
+        }
 
     private companion object {
         const val FEX_SONIC_GAME_ID = "CUSA07023"
+        val FEX_COMPATIBILITY_CONSTRAINTS = mapOf(
+            "gpu.copy_gpu_buffers" to CompatibilityConstraint(
+                JsonPrimitive(true),
+                "FEX guest execution can reuse command buffers before asynchronous GPU parsing completes",
+            ),
+        )
 
         fun androidCompatibilityConstraints() = mapOf(
             "general.dev_kit_mode" to CompatibilityConstraint(
@@ -87,6 +105,10 @@ class RuntimeLaunchProfileProvider internal constructor(
     }
 }
 
-class MissingRuntimeDriverException(val driverId: String) : IllegalStateException(
+class MissingRuntimeDriverException(
+    val driverId: String,
+    cause: Throwable? = null,
+) : IllegalStateException(
     "Selected Vulkan driver '$driverId' is not installed; open Turnip drivers and select another driver",
+    cause,
 )

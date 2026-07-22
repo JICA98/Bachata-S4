@@ -31,7 +31,6 @@ void ForceRegisterLib(Core::Loader::SymbolsResolver* sym) {
 #ifdef SHADPS4_ENABLE_FEX_GUEST_CPU
     RegisterFexLibcMemoryAliases(sym);
     RegisterFexLibcMathAliases(sym);
-    RegisterFexLibcIoAliases(sym);
     RegisterFexLibcStrAliases(sym);
     RegisterFexLibcCxaAliases(sym);
 #endif

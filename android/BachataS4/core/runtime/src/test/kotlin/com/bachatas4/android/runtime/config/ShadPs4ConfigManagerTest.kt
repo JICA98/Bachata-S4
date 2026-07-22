@@ -8,6 +8,7 @@ import java.nio.file.Files
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.boolean
+import kotlinx.serialization.json.int
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Assert.assertFalse
@@ -81,5 +82,30 @@ class ShadPs4ConfigManagerTest {
         val root = Json.parseToJsonElement(Files.readString(config)).jsonObject
         assertTrue(root.getValue("Future").jsonObject.getValue("keep").jsonPrimitive.boolean)
         assertTrue(root.getValue("GPU").jsonObject.getValue("null_gpu").jsonPrimitive.boolean)
+    }
+
+    @Test
+    fun writesNativeOrdinalForNumericEnumSettings() {
+        val runtimeRoot = temporaryFolder.newFolder("runtime-enum").toPath()
+        val spec = RuntimeSettingSpec(
+            id = "audio.audio_backend",
+            nativeKey = "Audio.audio_backend",
+            section = "Audio",
+            kind = SettingKind.ENUM,
+            defaultValue = JsonPrimitive("SDL"),
+            choices = listOf("SDL", "OpenAL"),
+            nativeEnumOrdinal = true,
+        )
+        val resolved = RuntimeProfileResolver(listOf(spec)).resolve(
+            RuntimeProfile(values = mapOf(spec.id to JsonPrimitive("OpenAL"))),
+            null,
+        )
+
+        ShadPs4ConfigManager.write(runtimeRoot, resolved)
+
+        val config = runtimeRoot.resolve(".local/share/shadPS4/config.json")
+        val audioBackend = Json.parseToJsonElement(Files.readString(config)).jsonObject
+            .getValue("Audio").jsonObject.getValue("audio_backend").jsonPrimitive.int
+        assertTrue(audioBackend == 1)
     }
 }
