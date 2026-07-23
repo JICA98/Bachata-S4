@@ -9,6 +9,7 @@
 #include <imgui.h>
 
 #include "imgui_impl_vulkan.h"
+#include "imgui_memory.h"
 
 #ifndef IM_MAX
 #define IM_MAX(A, B) (((A) >= (B)) ? (A) : (B))
@@ -22,6 +23,7 @@ struct RenderBuffer {
     vk::DeviceMemory buffer_memory{};
     vk::DeviceSize buffer_size{};
     vk::Buffer buffer{};
+    bool needs_memory_flush{};
 };
 
 // Reusable buffers used for rendering 1 current in-flight frame, for RenderDrawData()
@@ -182,14 +184,14 @@ static VkData* GetBackendData() {
     return ImGui::GetCurrentContext() ? (VkData*)ImGui::GetIO().BackendRendererUserData : nullptr;
 }
 
-static uint32_t FindMemoryType(vk::MemoryPropertyFlags properties, uint32_t type_bits) {
+static MemoryTypeSelection FindMemoryType(vk::MemoryPropertyFlags required, uint32_t type_bits,
+                                          vk::MemoryPropertyFlags preferred = {}) {
     VkData* bd = GetBackendData();
     const InitInfo& v = bd->init_info;
     const auto prop = v.physical_device.getMemoryProperties();
-    for (uint32_t i = 0; i < prop.memoryTypeCount; i++)
-        if ((prop.memoryTypes[i].propertyFlags & properties) == properties && type_bits & (1 << i))
-            return i;
-    return 0xFFFFFFFF; // Unable to find memoryType
+    return SelectMemoryType(static_cast<const VkPhysicalDeviceMemoryProperties&>(prop),
+                            static_cast<VkMemoryPropertyFlags>(required), type_bits,
+                            static_cast<VkMemoryPropertyFlags>(preferred));
 }
 
 template <typename T>
@@ -351,7 +353,7 @@ UploadTextureData UploadTexture(const void* data, vk::Format format, u32 width, 
         vk::MemoryAllocateInfo alloc_info{
             .allocationSize = IM_MAX(v.min_allocation_size, req.size),
             .memoryTypeIndex =
-                FindMemoryType(vk::MemoryPropertyFlagBits::eDeviceLocal, req.memoryTypeBits),
+                FindMemoryType(vk::MemoryPropertyFlagBits::eDeviceLocal, req.memoryTypeBits).index,
         };
         info.image_memory = CheckVkResult(v.device.allocateMemory(alloc_info, v.allocator));
         CheckVkErr(v.device.bindImageMemory(info.image, info.image_memory, 0));
@@ -376,6 +378,7 @@ UploadTextureData UploadTexture(const void* data, vk::Format format, u32 width, 
     info.im_texture = AddTexture(info.image_view, vk::ImageLayout::eShaderReadOnlyOptimal);
 
     // Create Upload Buffer
+    MemoryTypeSelection upload_memory_type{};
     {
         vk::BufferCreateInfo buffer_info{
             .size = size,
@@ -385,10 +388,12 @@ UploadTextureData UploadTexture(const void* data, vk::Format format, u32 width, 
         info.upload_buffer = CheckVkResult(v.device.createBuffer(buffer_info, v.allocator));
         auto req = v.device.getBufferMemoryRequirements(info.upload_buffer);
         auto alignemtn = IM_MAX(bd->buffer_memory_alignment, req.alignment);
+        upload_memory_type =
+            FindMemoryType(vk::MemoryPropertyFlagBits::eHostVisible, req.memoryTypeBits,
+                           vk::MemoryPropertyFlagBits::eHostCoherent);
         vk::MemoryAllocateInfo alloc_info{
             .allocationSize = IM_MAX(v.min_allocation_size, req.size),
-            .memoryTypeIndex =
-                FindMemoryType(vk::MemoryPropertyFlagBits::eHostVisible, req.memoryTypeBits),
+            .memoryTypeIndex = upload_memory_type.index,
         };
         info.upload_buffer_memory = CheckVkResult(v.device.allocateMemory(alloc_info, v.allocator));
         CheckVkErr(v.device.bindBufferMemory(info.upload_buffer, info.upload_buffer_memory, 0));
@@ -398,13 +403,15 @@ UploadTextureData UploadTexture(const void* data, vk::Format format, u32 width, 
     {
         char* map = (char*)CheckVkResult(v.device.mapMemory(info.upload_buffer_memory, 0, size));
         memcpy(map, data, size);
-        vk::MappedMemoryRange range[1]{
-            {
-                .memory = info.upload_buffer_memory,
-                .size = size,
-            },
-        };
-        CheckVkErr(v.device.flushMappedMemoryRanges(range));
+        if (upload_memory_type.NeedsMappedMemoryFlush()) {
+            vk::MappedMemoryRange range[1]{
+                {
+                    .memory = info.upload_buffer_memory,
+                    .size = size,
+                },
+            };
+            CheckVkErr(v.device.flushMappedMemoryRanges(range));
+        }
         v.device.unmapMemory(info.upload_buffer_memory);
     }
 
@@ -497,12 +504,15 @@ static void CreateOrResizeBuffer(RenderBuffer& rb, size_t new_size, vk::BufferUs
 
     const vk::MemoryRequirements req = v.device.getBufferMemoryRequirements(rb.buffer);
     bd->buffer_memory_alignment = IM_MAX(bd->buffer_memory_alignment, req.alignment);
+    const auto memory_type =
+        FindMemoryType(vk::MemoryPropertyFlagBits::eHostVisible, req.memoryTypeBits,
+                       vk::MemoryPropertyFlagBits::eHostCoherent);
     vk::MemoryAllocateInfo alloc_info{
         .allocationSize = req.size,
-        .memoryTypeIndex =
-            FindMemoryType(vk::MemoryPropertyFlagBits::eHostVisible, req.memoryTypeBits),
+        .memoryTypeIndex = memory_type.index,
     };
     rb.buffer_memory = CheckVkResult(v.device.allocateMemory(alloc_info, v.allocator));
+    rb.needs_memory_flush = memory_type.NeedsMappedMemoryFlush();
 
     CheckVkErr(v.device.bindBufferMemory(rb.buffer, rb.buffer_memory, 0));
     rb.buffer_size = buffer_size_aligned;
@@ -614,17 +624,22 @@ void RenderDrawData(ImDrawData& draw_data, vk::CommandBuffer command_buffer,
             vtx_dst += cmd_list->VtxBuffer.Size;
             idx_dst += cmd_list->IdxBuffer.Size;
         }
-        vk::MappedMemoryRange range[2]{
-            {
+        std::vector<vk::MappedMemoryRange> ranges;
+        if (frb.vertex.needs_memory_flush) {
+            ranges.push_back({
                 .memory = frb.vertex.buffer_memory,
                 .size = VK_WHOLE_SIZE,
-            },
-            {
+            });
+        }
+        if (frb.index.needs_memory_flush) {
+            ranges.push_back({
                 .memory = frb.index.buffer_memory,
                 .size = VK_WHOLE_SIZE,
-            },
-        };
-        CheckVkErr(v.device.flushMappedMemoryRanges({range}));
+            });
+        }
+        if (!ranges.empty()) {
+            CheckVkErr(v.device.flushMappedMemoryRanges(ranges));
+        }
         v.device.unmapMemory(frb.vertex.buffer_memory);
         v.device.unmapMemory(frb.index.buffer_memory);
     }
@@ -768,7 +783,7 @@ static bool CreateFontsTexture() {
         vk::MemoryAllocateInfo alloc_info{
             .allocationSize = IM_MAX(v.min_allocation_size, req.size),
             .memoryTypeIndex =
-                FindMemoryType(vk::MemoryPropertyFlagBits::eDeviceLocal, req.memoryTypeBits),
+                FindMemoryType(vk::MemoryPropertyFlagBits::eDeviceLocal, req.memoryTypeBits).index,
         };
         bd->font_memory = CheckVkResult(v.device.allocateMemory(alloc_info, v.allocator));
         CheckVkErr(v.device.bindImageMemory(bd->font_image, bd->font_memory, 0));
@@ -794,6 +809,7 @@ static bool CreateFontsTexture() {
 
     // Create the Upload Buffer:
     vk::DeviceMemory upload_buffer_memory{};
+    MemoryTypeSelection upload_memory_type{};
     vk::Buffer upload_buffer{};
     {
         vk::BufferCreateInfo buffer_info{
@@ -804,10 +820,12 @@ static bool CreateFontsTexture() {
         upload_buffer = CheckVkResult(v.device.createBuffer(buffer_info, v.allocator));
         vk::MemoryRequirements req = v.device.getBufferMemoryRequirements(upload_buffer);
         bd->buffer_memory_alignment = IM_MAX(bd->buffer_memory_alignment, req.alignment);
+        upload_memory_type =
+            FindMemoryType(vk::MemoryPropertyFlagBits::eHostVisible, req.memoryTypeBits,
+                           vk::MemoryPropertyFlagBits::eHostCoherent);
         vk::MemoryAllocateInfo alloc_info{
             .allocationSize = IM_MAX(v.min_allocation_size, req.size),
-            .memoryTypeIndex =
-                FindMemoryType(vk::MemoryPropertyFlagBits::eHostVisible, req.memoryTypeBits),
+            .memoryTypeIndex = upload_memory_type.index,
         };
         upload_buffer_memory = CheckVkResult(v.device.allocateMemory(alloc_info, v.allocator));
         CheckVkErr(v.device.bindBufferMemory(upload_buffer, upload_buffer_memory, 0));
@@ -823,13 +841,15 @@ static bool CreateFontsTexture() {
         }
         char* map = static_cast<char*>(mapped);
         memcpy(map, pixels, upload_size);
-        vk::MappedMemoryRange range[1]{
-            {
-                .memory = upload_buffer_memory,
-                .size = upload_size,
-            },
-        };
-        CheckVkErr(v.device.flushMappedMemoryRanges({range}));
+        if (upload_memory_type.NeedsMappedMemoryFlush()) {
+            vk::MappedMemoryRange range[1]{
+                {
+                    .memory = upload_buffer_memory,
+                    .size = upload_size,
+                },
+            };
+            CheckVkErr(v.device.flushMappedMemoryRanges({range}));
+        }
         v.device.unmapMemory(upload_buffer_memory);
     }
 
@@ -943,6 +963,7 @@ static void DestroyFrameRenderBuffers(vk::Device device, RenderBuffer& rb,
         rb.buffer_memory = VK_NULL_HANDLE;
     }
     rb.buffer_size = 0;
+    rb.needs_memory_flush = false;
 }
 
 static void DestroyWindowRenderBuffers(vk::Device device, WindowRenderBuffers& buffers,

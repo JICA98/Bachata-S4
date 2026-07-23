@@ -42,7 +42,13 @@ test("ARM64 production guest entries use the shared FEX runtime", () => {
   assert.match(guestCallback, /IsGuestFunctionAddress/);
   assert.match(guestCallback, /std::abort/);
 
-  assert.match(guestCpu, /GsBase/);
+  assert.match(guestCpu, /FsBase/);
+  assert.ok(
+    [...linker.matchAll(/request\.FsBase\s*=\s*reinterpret_cast<std::uintptr_t>\(GetTcbBase\(\)\)/g)]
+      .length >= 2,
+    "main and detached guest calls must expose the PS4 TCB through FS",
+  );
+  assert.doesNotMatch(linker, /request\.GsBase\s*=\s*reinterpret_cast<std::uintptr_t>\(GetTcbBase\(\)\)/);
   assert.match(fexCpu, /CallGuest/);
   assert.match(engine, /HandleCallback/);
   assert.match(engine, /ActiveThread/);

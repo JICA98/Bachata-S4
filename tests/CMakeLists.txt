@@ -9,7 +9,12 @@ include(FetchContent)
 )
 FetchContent_MakeAvailable(googletest)
 
-set(TEST_TARGETS shadps4_settings_test shadps4_gcn_test)
+set(TEST_TARGETS
+    shadps4_settings_test
+    shadps4_gcn_test
+    shadps4_guest_memory_validation_test
+    shadps4_imgui_memory_test
+)
 
 set(SETTINGS_TEST_SOURCES
     # Under test
@@ -128,8 +133,18 @@ set(GCN_TEST_SOURCES
     gcn/test_gcn_instructions.cpp
 )
 
+set(IMGUI_MEMORY_TEST_SOURCES
+    imgui/test_memory_type_selection.cpp
+)
+
+set(GUEST_MEMORY_VALIDATION_TEST_SOURCES
+    core/test_guest_memory_validation_cache.cpp
+)
+
 add_executable(shadps4_settings_test ${SETTINGS_TEST_SOURCES})
 add_executable(shadps4_gcn_test ${GCN_TEST_SOURCES})
+add_executable(shadps4_guest_memory_validation_test ${GUEST_MEMORY_VALIDATION_TEST_SOURCES})
+add_executable(shadps4_imgui_memory_test ${IMGUI_MEMORY_TEST_SOURCES})
 
 foreach(t ${TEST_TARGETS})
     target_include_directories(${t} PRIVATE
@@ -160,6 +175,13 @@ target_link_libraries(shadps4_gcn_test PRIVATE
     SDL3::SDL3
     spdlog::spdlog
     half::half
+)
+target_link_libraries(shadps4_imgui_memory_test PRIVATE
+    GTest::gtest_main
+    Vulkan::Headers
+)
+target_link_libraries(shadps4_guest_memory_validation_test PRIVATE
+    GTest::gtest_main
 )
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR

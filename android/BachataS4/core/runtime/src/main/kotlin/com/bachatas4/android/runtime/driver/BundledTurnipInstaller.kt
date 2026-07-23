@@ -47,7 +47,7 @@ class BundledTurnipInstaller(
             "Installed Turnip checksum mismatch after extract"
         }
         Files.createDirectories(registryRoot)
-        Files.writeString(markerFile, versionMarker)
+        Files.write(markerFile, versionMarker.toByteArray(Charsets.UTF_8))
         return installed
     }
 
@@ -58,7 +58,7 @@ class BundledTurnipInstaller(
 
     private fun markerMatches(): Boolean =
         Files.isRegularFile(markerFile) &&
-            Files.readString(markerFile).trim() == versionMarker
+            String(Files.readAllBytes(markerFile), Charsets.UTF_8).trim() == versionMarker
 
     private fun sha256(bytes: ByteArray): String =
         MessageDigest.getInstance("SHA-256")

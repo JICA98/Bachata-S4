@@ -61,6 +61,7 @@ std::atomic_uint32_t FexBlockTraceCount {};
 struct ActiveFexExecutionState final {
   FEXCore::Context::Context* Context {};
   FEXCore::Core::InternalThreadState* Thread {};
+  FEXCore::SignalDelegator* SignalDelegator {};
 };
 
 thread_local ActiveFexExecutionState ActiveFexExecution;
@@ -68,9 +69,10 @@ thread_local ActiveFexExecutionState ActiveFexExecution;
 class FexExecutionSignalScope final {
 public:
   FexExecutionSignalScope(FEXCore::Context::Context& context,
-                          FEXCore::Core::InternalThreadState* thread)
+                          FEXCore::Core::InternalThreadState* thread,
+                          FEXCore::SignalDelegator* signalDelegator)
     : Previous {ActiveFexExecution} {
-    ActiveFexExecution = {&context, thread};
+    ActiveFexExecution = {&context, thread, signalDelegator};
   }
 
   FexExecutionSignalScope(const FexExecutionSignalScope&) = delete;
@@ -689,9 +691,9 @@ GuestCode BuildGuestCode() {
 
 bool HandleGuestSignal(int signal, siginfo_t* info, void* rawContext) noexcept {
 #if defined(__aarch64__)
-  if (signal != SIGBUS || info == nullptr || info->si_code != BUS_ADRALN ||
-      rawContext == nullptr || ActiveFexExecution.Context == nullptr ||
-      ActiveFexExecution.Thread == nullptr) {
+  if (signal != SIGBUS || info == nullptr || rawContext == nullptr ||
+      ActiveFexExecution.Context == nullptr || ActiveFexExecution.Thread == nullptr ||
+      ActiveFexExecution.SignalDelegator == nullptr) {
     return false;
   }
 
@@ -702,6 +704,7 @@ bool HandleGuestSignal(int signal, siginfo_t* info, void* rawContext) noexcept {
   }
 
   auto* registers = reinterpret_cast<std::uint64_t*>(context->uc_mcontext.regs);
+  if (info->si_code != BUS_ADRALN) return false;
   const auto adjustment = FEXCore::ArchHelpers::Arm64::HandleUnalignedAccess(
       ActiveFexExecution.Thread,
       FEXCore::ArchHelpers::Arm64::UnalignedHandlerType::HalfBarrier, pc, registers);
@@ -801,7 +804,7 @@ public:
     thread->CurrentFrame->State.gregs[FEXCore::X86State::REG_R12] =
         reinterpret_cast<uint64_t>(stackPage.Get()) + 1;
     {
-      FexExecutionSignalScope signalScope {*Context, thread};
+      FexExecutionSignalScope signalScope {*Context, thread, SignalDelegator.get()};
       Context->ExecuteThread(thread);
     }
     if (Syscalls->FailureResult(invocation)) return *Syscalls->FailureResult(invocation);
@@ -842,7 +845,7 @@ public:
     state.gregs[FEXCore::X86State::REG_RDI] = kCallbackInput;
     state.gregs[FEXCore::X86State::REG_RSP] = initialRsp;
     {
-      FexExecutionSignalScope signalScope {*Context, thread};
+      FexExecutionSignalScope signalScope {*Context, thread, SignalDelegator.get()};
       Context->HandleCallback(thread, initialRip + guest.CallbackOffset);
     }
     if (state.gregs[FEXCore::X86State::REG_RAX] != kCallbackInput + 5 || state.gregs[FEXCore::X86State::REG_RSP] != initialRsp) {
@@ -853,7 +856,7 @@ public:
     state.rip = invalidationRip;
     state.gregs[FEXCore::X86State::REG_RSP] = initialRsp;
     {
-      FexExecutionSignalScope signalScope {*Context, thread};
+      FexExecutionSignalScope signalScope {*Context, thread, SignalDelegator.get()};
       Context->ExecuteThread(thread);
     }
     if (state.gregs[FEXCore::X86State::REG_RAX] != kInvalidationInitial) return Failure(EngineStage::Invalidate, EPROTO);
@@ -873,7 +876,7 @@ public:
     state.rip = invalidationRip;
     state.gregs[FEXCore::X86State::REG_RSP] = initialRsp;
     {
-      FexExecutionSignalScope signalScope {*Context, thread};
+      FexExecutionSignalScope signalScope {*Context, thread, SignalDelegator.get()};
       Context->ExecuteThread(thread);
     }
     result.Invalidation = state.gregs[FEXCore::X86State::REG_RAX] == kInvalidationUpdated;
@@ -929,7 +932,7 @@ public:
     callRetStack.Initialize(thread);
     thread->CurrentFrame->State.fs_cached = reinterpret_cast<uint64_t>(tlsPage.Get());
     {
-      FexExecutionSignalScope signalScope {*Context, thread};
+      FexExecutionSignalScope signalScope {*Context, thread, SignalDelegator.get()};
       Context->ExecuteThread(thread);
     }
     return thread->CurrentFrame->State.gregs[FEXCore::X86State::REG_RAX] == sentinel &&
@@ -1099,7 +1102,8 @@ EngineResult<GuestExecutionState> GuestEngine::Run(Thread& thread) {
   BridgeSyscallHandler::InvocationScope invocationScope {*ImplState->Syscalls, thread.Invocation,
                                                           thread.Native};
   {
-    FexExecutionSignalScope signalScope {*ImplState->Context, thread.Native};
+    FexExecutionSignalScope signalScope {*ImplState->Context, thread.Native,
+                                         ImplState->SignalDelegator.get()};
     ImplState->Context->ExecuteThread(thread.Native);
   }
   if (ImplState->Syscalls->FailureResult(thread.Invocation)) {
@@ -1161,7 +1165,8 @@ EngineResult<GuestExecutionState> GuestEngine::CallGuest(
   BridgeSyscallHandler::InvocationState invocation;
   BridgeSyscallHandler::InvocationScope invocationScope {*ImplState->Syscalls, invocation, thread};
   {
-    FexExecutionSignalScope signalScope {*ImplState->Context, thread};
+    FexExecutionSignalScope signalScope {*ImplState->Context, thread,
+                                         ImplState->SignalDelegator.get()};
     ImplState->Context->HandleCallback(thread, rip);
   }
   if (ImplState->Syscalls->FailureResult(invocation)) {

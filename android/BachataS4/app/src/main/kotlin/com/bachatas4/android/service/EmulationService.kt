@@ -25,12 +25,13 @@ import com.bachatas4.android.runtime.input.ControllerSnapshot
 import com.bachatas4.android.runtime.process.RuntimeProcessHandle
 import com.bachatas4.android.runtime.process.RuntimeProcessLauncher
 import com.bachatas4.android.runtime.process.RuntimeProcessRequest
-import com.bachatas4.android.runtime.process.RuntimeGuestBackend
+import com.bachatas4.android.runtime.settings.RuntimeGuestBackend
 import com.bachatas4.android.runtime.process.RuntimeVulkanDriver
 import com.bachatas4.android.runtime.process.VulkanDriverConfiguration
 import dagger.hilt.android.AndroidEntryPoint
 import com.bachatas4.android.runtime.session.ManagedSession
 import com.bachatas4.android.runtime.session.ManagedSessionState
+import com.bachatas4.android.runtime.session.FrameTelemetryReporter
 import com.winlator.xconnector.UnixSocketConfig
 import java.io.File
 import java.nio.file.FileAlreadyExistsException
@@ -113,6 +114,7 @@ class EmulationService : Service() {
             UUID.randomUUID().toString().substring(0, 8),
         )
         val outputFile = sessionLog.backendLog.toFile()
+        val telemetryReporter = FrameTelemetryReporter()
         sessionLog.info("Session", "start game=$gameId driver=$vulkanDriver")
         GamepadInputManager.onSessionStart()
         sessionLog.info(
@@ -163,7 +165,7 @@ class EmulationService : Service() {
                 installedRuntime,
                 filesDir.toPath(),
             )
-            val guestBackend = launchProfileProvider.guestBackend(gameId)
+            val guestBackend = launchProfile.guestBackend
             sessionLog.info("Runtime", "guestBackend=${guestBackend.name.lowercase()}")
             sessionLog.info("Vulkan", "driver=${launchProfile.driverId} box64Mode=${driverConfiguration.box64Mode}")
             val runtimeHome = filesDir.toPath().resolve("runtime-home")
@@ -230,7 +232,13 @@ class EmulationService : Service() {
                         sessionLog.info("Session", "backend reported Running")
                         ManagedSession.update(ManagedSessionState.Running(gameId))
                     }
-                    frame == "BACHATA/1 EVENT Frame" -> ManagedSession.recordPresentedFrame()
+                    frame == "BACHATA/1 EVENT Frame" -> {
+                        val nowNanos = System.nanoTime()
+                        ManagedSession.recordPresentedFrame(nowNanos)
+                        telemetryReporter.record(nowNanos, ManagedSession.frameTelemetry.value)?.let { sample ->
+                            sessionLog.info("Performance", sample.logLine())
+                        }
+                    }
                     frame.startsWith("BACHATA/1 ERROR code=") -> {
                         sessionLog.error("Backend", frame)
                         ManagedSession.update(

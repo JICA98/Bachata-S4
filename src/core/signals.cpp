@@ -106,13 +106,12 @@ void SignalHandler(int sig, siginfo_t* info, void* raw_context) {
 
     switch (sig) {
     case SIGBUS:
+    case SIGSEGV: {
 #ifdef SHADPS4_ENABLE_FEX_GUEST_CPU
-        if (::Core::Fex::HandleGuestSignal(sig, info, raw_context)) {
+        if (sig == SIGBUS && ::Core::Fex::HandleGuestSignal(sig, info, raw_context)) {
             return;
         }
 #endif
-        [[fallthrough]];
-    case SIGSEGV: {
         const bool is_write = Common::IsWriteError(raw_context);
         if (!signals->DispatchAccessViolation(raw_context, info->si_addr)) {
             // If the guest has installed a custom signal handler, and the access violation didn't

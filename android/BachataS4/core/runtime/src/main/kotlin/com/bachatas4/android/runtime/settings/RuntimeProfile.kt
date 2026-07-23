@@ -17,11 +17,18 @@ enum class Box64Preset(val environmentValue: String?) {
 }
 
 @Serializable
+enum class RuntimeGuestBackend {
+    FEX,
+    BOX64,
+}
+
+@Serializable
 data class RuntimeProfile(
     val schemaVersion: Int = CURRENT_SCHEMA_VERSION,
     val values: Map<String, JsonElement> = emptyMap(),
     val unknownShadPs4: Map<String, JsonElement> = emptyMap(),
     val unknownBox64: Map<String, String> = emptyMap(),
+    val guestBackend: RuntimeGuestBackend? = null,
     val box64Preset: Box64Preset? = null,
     val driverId: String? = null,
     val controllerSlots: List<ControllerProfile> = emptyList(),

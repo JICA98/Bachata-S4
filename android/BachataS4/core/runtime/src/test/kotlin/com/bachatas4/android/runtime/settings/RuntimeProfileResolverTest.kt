@@ -72,5 +72,40 @@ class RuntimeProfileResolverTest {
         )
     }
 
+    @Test
+    fun guestBackendDefaultsToFex() {
+        val resolved = RuntimeProfileResolver(listOf(nullGpu)).resolve(RuntimeProfile(), null)
+
+        assertEquals(RuntimeGuestBackend.FEX, resolved.guestBackend)
+    }
+
+    @Test
+    fun globalGuestBackendOverridesProductDefault() {
+        val global = RuntimeProfile(guestBackend = RuntimeGuestBackend.BOX64)
+
+        val resolved = RuntimeProfileResolver(listOf(nullGpu)).resolve(global, null)
+
+        assertEquals(RuntimeGuestBackend.BOX64, resolved.guestBackend)
+    }
+
+    @Test
+    fun gameGuestBackendOverridesGlobalBackend() {
+        val global = RuntimeProfile(guestBackend = RuntimeGuestBackend.BOX64)
+        val game = RuntimeProfile(guestBackend = RuntimeGuestBackend.FEX)
+
+        val resolved = RuntimeProfileResolver(listOf(nullGpu)).resolve(global, game)
+
+        assertEquals(RuntimeGuestBackend.FEX, resolved.guestBackend)
+    }
+
+    @Test
+    fun nullGameGuestBackendInheritsGlobalBackend() {
+        val global = RuntimeProfile(guestBackend = RuntimeGuestBackend.BOX64)
+
+        val resolved = RuntimeProfileResolver(listOf(nullGpu)).resolve(global, RuntimeProfile())
+
+        assertEquals(RuntimeGuestBackend.BOX64, resolved.guestBackend)
+    }
+
     private fun JsonPrimitive.jsonPrimitiveBoolean(): Boolean = content.toBooleanStrict()
 }

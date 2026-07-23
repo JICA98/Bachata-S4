@@ -61,6 +61,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.bachatas4.android.runtime.settings.Box64Preset
 import com.bachatas4.android.runtime.settings.ProfileScope
 import com.bachatas4.android.runtime.settings.RuntimeSettingSpec
+import com.bachatas4.android.runtime.settings.RuntimeGuestBackend
 import com.bachatas4.android.runtime.settings.SettingKind
 import com.bachatas4.android.feature.settings.input.ControllerMappingScreen
 import com.bachatas4.android.feature.settings.input.TouchLayoutEditorScreen
@@ -126,6 +127,7 @@ fun SettingsScreen(
         onCategory = viewModel::selectCategory,
         onScope = viewModel::selectScope,
         onPreset = viewModel::setPreset,
+        onGuestBackend = viewModel::setGuestBackend,
         onValue = viewModel::setText,
         onBoolean = viewModel::setValue,
         onReset = { viewModel.setValue(it, null) },
@@ -149,6 +151,7 @@ private fun SettingsContent(
     onCategory: (String?) -> Unit,
     onScope: (ProfileScope) -> Unit,
     onPreset: (Box64Preset) -> Unit,
+    onGuestBackend: (RuntimeGuestBackend?) -> Unit,
     onValue: (RuntimeSettingSpec, String) -> Unit,
     onBoolean: (RuntimeSettingSpec, JsonPrimitive) -> Unit,
     onReset: (RuntimeSettingSpec) -> Unit,
@@ -443,6 +446,53 @@ private fun SettingsContent(
                             item {
                                 BachataPanel(modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(), color = Color(0xFF3A2B18)) {
                                     Text("Emulation is active; changes apply next launch.", modifier = Modifier.padding(12.dp), color = Color(0xFFFFDDB5))
+                                }
+                            }
+                        }
+                        if (state.runtime == SettingsRuntime.SHADPS4) {
+                            item {
+                                val gameScope = state.scope is ProfileScope.Game
+                                val selected = state.profile.guestBackend
+                                val options = if (gameScope) {
+                                    listOf<RuntimeGuestBackend?>(null) + RuntimeGuestBackend.entries
+                                } else {
+                                    RuntimeGuestBackend.entries.map { it }
+                                }
+                                BachataPanel(
+                                    modifier = Modifier.padding(horizontal = 16.dp).fillMaxWidth(),
+                                    color = BachataPalette.RaisedSurface,
+                                ) {
+                                    Column(
+                                        modifier = Modifier.padding(12.dp),
+                                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                                    ) {
+                                        Text(
+                                            "Guest CPU backend",
+                                            fontWeight = FontWeight.SemiBold,
+                                            color = BachataPalette.Primary,
+                                        )
+                                        LazyRow(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                                            items(options) { option ->
+                                                val label = option?.name?.lowercase() ?: "inherit"
+                                                val isSelected = if (gameScope) {
+                                                    selected == option
+                                                } else {
+                                                    (selected ?: RuntimeGuestBackend.FEX) == option
+                                                }
+                                                CategoryTab(label, isSelected, focused = false) {
+                                                    onGuestBackend(option)
+                                                }
+                                            }
+                                        }
+                                        Text(
+                                            if (gameScope && selected == null) {
+                                                "Uses the global backend."
+                                            } else {
+                                                "FEX is the default; Box64 remains an explicit compatibility fallback."
+                                            },
+                                            color = BachataPalette.Secondary,
+                                        )
+                                    }
                                 }
                             }
                         }

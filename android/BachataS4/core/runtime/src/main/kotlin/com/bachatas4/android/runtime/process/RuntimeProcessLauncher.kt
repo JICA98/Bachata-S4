@@ -1,5 +1,6 @@
 package com.bachatas4.android.runtime.process
 
+import com.bachatas4.android.runtime.settings.RuntimeGuestBackend
 import java.io.File
 import java.nio.file.Files
 import java.nio.file.Path
@@ -17,13 +18,8 @@ data class RuntimeProcessRequest(
     val arguments: List<String> = emptyList(),
     val outputPath: Path? = null,
     val box64Mode: Box64Mode = Box64Mode.HOST_GLIBC,
-    val guestBackend: RuntimeGuestBackend = RuntimeGuestBackend.BOX64,
+    val guestBackend: RuntimeGuestBackend,
 )
-
-enum class RuntimeGuestBackend {
-    BOX64,
-    FEX,
-}
 
 interface RuntimeProcessHandle {
     val isAlive: Boolean

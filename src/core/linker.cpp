@@ -18,6 +18,7 @@
 #ifdef SHADPS4_ENABLE_FEX_GUEST_CPU
 #include "core/guest_cpu/fex_guest_cpu.h"
 #include "core/guest_cpu/fex_hle_bridge.h"
+#include "core/guest_cpu/guest_memory_validation_cache.h"
 #include "core/guest_cpu/hle_call_adapter.h"
 #endif
 #include "core/libraries/kernel/kernel.h"
@@ -46,21 +47,30 @@ static bool ValidateGuestMemory(void* context, std::uintptr_t address, std::size
         return false;
     }
     auto* memory = static_cast<MemoryManager*>(context);
+    const auto required = static_cast<u32>(MemoryProt::CpuRead) |
+                          (writable ? static_cast<u32>(MemoryProt::CpuWrite) : 0);
+    static thread_local GuestCpu::GuestMemoryValidationCache validation_cache;
+    const auto generation = memory->MappingGeneration();
+    if (validation_cache.Contains(memory, generation, address, size, required)) {
+        return true;
+    }
     const auto end = address + size;
     auto cursor = address;
     while (cursor < end) {
         void* range_start{};
         void* range_end{};
         u32 protection{};
-        if (memory->QueryProtection(cursor, &range_start, &range_end, &protection) != ORBIS_OK) {
+        u64 range_generation{};
+        if (memory->QueryProtection(cursor, &range_start, &range_end, &protection,
+                                    &range_generation) != ORBIS_OK) {
             return false;
         }
+        const auto mapped_begin = reinterpret_cast<std::uintptr_t>(range_start);
         const auto mapped_end = reinterpret_cast<std::uintptr_t>(range_end);
-        const auto required = static_cast<u32>(MemoryProt::CpuRead) |
-                              (writable ? static_cast<u32>(MemoryProt::CpuWrite) : 0);
         if (mapped_end <= cursor || (protection & required) != required) {
             return false;
         }
+        validation_cache.Store(memory, range_generation, mapped_begin, mapped_end, protection);
         cursor = std::min(end, mapped_end);
     }
     return true;
@@ -350,7 +360,7 @@ Linker::GuestFunctionResult Linker::RunGuestFunction(VAddr entry,
     request.Rip = entry;
     request.Rsp = rsp;
     request.Rflags = 1U << 1;
-    request.GsBase = reinterpret_cast<std::uintptr_t>(GetTcbBase());
+    request.FsBase = reinterpret_cast<std::uintptr_t>(GetTcbBase());
     SetGuestIntegerArguments(request, arguments);
     request.MappedRanges = {*codeRange, *stackRange, m_fex_backend->ReturnRange(),
                             m_fex_backend->CallbackReturnRange()};
@@ -422,7 +432,7 @@ Linker::GuestFunctionResult Linker::RunGuestMain(EntryParams* params) {
     request.Rflags = 1U << 1;
     request.Gpr[7] = guestParamsAddress;
     request.Gpr[6] = m_fex_exit_veneer;
-    request.GsBase = reinterpret_cast<std::uintptr_t>(GetTcbBase());
+    request.FsBase = reinterpret_cast<std::uintptr_t>(GetTcbBase());
     request.MappedRanges = {*codeRange, *stackRange, m_fex_backend->ReturnRange(),
                             m_fex_backend->CallbackReturnRange()};
     const auto veneerRanges = m_hle_veneers->GetExecutableRanges();

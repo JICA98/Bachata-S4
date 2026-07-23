@@ -32,6 +32,13 @@ void SymbolsResolver::AddFunction(const SymbolResolver& s,
     if (adapter == nullptr) {
         return;
     }
+    for (auto& record : m_symbols) {
+        if (record.name == name && record.hle_fallback) {
+            record.hle_adapter = std::move(adapter);
+            record.hle_fallback = false;
+            return;
+        }
+    }
     m_symbols.emplace_back(name, s.nidName, 0, std::move(adapter));
 }
 

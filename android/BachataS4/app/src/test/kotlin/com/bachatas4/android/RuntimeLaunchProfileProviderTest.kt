@@ -5,13 +5,13 @@ import com.bachatas4.android.feature.drivers.DriverManagerBackend
 import com.bachatas4.android.feature.drivers.DriverManagerCapabilities
 import com.bachatas4.android.runtime.driver.InstalledDriver
 import com.bachatas4.android.runtime.driver.TurnipReleaseAsset
-import com.bachatas4.android.runtime.process.RuntimeGuestBackend
 import com.bachatas4.android.runtime.process.RuntimeVulkanDriver
 import com.bachatas4.android.runtime.process.VulkanDriverConfiguration
 import com.bachatas4.android.runtime.settings.CompatibilityConstraint
 import com.bachatas4.android.runtime.settings.Box64Preset
 import com.bachatas4.android.runtime.settings.ProfileScope
 import com.bachatas4.android.runtime.settings.RuntimeSettingCatalog
+import com.bachatas4.android.runtime.settings.RuntimeGuestBackend
 import com.bachatas4.android.runtime.settings.RuntimeSettingSpec
 import com.bachatas4.android.runtime.settings.SettingKind
 import com.bachatas4.android.runtime.settings.ValueSource
@@ -49,26 +49,49 @@ class RuntimeLaunchProfileProviderTest {
     }
 
     @Test
-    fun selectsFexOnlyForSonicCompatibilitySlice() {
+    fun fexIsTheDefaultForEveryGame() = runTest {
         val store = RuntimeProfileStore(temporaryFolder.root)
         val provider = RuntimeLaunchProfileProvider(store, catalog, emptyMap(), strictBackend)
 
-        assertEquals(RuntimeGuestBackend.FEX, provider.guestBackend("CUSA07023"))
-        assertEquals(RuntimeGuestBackend.BOX64, provider.guestBackend("CUSA00999"))
+        assertEquals(RuntimeGuestBackend.FEX, provider.resolve("CUSA07023").guestBackend)
+        assertEquals(RuntimeGuestBackend.FEX, provider.resolve("CUSA00900").guestBackend)
     }
 
     @Test
-    fun fexForcesGpuCommandCopiesWithoutChangingBox64Profiles() = runTest {
+    fun fexForcesGpuCommandCopies() = runTest {
         val store = RuntimeProfileStore(temporaryFolder.root)
         val provider = RuntimeLaunchProfileProvider(store, catalog, emptyMap(), strictBackend)
 
         val sonic = provider.resolve("CUSA07023")
-        val other = provider.resolve("CUSA00999")
 
         assertEquals(JsonPrimitive(true), sonic.settings.getValue(gpuCopy.id).value)
         assertEquals(ValueSource.COMPATIBILITY, sonic.settings.getValue(gpuCopy.id).source)
-        assertEquals(JsonPrimitive(false), other.settings.getValue(gpuCopy.id).value)
-        assertEquals(ValueSource.DEFAULT, other.settings.getValue(gpuCopy.id).source)
+    }
+
+    @Test
+    fun explicitBox64DoesNotReceiveFexCompatibilityConstraints() = runTest {
+        val store = RuntimeProfileStore(temporaryFolder.root)
+        store.update(ProfileScope.Global) { it.copy(guestBackend = RuntimeGuestBackend.BOX64) }
+        val provider = RuntimeLaunchProfileProvider(store, catalog, emptyMap(), strictBackend)
+
+        val resolved = provider.resolve("CUSA00900")
+
+        assertEquals(RuntimeGuestBackend.BOX64, resolved.guestBackend)
+        assertEquals(JsonPrimitive(false), resolved.settings.getValue(gpuCopy.id).value)
+        assertEquals(ValueSource.DEFAULT, resolved.settings.getValue(gpuCopy.id).source)
+    }
+
+    @Test
+    fun perGameFexOverridesGlobalBox64() = runTest {
+        val store = RuntimeProfileStore(temporaryFolder.root)
+        store.update(ProfileScope.Global) { it.copy(guestBackend = RuntimeGuestBackend.BOX64) }
+        store.update(ProfileScope.Game("CUSA00900")) { it.copy(guestBackend = RuntimeGuestBackend.FEX) }
+        val provider = RuntimeLaunchProfileProvider(store, catalog, emptyMap(), strictBackend)
+
+        val resolved = provider.resolve("CUSA00900")
+
+        assertEquals(RuntimeGuestBackend.FEX, resolved.guestBackend)
+        assertEquals(ValueSource.COMPATIBILITY, resolved.settings.getValue(gpuCopy.id).source)
     }
 
     @Test

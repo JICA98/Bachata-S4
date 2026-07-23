@@ -189,7 +189,7 @@ public:
     bool is_fifo;
 };
 
-using OrbisKernelSema = Common::SlotId;
+using OrbisKernelSema = u32;
 
 static Common::SlotVector<std::unique_ptr<OrbisSem>> orbis_sems;
 
@@ -199,8 +199,10 @@ s32 PS4_SYSV_ABI sceKernelCreateSema(OrbisKernelSema* sem, const char* pName, u3
         LOG_ERROR(Lib_Kernel, "Semaphore creation parameters are invalid!");
         return ORBIS_KERNEL_ERROR_EINVAL;
     }
-    *sem = orbis_sems.insert(
-        std::move(std::make_unique<OrbisSem>(initCount, maxCount, pName, attr == 1)));
+    *sem = orbis_sems
+               .insert(std::move(
+                   std::make_unique<OrbisSem>(initCount, maxCount, pName, attr == 1)))
+               .index;
     return ORBIS_OK;
 }
 

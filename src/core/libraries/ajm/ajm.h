@@ -189,23 +189,24 @@ u32 GetChannelMask(u32 num_channels);
 int PS4_SYSV_ABI sceAjmBatchCancel(const u32 context_id, const u32 batch_id);
 int PS4_SYSV_ABI sceAjmBatchErrorDump();
 void* PS4_SYSV_ABI sceAjmBatchJobControlBufferRa(void* p_buffer, u32 instance_id, u64 flags,
-                                                 void* p_sideband_input, size_t sideband_input_size,
+                                                 const void* p_sideband_input,
+                                                 size_t sideband_input_size,
                                                  void* p_sideband_output,
                                                  size_t sideband_output_size,
-                                                 void* p_return_address);
+                                                 const void* p_return_address);
 void* PS4_SYSV_ABI sceAjmBatchJobInlineBuffer(void* p_buffer, const void* p_data_input,
                                               size_t data_input_size,
                                               const void** pp_batch_address);
 void* PS4_SYSV_ABI sceAjmBatchJobRunBufferRa(void* p_buffer, u32 instance_id, u64 flags,
-                                             void* p_data_input, size_t data_input_size,
+                                             const void* p_data_input, size_t data_input_size,
                                              void* p_data_output, size_t data_output_size,
                                              void* p_sideband_output, size_t sideband_output_size,
-                                             void* p_return_address);
+                                             const void* p_return_address);
 void* PS4_SYSV_ABI sceAjmBatchJobRunSplitBufferRa(
     void* p_buffer, u32 instance_id, u64 flags, const AjmBuffer* p_data_input_buffers,
     size_t num_data_input_buffers, const AjmBuffer* p_data_output_buffers,
     size_t num_data_output_buffers, void* p_sideband_output, size_t sideband_output_size,
-    void* p_return_address);
+    const void* p_return_address);
 int PS4_SYSV_ABI sceAjmBatchStartBuffer(u32 context, u8* batch, u32 batch_size, const int priority,
                                         AjmBatchError* batch_error, u32* out_batch_id);
 int PS4_SYSV_ABI sceAjmBatchWait(const u32 context, const u32 batch_id, const u32 timeout,
@@ -216,7 +217,7 @@ int PS4_SYSV_ABI sceAjmDecMp3ParseFrame(const u8* stream, u32 stream_size, int p
 int PS4_SYSV_ABI sceAjmFinalize();
 int PS4_SYSV_ABI sceAjmInitialize(s64 reserved, u32* out_context);
 AjmCodecType PS4_SYSV_ABI sceAjmInstanceCodecType(u32 instance_id);
-int PS4_SYSV_ABI sceAjmInstanceCreate(u32 context, AjmCodecType codec_type, AjmInstanceFlags flags,
+int PS4_SYSV_ABI sceAjmInstanceCreate(u32 context, AjmCodecType codec_type, u64 flags_raw,
                                       u32* instance);
 int PS4_SYSV_ABI sceAjmInstanceDestroy(u32 context, u32 instance);
 int PS4_SYSV_ABI sceAjmInstanceExtend();

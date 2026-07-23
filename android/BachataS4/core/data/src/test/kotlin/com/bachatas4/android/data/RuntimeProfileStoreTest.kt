@@ -2,6 +2,7 @@ package com.bachatas4.android.data
 
 import com.bachatas4.android.runtime.settings.ProfileScope
 import com.bachatas4.android.runtime.settings.RuntimeProfile
+import com.bachatas4.android.runtime.settings.RuntimeGuestBackend
 import java.io.File
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonPrimitive
@@ -71,5 +72,20 @@ class RuntimeProfileStoreTest {
         importedStore.import(ProfileScope.Global, exported)
 
         assertEquals(profile, importedStore.load(ProfileScope.Global))
+    }
+
+    @Test
+    fun persistsGlobalAndGameBackendSelectionsSeparately() = runTest {
+        val store = RuntimeProfileStore(temporaryFolder.root)
+        store.update(ProfileScope.Global) { it.copy(guestBackend = RuntimeGuestBackend.FEX) }
+        store.update(ProfileScope.Game("CUSA00900")) {
+            it.copy(guestBackend = RuntimeGuestBackend.BOX64)
+        }
+
+        assertEquals(RuntimeGuestBackend.FEX, store.load(ProfileScope.Global).guestBackend)
+        assertEquals(
+            RuntimeGuestBackend.BOX64,
+            store.load(ProfileScope.Game("CUSA00900")).guestBackend,
+        )
     }
 }

@@ -37,6 +37,7 @@ data class ResolvedRuntimeProfile(
     val settings: Map<String, ResolvedSetting>,
     val unknownShadPs4: Map<String, JsonElement>,
     val unknownBox64: Map<String, String>,
+    val guestBackend: RuntimeGuestBackend,
     val box64Preset: Box64Preset,
     val driverId: String,
     val controllerSlots: List<ControllerProfile>,
@@ -83,6 +84,7 @@ class RuntimeProfileResolver(
             settings = settings,
             unknownShadPs4 = global.unknownShadPs4 + game.orEmptyUnknownShadPs4(),
             unknownBox64 = global.unknownBox64 + game.orEmptyUnknownBox64(),
+            guestBackend = resolveGuestBackend(global, game),
             box64Preset = game?.box64Preset ?: global.box64Preset ?: Box64Preset.DEFAULT,
             driverId = game?.driverId ?: global.driverId ?: "system",
             controllerSlots = game?.controllerSlots?.takeIf { it.isNotEmpty() } ?: global.controllerSlots,
@@ -115,4 +117,9 @@ class RuntimeProfileResolver(
 
     private fun RuntimeProfile?.orEmptyUnknownShadPs4(): Map<String, JsonElement> = this?.unknownShadPs4.orEmpty()
     private fun RuntimeProfile?.orEmptyUnknownBox64(): Map<String, String> = this?.unknownBox64.orEmpty()
+
+    companion object {
+        fun resolveGuestBackend(global: RuntimeProfile, game: RuntimeProfile?): RuntimeGuestBackend =
+            game?.guestBackend ?: global.guestBackend ?: RuntimeGuestBackend.FEX
+    }
 }

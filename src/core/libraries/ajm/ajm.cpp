@@ -55,13 +55,15 @@ int PS4_SYSV_ABI sceAjmBatchErrorDump() {
 }
 
 void* PS4_SYSV_ABI sceAjmBatchJobControlBufferRa(void* p_buffer, u32 instance_id, u64 flags,
-                                                 void* p_sideband_input, size_t sideband_input_size,
+                                                 const void* p_sideband_input,
+                                                 size_t sideband_input_size,
                                                  void* p_sideband_output,
                                                  size_t sideband_output_size,
-                                                 void* p_return_address) {
-    return BatchJobControlBufferRa(p_buffer, instance_id, flags, p_sideband_input,
+                                                 const void* p_return_address) {
+    return BatchJobControlBufferRa(p_buffer, instance_id, flags,
+                                   const_cast<void*>(p_sideband_input),
                                    sideband_input_size, p_sideband_output, sideband_output_size,
-                                   p_return_address);
+                                   const_cast<void*>(p_return_address));
 }
 
 void* PS4_SYSV_ABI sceAjmBatchJobInlineBuffer(void* p_buffer, const void* p_data_input,
@@ -71,24 +73,25 @@ void* PS4_SYSV_ABI sceAjmBatchJobInlineBuffer(void* p_buffer, const void* p_data
 }
 
 void* PS4_SYSV_ABI sceAjmBatchJobRunBufferRa(void* p_buffer, u32 instance_id, u64 flags,
-                                             void* p_data_input, size_t data_input_size,
+                                             const void* p_data_input, size_t data_input_size,
                                              void* p_data_output, size_t data_output_size,
                                              void* p_sideband_output, size_t sideband_output_size,
-                                             void* p_return_address) {
-    return BatchJobRunBufferRa(p_buffer, instance_id, flags, p_data_input, data_input_size,
-                               p_data_output, data_output_size, p_sideband_output,
-                               sideband_output_size, p_return_address);
+                                             const void* p_return_address) {
+    return BatchJobRunBufferRa(p_buffer, instance_id, flags, const_cast<void*>(p_data_input),
+                               data_input_size, p_data_output, data_output_size,
+                               p_sideband_output, sideband_output_size,
+                               const_cast<void*>(p_return_address));
 }
 
 void* PS4_SYSV_ABI sceAjmBatchJobRunSplitBufferRa(
     void* p_buffer, u32 instance_id, u64 flags, const AjmBuffer* p_data_input_buffers,
     size_t num_data_input_buffers, const AjmBuffer* p_data_output_buffers,
     size_t num_data_output_buffers, void* p_sideband_output, size_t sideband_output_size,
-    void* p_return_address) {
+    const void* p_return_address) {
     return BatchJobRunSplitBufferRa(p_buffer, instance_id, flags, p_data_input_buffers,
                                     num_data_input_buffers, p_data_output_buffers,
                                     num_data_output_buffers, p_sideband_output,
-                                    sideband_output_size, p_return_address);
+                                    sideband_output_size, const_cast<void*>(p_return_address));
 }
 
 int PS4_SYSV_ABI sceAjmBatchStartBuffer(u32 context_id, u8* p_batch, u32 batch_size,
@@ -149,7 +152,8 @@ AjmCodecType PS4_SYSV_ABI sceAjmInstanceCodecType(u32 instance_id) {
 }
 
 int PS4_SYSV_ABI sceAjmInstanceCreate(u32 context_id, AjmCodecType codec_type,
-                                      AjmInstanceFlags flags, u32* out_instance) {
+                                      u64 flags_raw, u32* out_instance) {
+    AjmInstanceFlags flags{.raw = flags_raw};
     LOG_INFO(Lib_Ajm, "called context = {}, codec_type = {}, flags = {:#x}", context_id,
              magic_enum::enum_name(codec_type), flags.raw);
 

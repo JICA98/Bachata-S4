@@ -7,10 +7,10 @@ import com.bachatas4.android.runtime.settings.CompatibilityConstraint
 import com.bachatas4.android.runtime.settings.ProfileScope
 import com.bachatas4.android.runtime.settings.ResolvedRuntimeProfile
 import com.bachatas4.android.runtime.settings.RuntimeProfileResolver
+import com.bachatas4.android.runtime.settings.RuntimeGuestBackend
 import com.bachatas4.android.runtime.settings.RuntimeSettingCatalog
 import com.bachatas4.android.runtime.settings.SettingKind
 import com.bachatas4.android.runtime.settings.ValueSource
-import com.bachatas4.android.runtime.process.RuntimeGuestBackend
 import com.bachatas4.android.runtime.process.VulkanDriverConfiguration
 import java.nio.file.Path
 import javax.inject.Inject
@@ -38,14 +38,17 @@ class RuntimeLaunchProfileProvider internal constructor(
     )
 
     suspend fun resolve(gameId: String): ResolvedRuntimeProfile {
-        val constraints = if (guestBackend(gameId) == RuntimeGuestBackend.FEX) {
+        val global = store.load(ProfileScope.Global)
+        val game = store.load(ProfileScope.Game(gameId))
+        val guestBackend = RuntimeProfileResolver.resolveGuestBackend(global, game)
+        val constraints = if (guestBackend == RuntimeGuestBackend.FEX) {
             compatibilityConstraints + FEX_COMPATIBILITY_CONSTRAINTS
         } else {
             compatibilityConstraints
         }
         return RuntimeProfileResolver(specs, constraints).resolve(
-            store.load(ProfileScope.Global),
-            store.load(ProfileScope.Game(gameId)),
+            global,
+            game,
         )
     }
 
@@ -69,13 +72,6 @@ class RuntimeLaunchProfileProvider internal constructor(
     fun explicitSettingIds(profile: ResolvedRuntimeProfile): List<String> =
         profile.settings.values.filter { it.source != ValueSource.DEFAULT }.map { it.spec.id }.sorted()
 
-    fun guestBackend(gameId: String): RuntimeGuestBackend =
-        if (gameId.equals(FEX_SONIC_GAME_ID, ignoreCase = true)) {
-            RuntimeGuestBackend.FEX
-        } else {
-            RuntimeGuestBackend.BOX64
-        }
-
     fun vulkanConfiguration(profile: ResolvedRuntimeProfile, runtimeRoot: Path, filesDir: Path): VulkanDriverConfiguration =
         try {
             driverBackend.configurationFor(profile.driverId, runtimeRoot)
@@ -84,7 +80,6 @@ class RuntimeLaunchProfileProvider internal constructor(
         }
 
     private companion object {
-        const val FEX_SONIC_GAME_ID = "CUSA07023"
         val FEX_COMPATIBILITY_CONSTRAINTS = mapOf(
             "gpu.copy_gpu_buffers" to CompatibilityConstraint(
                 JsonPrimitive(true),

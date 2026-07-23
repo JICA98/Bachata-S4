@@ -32,3 +32,28 @@ test("debug APK exposes a generic ADB game launcher without another launcher ico
   assert.match(mainActivity, /@SuppressLint\("RestrictedApi"\)/);
   assert.match(activity, /Toast\.makeText/);
 });
+
+test("Bloodborne qualification launcher is bounded and preserves app data", () => {
+  const script = read("runtime/qualification/run-bloodborne-fex-first-room.sh");
+
+  assert.match(script, /set -euo pipefail/);
+  assert.match(script, /DirectLaunchActivity/);
+  assert.match(script, /--es game_id/);
+  assert.match(script, /CUSA00900/);
+  assert.match(script, /logcat -c/);
+  assert.match(script, /screencap -p/);
+  assert.match(script, /files\/logs/);
+  assert.match(script, /run-as[^\n]*ls -1 files\/logs/);
+  assert.match(script, /sessions_before=/);
+  assert.match(script, /comm -13/);
+  assert.ok(
+    script.indexOf("sessions_before=") < script.indexOf("am start"),
+    "existing sessions must be captured before launch",
+  );
+  assert.doesNotMatch(script, /run-as[^\n]*sh -c/);
+  assert.match(script, /BACHATA_CAPTURE_SECONDS/);
+  assert.match(script, /seq 1 60/);
+  assert.doesNotMatch(script, /adb[^\n]*(?:uninstall|pm clear)/);
+  assert.doesNotMatch(script, /run-as[^\n]*\brm\b/);
+  assert.doesNotMatch(script, /rm -rf/);
+});

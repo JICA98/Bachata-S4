@@ -6,6 +6,7 @@ import com.bachatas4.android.data.RuntimeProfileStore
 import com.bachatas4.android.runtime.settings.Box64Preset
 import com.bachatas4.android.runtime.settings.ProfileScope
 import com.bachatas4.android.runtime.settings.RuntimeProfile
+import com.bachatas4.android.runtime.settings.RuntimeGuestBackend
 import com.bachatas4.android.runtime.settings.RuntimeSettingCatalog
 import com.bachatas4.android.runtime.settings.RuntimeSettingSpec
 import com.bachatas4.android.runtime.settings.SettingKind
@@ -93,6 +94,8 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun setPreset(preset: Box64Preset) = mutate { it.copy(box64Preset = preset) }
+
+    fun setGuestBackend(backend: RuntimeGuestBackend?) = mutate { it.copy(guestBackend = backend) }
 
     fun importJson(text: String) {
         viewModelScope.launch {

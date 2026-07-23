@@ -4,6 +4,7 @@ import com.bachatas4.android.model.LaunchRequest
 import com.bachatas4.android.model.RuntimeState
 import com.bachatas4.android.runtime.process.RuntimeProcessHandle
 import com.bachatas4.android.runtime.process.RuntimeProcessRequest
+import com.bachatas4.android.runtime.settings.RuntimeGuestBackend
 import com.bachatas4.android.runtime.protocol.RuntimeMessage
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
@@ -206,6 +207,7 @@ class Box64EmulatorRuntimeTest {
             overrideRoot = Path.of("/data"),
             shadPs4Executable = Path.of("/data/runtime/bin/shadps4"),
             socketPath = "/data/runtime/session.sock",
+            guestBackend = RuntimeGuestBackend.BOX64,
         )
     }
 }

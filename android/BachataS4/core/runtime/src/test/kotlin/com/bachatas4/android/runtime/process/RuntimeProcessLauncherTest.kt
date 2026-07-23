@@ -1,5 +1,6 @@
 package com.bachatas4.android.runtime.process
 
+import com.bachatas4.android.runtime.settings.RuntimeGuestBackend
 import java.nio.file.Files
 import java.nio.file.Path
 import java.util.concurrent.TimeUnit
@@ -222,6 +223,7 @@ class RuntimeProcessLauncherTest {
             socketPath = base.resolve("runtime.sock").toString(),
             environment = environment,
             box64Mode = Box64Mode.HOST_GLIBC,
+            guestBackend = RuntimeGuestBackend.BOX64,
         )
     }
 }
