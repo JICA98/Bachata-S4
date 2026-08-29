@@ -163,6 +163,11 @@ jobs:
                   https_at(entry["url"], p+".url", "github.com")
                   if entry["tag"] in tags: stop(p+".tag: duplicate source tag")
                   tags[entry["tag"]] = entry["revision"]
+                  # The historical archive was intentionally deleted. Keep
+                  # its retained manifest entries, but do not require a live
+                  # remote tag lookup for that retired repository.
+                  if entry["repository"] == "https://github.com/JICA98/Bachata-S4-Fork-Archive":
+                      continue
                   repo_path = entry["repository"].split("https://github.com/", 1)[1]
                   ref = github_json(repo_path + "/git/ref/tags/" + entry["tag"])
                   target = ref.get("object", {})
@@ -237,6 +242,7 @@ jobs:
               ".github/bachata-labels.json",
               ".github/workflows/compatibility-pages.yml",
               ".github/workflows/compatibility.yml",
+              ".github/workflows/deploy-site.yml",
               ".github/workflows/public-contribution-policy.yml",
               "CONTRIBUTING.md", "LICENSE", "README.md", "SECURITY.md",
               "compatibility-data/README.md", "compatibility-data/schema-v1.json",
