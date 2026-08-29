@@ -38,7 +38,7 @@ jobs:
           ARTIFACT_REPO = "https://github.com/JICA98/Bachata-S4"
           SOURCE_REPOSITORIES = {
               "https://github.com/JICA98/Bachata-S4",
-              "https://github.com/JICA98/shadps4-arm64",
+              "https://github.com/zenithblue-oss/shadps4-arm64",
           }
           HEX40 = re.compile(r"^[0-9a-f]{40}$")
           SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -227,7 +227,18 @@ jobs:
           # Reports are top-level CUSA JSON only; nested/non-JSON files and
           # accidental root/private files never silently ship.
           allowed = {
-              "README.md", "LICENSE", ".github/workflows/compatibility.yml",
+              ".github/ISSUE_TEMPLATE/app-bug-report.yaml",
+              ".github/ISSUE_TEMPLATE/compatibility.yml",
+              ".github/ISSUE_TEMPLATE/config.yml",
+              ".github/ISSUE_TEMPLATE/feature-request.yaml",
+              ".github/ISSUE_TEMPLATE/game-bug-report.yaml",
+              ".github/PULL_REQUEST_TEMPLATE/compatibility.md",
+              ".github/PULL_REQUEST_TEMPLATE/site-docs.md",
+              ".github/bachata-labels.json",
+              ".github/workflows/compatibility-pages.yml",
+              ".github/workflows/compatibility.yml",
+              ".github/workflows/public-contribution-policy.yml",
+              "CONTRIBUTING.md", "LICENSE", "README.md", "SECURITY.md",
               "compatibility-data/README.md", "compatibility-data/schema-v1.json",
               "release-metadata/source-links.json",
           }

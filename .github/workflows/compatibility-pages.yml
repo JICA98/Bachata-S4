@@ -34,6 +34,7 @@ jobs:
       - name: Check out Bachata S4 frontend
         uses: actions/checkout@v4
         with:
+          ref: gh-pages
           path: bachata
 
       - name: Check out compatibility source data
@@ -72,7 +73,7 @@ jobs:
           rm -rf _site
           cp -a bachata/compatibility-site _site
           mkdir -p _site/data _site/evidence _site/assets
-          cp bachata/android/BachataS4/app/src/main/play_store_512.png _site/assets/bachata-s4-logo.png
+          cp bachata/assets/bachata-s4-logo.png _site/assets/bachata-s4-logo.png
           cp compatibility/generated/site-index.json _site/data/site-index.json
           cp compatibility/generated/releases.json _site/data/releases.json
           cp -a compatibility/generated/games _site/data/games
