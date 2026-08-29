@@ -38,7 +38,7 @@ jobs:
           ARTIFACT_REPO = "https://github.com/JICA98/Bachata-S4"
           SOURCE_REPOSITORIES = {
               "https://github.com/JICA98/Bachata-S4",
-              "https://github.com/zenithblue-oss/shadps4-arm64",
+              "https://github.com/JICA98/Bachata-S4-Fork-Archive",
           }
           HEX40 = re.compile(r"^[0-9a-f]{40}$")
           SHA256 = re.compile(r"^[0-9a-f]{64}$")
