@@ -4,7 +4,7 @@ SPDX-License-Identifier: GPL-2.0-or-later
 -->
 
 <p align="center">
-  <img src="https://raw.githubusercontent.com/JICA98/Bachata-S4/a2aacfd02b053570853e429b2d20380596641e88/android/BachataS4/app/src/main/play_store_512.png" alt="Bachata S4 logo" width="176">
+  <img src="https://raw.githubusercontent.com/JICA98/Bachata-S4/250a96557a5b29ee80bd3b62b151811d19884420/assets/bachata-s4-logo.png" alt="Bachata S4 logo" width="176">
 </p>
 
 <h1 align="center">Bachata S4</h1>
@@ -14,6 +14,15 @@ SPDX-License-Identifier: GPL-2.0-or-later
   Powered by <a href="https://github.com/shadps4-emu/shadPS4">shadPS4</a>,
   FEX, a managed Linux runtime, and Vulkan.
 </p>
+
+> [!IMPORTANT]
+> **This is the Bachata S4 release repository.** It hosts releases, compatibility
+> information, documentation, and community coordination; it is not the maintained
+> emulator core source repository.
+>
+> The maintained emulator core fork has moved to
+> **[`zenithblue-oss/shadps4-arm64`](https://github.com/zenithblue-oss/shadps4-arm64)**.
+> Core source development and contributions belong in that repository.
 
 <p align="center">
   <a href="https://play.google.com/store/apps/details?id=com.bachatas4.android">
