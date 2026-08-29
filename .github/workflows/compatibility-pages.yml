@@ -60,6 +60,7 @@ jobs:
           node --check compatibility-site/assets/js/home.js
           node --check compatibility-site/assets/js/updates.js
           node --check compatibility-site/assets/js/site.js
+          python3 -m py_compile scripts/compatibility/build_static_pages.py scripts/compatibility/site_audit.py
           bash -n scripts/compatibility/capture_android_report.sh
 
       - name: Assemble Pages artifact
@@ -77,16 +78,28 @@ jobs:
             cd compatibility
             find assets -type f -path '*/screenshots/*' -exec cp --parents '{}' ../_site/evidence/ \;
           )
-          oversized="$(find _site -type f -size +25M -print -quit)"
-          if [[ -n "$oversized" ]]; then
-            echo "A deployed file exceeds 25 MiB: $oversized" >&2
+
+      - name: Generate crawlable compatibility pages
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 bachata/scripts/compatibility/build_static_pages.py \
+            --site _site \
+            --data _site/data \
+            --base-url https://bachatas4.games
+
+      - name: Audit assembled site
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 bachata/scripts/compatibility/site_audit.py --site _site
+          game_json_count="$(find _site/data/games -maxdepth 1 -type f -name 'CUSA*.json' | wc -l)"
+          game_html_count="$(find _site/games -maxdepth 1 -type f -name 'CUSA*.html' | wc -l)"
+          if [[ "$game_json_count" != "$game_html_count" ]]; then
+            echo "::error::Generated game HTML count ($game_html_count) does not match game JSON count ($game_json_count)."
             exit 1
           fi
-          total_kib="$(du -sk _site | awk '{print $1}')"
-          if (( total_kib >= 900000 )); then
-            echo "Pages artifact exceeds the 900 MiB safety budget." >&2
-            exit 1
-          fi
+          echo "Verified $game_html_count permanent game page(s)."
 
       - name: Verify production ads.txt
         shell: bash
@@ -100,6 +113,21 @@ jobs:
             exit 1
           fi
           echo "ads.txt verified: $ACTUAL_ADS_TXT"
+
+      - name: Enforce Pages artifact size budget
+        shell: bash
+        run: |
+          set -euo pipefail
+          oversized="$(find _site -type f -size +25M -print -quit)"
+          if [[ -n "$oversized" ]]; then
+            echo "A deployed file exceeds 25 MiB: $oversized" >&2
+            exit 1
+          fi
+          total_kib="$(du -sk _site | awk '{print $1}')"
+          if (( total_kib >= 900000 )); then
+            echo "Pages artifact exceeds the 900 MiB safety budget." >&2
+            exit 1
+          fi
 
       - name: Upload Pages artifact
         if: github.event_name != 'pull_request'

@@ -4,6 +4,7 @@
   const INDEX_URL = 'data/site-index.json';
   const RELEASES_URL = 'data/releases.json';
   const GAME_URL = cusaId => `data/games/${encodeURIComponent(cusaId)}.json`;
+  const GAME_PAGE_URL = cusaId => `games/${encodeURIComponent(cusaId)}.html`;
   const PLACEHOLDER = 'assets/placeholder.svg';
   const STATUS_ORDER = { playable: 0, ingame: 1, menus: 2, boots: 3, nothing: 4, unknown: 5 };
   const STATUS_LABEL = { playable: 'Playable', ingame: 'Ingame', menus: 'Menus', boots: 'Boots', nothing: 'Nothing', unknown: 'Unknown' };
@@ -175,6 +176,7 @@
   function createCard({ game, report }) {
     const fragment = els.template.content.cloneNode(true);
     const button = fragment.querySelector('.game-card-button');
+    const pageLink = fragment.querySelector('.game-page-link');
     const issueLink = fragment.querySelector('.game-issue-link');
     const image = fragment.querySelector('.game-image');
     const status = normalizeStatus(report?.status || game.bestStatus);
@@ -197,6 +199,10 @@
     const label = `${STATUS_LABEL[status]} · ${game.reportCount} ${game.reportCount === 1 ? 'report' : 'reports'} · ${game.title} ${game.cusaId} — open all reports`;
     button.setAttribute('aria-label', label);
     button.addEventListener('click', () => openGame(game.cusaId, report?.reportId));
+    if (pageLink) {
+      pageLink.href = GAME_PAGE_URL(game.cusaId);
+      pageLink.setAttribute('aria-label', `Open permanent compatibility page for ${game.title} ${game.cusaId}`);
+    }
     if (issueLink) {
       if (game.issueUrl) {
         issueLink.href = game.issueUrl;
@@ -427,7 +433,8 @@
   }
 
   async function fetchJson(url) {
-    const response = await fetch(url, { cache: 'no-store' });
+    // Revalidate cached deployment data instead of forcing a full no-store download.
+    const response = await fetch(url, { cache: 'no-cache' });
     if (!response.ok) throw new Error(`${url}: HTTP ${response.status}`);
     return response.json();
   }
