@@ -244,3 +244,45 @@ git -C /home/jica/repo/Bachata-S4-Dev status --short
 ```
 
 Expected: pre-existing emulator/UI changes are unchanged and no site-fix files were added there.
+
+### Task 6: Remove audit-blocked internal wording
+
+**Files:**
+- Modify: `/home/jica/repo/Bachata-S4/.worktrees/site-quality-adsense/compatibility-site/methodology.html:114`
+
+**Interfaces:**
+- Consumes: the failing `site_audit.py` result and the existing public link to the compatibility workflow.
+- Produces: public-facing methodology copy accepted by `FORBIDDEN_PUBLIC_PHRASES` checks.
+
+- [ ] **Step 1: Confirm the focused failing assertion**
+
+```bash
+rg -n -F 'repository skill' /home/jica/repo/Bachata-S4/.worktrees/site-quality-adsense/compatibility-site/methodology.html
+```
+
+Expected: line 114 contains the audit-blocked phrase.
+
+- [ ] **Step 2: Replace only the blocked wording**
+
+Change `the full step-by-step workflow is documented in the repository skill:` to `the full step-by-step workflow is documented in the public compatibility repository:` while preserving the existing link and surrounding HTML.
+
+Expected: no other methodology content changes.
+
+- [ ] **Step 3: Re-run the workflow-equivalent artifact audit**
+
+Repeat Task 5 Step 3 with screenshot evidence copied into `_site/evidence/assets`, then run:
+
+```bash
+python3 /home/jica/repo/Bachata-S4/.worktrees/site-quality-adsense/scripts/compatibility/site_audit.py --site "$artifact_dir/_site"
+```
+
+Expected: `Site audit passed: 13 HTML pages checked.` (or the equivalent success count for current generated data) and no forbidden phrase or broken-link errors.
+
+- [ ] **Step 4: Check the focused diff**
+
+```bash
+git -C /home/jica/repo/Bachata-S4/.worktrees/site-quality-adsense diff --check
+git -C /home/jica/repo/Bachata-S4/.worktrees/site-quality-adsense diff -- compatibility-site/methodology.html
+```
+
+Expected: one wording-only hunk in `methodology.html`.
