@@ -1,11 +1,7 @@
-# Deploy the compatibility website from the gh-pages branch.
-#
-# Scheduled workflows only run when defined on the default branch, so this
-# dispatcher lives on release-source main. It checks out ONLY the gh-pages
-# branch (website content, never emulator source) and deploys it. It has no
-# push trigger: publishing site content happens on the gh-pages branch and
-# deploys there; this file covers scheduled refreshes and manual redeploys.
-
+# Scheduled/manual dispatcher for the compatibility website.
+# Website implementation lives on gh-pages; compatibility evidence lives in
+# JICA98/Bachata-S4-Compatibility. This workflow intentionally does not call
+# that repository's release-index validator or generated-index scripts.
 name: Deploy website (from gh-pages)
 
 on:
@@ -26,83 +22,57 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out website content (gh-pages branch only)
-        uses: actions/checkout@v4
+      - name: Check out website content
+        uses: actions/checkout@v6
         with:
           ref: gh-pages
           path: bachata
 
-      - name: Check out compatibility source data
-        uses: actions/checkout@v4
+      - name: Check out compatibility data
+        uses: actions/checkout@v6
         with:
           repository: JICA98/Bachata-S4-Compatibility
           ref: main
-          path: compatibility
+          path: compatibility-data
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
-      - name: Validate immutable source data
-        working-directory: compatibility
-        run: python3 scripts/validate.py
-
-      - name: Generate compact and per-game indexes
-        working-directory: compatibility
-        run: python3 scripts/build_site_data.py --output generated
-
-      - name: Assemble Pages artifact
-        shell: bash
+      - name: Regression test static builder
         run: |
-          set -euo pipefail
-          rm -rf _site
-          cp -a bachata/compatibility-site _site
-          mkdir -p _site/data _site/evidence _site/assets
-          cp bachata/assets/bachata-s4-logo.png _site/assets/bachata-s4-logo.png
-          cp compatibility/generated/site-index.json _site/data/site-index.json
-          cp compatibility/generated/releases.json _site/data/releases.json
-          cp -a compatibility/generated/games _site/data/games
-          (
-            cd compatibility
-            find assets -type f -path '*/screenshots/*' -exec cp --parents '{}' ../_site/evidence/ \;
-          )
+          python3 bachata/scripts/build_site.py \
+            --source bachata/tests/fixture-compatibility \
+            --site bachata/compatibility-site \
+            --output _fixture-site \
+            --base-url https://bachatas4.games
+          python3 bachata/scripts/site_audit.py --site _fixture-site
+          grep -q 'v0.1.6' _fixture-site/games/CUSA00001/index.html
+          grep -q 'v0.1.9' _fixture-site/games/CUSA00001/index.html
 
-      - name: Generate crawlable compatibility pages
-        shell: bash
+      - name: Build production site
         run: |
-          set -euo pipefail
-          python3 bachata/scripts/compatibility/build_static_pages.py \
-            --site _site \
-            --data _site/data \
+          python3 bachata/scripts/build_site.py \
+            --source compatibility-data \
+            --site bachata/compatibility-site \
+            --output _site \
             --base-url https://bachatas4.games
 
-      - name: Audit assembled site
-        shell: bash
+      - name: Check source and generated site
         run: |
-          set -euo pipefail
-          python3 bachata/scripts/compatibility/site_audit.py --site _site
-          game_json_count="$(find _site/data/games -maxdepth 1 -type f -name 'CUSA*.json' | wc -l)"
-          game_html_count="$(find _site/games -maxdepth 1 -type f -name 'CUSA*.html' | wc -l)"
-          if [[ "$game_json_count" != "$game_html_count" ]]; then
-            echo "::error::Generated game HTML count ($game_html_count) does not match game JSON count ($game_json_count)."
-            exit 1
-          fi
+          node --check bachata/compatibility-site/assets/js/site.js
+          node --check bachata/compatibility-site/assets/js/cards.js
+          node --check bachata/compatibility-site/assets/js/home.js
+          node --check bachata/compatibility-site/assets/js/compatibility.js
+          python3 -m py_compile bachata/scripts/build_site.py bachata/scripts/site_audit.py
+          python3 bachata/scripts/site_audit.py --site _site
 
-      - name: Verify production ads.txt
-        shell: bash
+      - name: Verify ads.txt
         run: |
-          set -euo pipefail
-          test -f _site/ads.txt
-          EXPECTED_ADS_TXT='google.com, pub-8704776489115590, DIRECT, f08c47fec0942fa0'
-          ACTUAL_ADS_TXT="$(tr -d '\r' < _site/ads.txt | sed '/^[[:space:]]*$/d')"
-          if [[ "$ACTUAL_ADS_TXT" != "$EXPECTED_ADS_TXT" ]]; then
-            echo "::error::Production ads.txt does not contain the expected AdSense publisher record."
-            exit 1
-          fi
-          echo "ads.txt verified: $ACTUAL_ADS_TXT"
+          test "$(tr -d '\r' < _site/ads.txt | sed '/^[[:space:]]*$/d')" = "google.com, pub-8704776489115590, DIRECT, f08c47fec0942fa0"
 
-      - name: Enforce Pages artifact size budget
+      - name: Enforce Pages size budget
         shell: bash
         run: |
           set -euo pipefail
@@ -116,6 +86,9 @@ jobs:
             echo "Pages artifact exceeds the 900 MiB safety budget." >&2
             exit 1
           fi
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v5
