@@ -53,6 +53,8 @@ button, input, select { font: inherit; }
 .site-header { position:sticky; top:0; z-index:50; backdrop-filter: blur(18px); background:color-mix(in srgb, var(--bg) 80%, transparent); border-bottom:1px solid var(--line); }
 .header-inner { min-height:72px; display:flex; align-items:center; gap:22px; }
 .brand { display:flex; gap:12px; align-items:center; text-decoration:none; min-width:max-content; }
+.brand-logo, .brand img { width:42px; height:42px; border-radius:12px; object-fit:contain; display:block; flex-shrink:0; }
+.footer-inner .brand-logo, .footer-inner .brand img { width:38px; height:38px; border-radius:10px; }
 .brand-mark { width:42px; height:42px; display:grid; place-items:center; border-radius:13px; background:linear-gradient(145deg,#202b48,#0d1220); border:1px solid rgba(255,255,255,.16); box-shadow:inset 0 1px 0 rgba(255,255,255,.12); font-weight:800; letter-spacing:-.06em; color:#fff; }
 .brand span { display:grid; line-height:1.05; }
 .brand strong { font-size:15px; }

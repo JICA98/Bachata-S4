@@ -20,7 +20,7 @@
       <header class="site-header">
         <div class="container header-inner">
           <a class="brand" href="/" aria-label="Bachata S4 home">
-            <span class="brand-mark" aria-hidden="true">B4</span>
+            <img class="brand-logo" src="/assets/bachata-s4-logo.png" alt="Bachata S4 logo" width="42" height="42">
             <span><strong>Bachata S4</strong><small>PS4 emulation on Android</small></span>
           </a>
           <nav class="site-nav" id="site-nav" aria-label="Primary">
@@ -40,7 +40,7 @@
     footer.innerHTML = `
       <footer class="site-footer">
         <div class="container footer-inner">
-          <div class="brand"><span class="brand-mark" aria-hidden="true">B4</span><span><strong>Bachata S4</strong><small>Evidence-based compatibility</small></span></div>
+          <div class="brand"><img class="brand-logo" src="/assets/bachata-s4-logo.png" alt="Bachata S4 logo" width="38" height="38"><span><strong>Bachata S4</strong><small>Evidence-based compatibility</small></span></div>
           <div>
             <nav class="footer-nav" aria-label="Footer">
               <a href="/compatibility.html">Compatibility</a><a href="/guide.html">Guide</a><a href="/faq.html">FAQ</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a>

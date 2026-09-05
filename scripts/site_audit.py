@@ -7,7 +7,7 @@ from pathlib import Path
 def main():
     ap=argparse.ArgumentParser(); ap.add_argument('--site',type=Path,required=True); args=ap.parse_args(); site=args.site
     errors=[]
-    required=['index.html','compatibility.html','assets/css/styles.css','assets/js/cards.js','assets/js/home.js','assets/js/compatibility.js','data/site-index.json','sitemap.xml','robots.txt','ads.txt']
+    required=['index.html','compatibility.html','assets/css/styles.css','assets/js/cards.js','assets/js/home.js','assets/js/compatibility.js','assets/bachata-s4-logo.png','favicon.ico','data/site-index.json','sitemap.xml','robots.txt','ads.txt']
     for item in required:
         if not (site/item).is_file(): errors.append(f'missing {item}')
     if (site/'data/site-index.json').is_file():
@@ -18,6 +18,8 @@ def main():
             if not (site/'games'/cusa/'index.html').is_file(): errors.append(f'missing game page for {cusa}')
     for path in site.rglob('*.html'):
         text=path.read_text(encoding='utf-8')
+        if 'rel="icon"' not in text and "rel='icon'" not in text:
+            errors.append(f"{path.relative_to(site)} missing favicon link")
         forbidden=['<dialog','View permanent page','Open game discussion','Archived discussion','Permanent game pages','compatibility.html?game=']
         for needle in forbidden:
             if needle.lower() in text.lower(): errors.append(f'{path.relative_to(site)} contains forbidden legacy UI: {needle}')
