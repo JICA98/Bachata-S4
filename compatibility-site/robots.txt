@@ -1,4 +1,0 @@
-User-agent: *
-Allow: /
-
-Sitemap: https://bachatas4.games/sitemap.xml

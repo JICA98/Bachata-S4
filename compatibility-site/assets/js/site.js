@@ -1,60 +1,64 @@
 (() => {
-  'use strict';
+  const root = document.documentElement;
+  const saved = localStorage.getItem('bachata-theme');
+  if (saved === 'light' || saved === 'dark') root.dataset.theme = saved;
 
-  const themeToggle = document.querySelector('#theme-toggle');
+  const current = document.body.dataset.page || '';
+  const nav = [
+    ['home', '/', 'Home'],
+    ['compatibility', '/compatibility.html', 'Compatibility'],
+    ['updates', '/updates.html', 'Updates'],
+    ['methodology', '/methodology.html', 'How Testing Works'],
+    ['about', '/about.html', 'About'],
+    ['contact', '/contact.html', 'Contact']
+  ];
 
-  function setTheme(theme) {
-    document.documentElement.dataset.theme = theme;
-    localStorage.setItem('bachata-compat-theme', theme);
-    if (themeToggle) {
-      themeToggle.setAttribute('aria-label', `Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`);
-    }
+  const header = document.querySelector('[data-site-header]');
+  if (header) {
+    header.innerHTML = `
+      <a class="skip-link" href="#main">Skip to content</a>
+      <header class="site-header">
+        <div class="container header-inner">
+          <a class="brand" href="/" aria-label="Bachata S4 home">
+            <span class="brand-mark" aria-hidden="true">B4</span>
+            <span><strong>Bachata S4</strong><small>PS4 emulation on Android</small></span>
+          </a>
+          <nav class="site-nav" id="site-nav" aria-label="Primary">
+            ${nav.map(([id, href, label]) => `<a class="nav-link" href="${href}" ${current === id ? 'aria-current="page"' : ''}>${label}</a>`).join('')}
+            <a class="nav-link" href="https://github.com/JICA98/Bachata-S4" target="_blank" rel="noreferrer">GitHub ↗</a>
+          </nav>
+          <div class="header-actions">
+            <button class="icon-button" id="theme-toggle" type="button" aria-label="Switch theme">◐</button>
+            <button class="icon-button nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">☰</button>
+          </div>
+        </div>
+      </header>`;
   }
 
-  function initializeTheme() {
-    if (!themeToggle) return;
-    const saved = localStorage.getItem('bachata-compat-theme');
-    const preferred = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
-    setTheme(saved || preferred);
-    themeToggle.addEventListener('click', () => setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'));
+  const footer = document.querySelector('[data-site-footer]');
+  if (footer) {
+    footer.innerHTML = `
+      <footer class="site-footer">
+        <div class="container footer-inner">
+          <div class="brand"><span class="brand-mark" aria-hidden="true">B4</span><span><strong>Bachata S4</strong><small>Evidence-based compatibility</small></span></div>
+          <div>
+            <nav class="footer-nav" aria-label="Footer">
+              <a href="/compatibility.html">Compatibility</a><a href="/guide.html">Guide</a><a href="/faq.html">FAQ</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a>
+            </nav>
+            <p class="footer-copy">Bachata S4 is an independent open-source project and is not affiliated with Sony Interactive Entertainment. Use only software and content you are legally entitled to use.</p>
+          </div>
+        </div>
+      </footer>`;
   }
 
-  const navToggle = document.querySelector('#nav-toggle');
-  const siteNav = document.querySelector('#site-nav');
-
-  function closeMenu() {
-    if (!navToggle) return;
-    navToggle.setAttribute('aria-expanded', 'false');
-    navToggle.setAttribute('aria-label', 'Open menu');
-    siteNav.classList.remove('nav-open');
-  }
-
-  function initializeNav() {
-    if (!navToggle || !siteNav) return;
-    navToggle.addEventListener('click', () => {
-      const expanded = navToggle.getAttribute('aria-expanded') === 'true';
-      if (expanded) {
-        closeMenu();
-      } else {
-        navToggle.setAttribute('aria-expanded', 'true');
-        navToggle.setAttribute('aria-label', 'Close menu');
-        siteNav.classList.add('nav-open');
-      }
-    });
-    siteNav.addEventListener('click', event => {
-      if (event.target.closest('a')) closeMenu();
-    });
-    document.addEventListener('keydown', event => {
-      if (event.key === 'Escape' && siteNav.classList.contains('nav-open')) {
-        closeMenu();
-        navToggle.focus();
-      }
-    });
-    document.addEventListener('click', event => {
-      if (siteNav.classList.contains('nav-open') && !event.target.closest('.site-header')) closeMenu();
-    });
-  }
-
-  initializeTheme();
-  initializeNav();
+  document.querySelector('#theme-toggle')?.addEventListener('click', () => {
+    const next = root.dataset.theme === 'light' ? 'dark' : 'light';
+    root.dataset.theme = next;
+    localStorage.setItem('bachata-theme', next);
+  });
+  const menu = document.querySelector('#site-nav');
+  document.querySelector('#nav-toggle')?.addEventListener('click', (event) => {
+    const open = menu?.classList.toggle('open');
+    event.currentTarget.setAttribute('aria-expanded', open ? 'true' : 'false');
+  });
 })();

@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 2,
+  "cusaId": "CUSA00001",
+  "title": "Fixture Adventure",
+  "region": "US",
+  "publisher": "Fixture Studio",
+  "canonicalIssue": {"repository": "JICA98/Bachata-S4", "number": 999},
+  "legacyIssues": [{"repository": "archive/example", "number": 1}]
+}

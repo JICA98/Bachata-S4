@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "reportId": "20260101-old",
+  "cusaId": "CUSA00001",
+  "testedAt": "2026-01-01T10:00:00Z",
+  "status": "boots",
+  "gameVersion": "01.00",
+  "release": {"tag": "v0.1.6", "commit": "old"},
+  "summary": "Old release boots to a rendered screen.",
+  "notes": "This historical report intentionally references a release absent from any release index.",
+  "device": {"label": "Fixture Phone", "soc": "SM0000", "gpu": "Adreno Fixture", "androidVersion": "15"},
+  "driver": {"type": "turnip", "name": "Mesa Turnip", "version": "26.0"},
+  "performance": {"averageFps": 20.0, "minimumFps": 15.0, "maximumFps": 30.0},
+  "evidence": {"screenshots": [], "logs": []},
+  "issueNumber": 999
+}

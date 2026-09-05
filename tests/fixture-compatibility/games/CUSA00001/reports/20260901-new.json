@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "reportId": "test",
+  "cusaId": "CUSA00001",
+  "testedAt": "2026-09-01T10:00:00Z",
+  "status": "ingame",
+  "gameVersion": "01.01",
+  "release": {"tag": "v0.1.9", "commit": "new"},
+  "summary": "Fixture reaches controllable gameplay.",
+  "notes": "Synthetic fixture used only to test the site builder.",
+  "device": {"label": "Fixture Phone", "soc": "SM0000", "gpu": "Adreno Fixture", "androidVersion": "16"},
+  "driver": {"type": "turnip", "name": "Mesa Turnip", "version": "26.3.0"},
+  "performance": {"averageFps": 42.5, "minimumFps": 31.0, "maximumFps": 60.0, "framePacing": "stable", "testDurationSeconds": 60},
+  "evidence": {"screenshots": [{"path": "assets/CUSA00001/test/screenshots/01.svg", "caption": "Synthetic test screenshot"}], "logs": [{"path": "assets/CUSA00001/test/logs/01.log.gz", "label": "Fixture log"}]},
+  "issueNumber": 999
+}

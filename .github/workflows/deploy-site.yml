@@ -1,0 +1,108 @@
+name: Deploy compatibility website
+
+on:
+  push:
+    branches: [gh-pages]
+    paths:
+      - "compatibility-site/**"
+      - "scripts/**"
+      - "tests/**"
+      - ".github/workflows/deploy-site.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: compatibility-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out website branch
+        uses: actions/checkout@v6
+        with:
+          ref: gh-pages
+          path: bachata
+
+      - name: Check out compatibility data
+        uses: actions/checkout@v6
+        with:
+          repository: JICA98/Bachata-S4-Compatibility
+          ref: main
+          path: compatibility-data
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Regression test static builder
+        run: |
+          python3 bachata/scripts/build_site.py \
+            --source bachata/tests/fixture-compatibility \
+            --site bachata/compatibility-site \
+            --output _fixture-site \
+            --base-url https://bachatas4.games
+          python3 bachata/scripts/site_audit.py --site _fixture-site
+          grep -q 'v0.1.6' _fixture-site/games/CUSA00001/index.html
+          grep -q 'v0.1.9' _fixture-site/games/CUSA00001/index.html
+
+      - name: Build production site
+        run: |
+          python3 bachata/scripts/build_site.py \
+            --source compatibility-data \
+            --site bachata/compatibility-site \
+            --output _site \
+            --base-url https://bachatas4.games
+
+      - name: Check source and generated site
+        run: |
+          node --check bachata/compatibility-site/assets/js/site.js
+          node --check bachata/compatibility-site/assets/js/cards.js
+          node --check bachata/compatibility-site/assets/js/home.js
+          node --check bachata/compatibility-site/assets/js/compatibility.js
+          python3 -m py_compile bachata/scripts/build_site.py bachata/scripts/site_audit.py
+          python3 bachata/scripts/site_audit.py --site _site
+
+      - name: Verify ads.txt
+        run: |
+          test "$(tr -d '\r' < _site/ads.txt | sed '/^[[:space:]]*$/d')" = "google.com, pub-8704776489115590, DIRECT, f08c47fec0942fa0"
+
+      - name: Enforce Pages size budget
+        shell: bash
+        run: |
+          set -euo pipefail
+          oversized="$(find _site -type f -size +25M -print -quit)"
+          if [[ -n "$oversized" ]]; then
+            echo "A deployed file exceeds 25 MiB: $oversized" >&2
+            exit 1
+          fi
+          total_kib="$(du -sk _site | awk '{print $1}')"
+          if (( total_kib >= 900000 )); then
+            echo "Pages artifact exceeds the 900 MiB safety budget." >&2
+            exit 1
+          fi
+
+      - name: Configure Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v5
