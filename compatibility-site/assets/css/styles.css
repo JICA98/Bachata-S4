@@ -185,3 +185,10 @@ h1 span { background:linear-gradient(100deg,#8eb6ff,#a792ff); -webkit-background
   h1 { font-size:clamp(38px,13vw,58px); }
   .screenshot-grid { grid-template-columns:1fr; }
 }
+.button-partner { display:inline-flex; align-items:center; justify-content:center; min-height:38px; border:1px solid color-mix(in srgb,var(--accent) 45%,var(--line)); border-radius:11px; padding:0 13px; font-size:13px; font-weight:650; text-decoration:none; background:color-mix(in srgb,var(--accent) 14%,var(--panel)); color:var(--text); white-space:nowrap; transition:transform .18s ease,border-color .18s ease,background .18s ease; }
+.button-partner:hover { transform:translateY(-1px); border-color:var(--accent); background:color-mix(in srgb,var(--accent) 24%,var(--panel)); }
+.ad-native-section { margin:34px auto 44px; display:flex; justify-content:center; align-items:center; min-height:90px; text-align:center; overflow:hidden; }
+.ad-native-section > div { width:100%; }
+@media (max-width: 520px) {
+  .header-actions .button-partner { display:none; }
+}

@@ -188,13 +188,13 @@ def render_game_page(base_url: str, game: dict, reports: list[dict]) -> str:
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#070910">
 <meta name="description" content="{esc(title)} compatibility on Bachata S4: {esc(latest_summary)}"><link rel="canonical" href="{esc(canonical)}">
 <meta property="og:title" content="{esc(title)} — Bachata S4 compatibility"><meta property="og:description" content="{esc(latest_summary)}"><meta property="og:url" content="{esc(canonical)}"><meta property="og:image" content="{esc(base_url.rstrip('/') + hero_img)}">
-<title>{esc(title)} — Bachata S4 Compatibility</title><link rel="icon" type="image/png" href="/assets/bachata-s4-logo.png"><link rel="apple-touch-icon" href="/assets/bachata-s4-logo.png"><link rel="stylesheet" href="/assets/css/styles.css"><script defer src="/assets/js/site.js"></script><script src="https://pl31216478.profitableratecpmnetwork.com/4a/df/14/4adf14a84750a2d0600a09b08d716eb9.js"></script><script src="https://pl31216479.profitableratecpmnetwork.com/42/c2/5d/42c25deeba91abf93227a55fc910dc68.js"></script></head>
+<title>{esc(title)} — Bachata S4 Compatibility</title><link rel="icon" type="image/png" href="/assets/bachata-s4-logo.png"><link rel="apple-touch-icon" href="/assets/bachata-s4-logo.png"><link rel="stylesheet" href="/assets/css/styles.css"><script defer src="/assets/js/site.js"></script></head>
 <body data-page="compatibility"><div data-site-header></div><main id="main" class="game-page"><div class="container">
 <nav class="breadcrumbs" aria-label="Breadcrumb"><a href="/">Home</a><span>›</span><a href="/compatibility.html">Compatibility</a><span>›</span><span>{esc(cusa)}</span></nav>
 <section class="game-hero"><div class="game-hero-media"><img src="{esc(hero_img)}" alt="{esc(title)} compatibility screenshot"></div><div class="game-hero-copy"><span class="eyebrow">Game compatibility</span><h1>{esc(title)}</h1><p>{esc(latest_summary)}</p><div class="game-meta-row"><span>{esc(meta)}</span><span>{len(reports)} {'report' if len(reports)==1 else 'reports'}</span><span class="status-badge {esc(status)}" style="position:static">{esc(STATUS_LABEL[status])}</span></div></div></section>
 <div class="section-heading"><div><span class="eyebrow">Report history</span><h2>All recorded tests</h2></div><p>Newest test first</p></div>
 <section class="report-stack">{report_html or '<div class="empty-state"><h3>No reports recorded</h3></div>'}</section>
-</div></main><div data-site-footer></div></body></html>'''
+</div></main><div class="ad-native-section container"><script async="async" data-cfasync="false" src="https://pl31216953.profitableratecpmnetwork.com/7f163c7ce69fdf82476c891df00fdf82/invoke.js"></script><div id="container-7f163c7ce69fdf82476c891df00fdf82"></div></div><div data-site-footer></div></body></html>'''
 
 
 def build(source: Path, site: Path, output: Path, base_url: str) -> None:

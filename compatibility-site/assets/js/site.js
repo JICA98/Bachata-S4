@@ -26,8 +26,10 @@
           <nav class="site-nav" id="site-nav" aria-label="Primary">
             ${nav.map(([id, href, label]) => `<a class="nav-link" href="${href}" ${current === id ? 'aria-current="page"' : ''}>${label}</a>`).join('')}
             <a class="nav-link" href="https://github.com/JICA98/Bachata-S4" target="_blank" rel="noreferrer">GitHub ↗</a>
+            <a class="nav-link" href="https://www.profitableratecpmnetwork.com/h7iu4ucf5?key=629d0734aa9635e65f0197352ff2748f" target="_blank" rel="noopener noreferrer">Support Us ↗</a>
           </nav>
           <div class="header-actions">
+            <a class="button button-partner" href="https://www.profitableratecpmnetwork.com/h7iu4ucf5?key=629d0734aa9635e65f0197352ff2748f" target="_blank" rel="noopener noreferrer">Support Us ↗</a>
             <button class="icon-button" id="theme-toggle" type="button" aria-label="Switch theme">◐</button>
             <button class="icon-button nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">☰</button>
           </div>
@@ -43,7 +45,7 @@
           <div class="brand"><img class="brand-logo" src="/assets/bachata-s4-logo.png" alt="Bachata S4 logo" width="38" height="38"><span><strong>Bachata S4</strong><small>Evidence-based compatibility</small></span></div>
           <div>
             <nav class="footer-nav" aria-label="Footer">
-              <a href="/compatibility.html">Compatibility</a><a href="/guide.html">Guide</a><a href="/faq.html">FAQ</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a>
+              <a href="/compatibility.html">Compatibility</a><a href="/guide.html">Guide</a><a href="/faq.html">FAQ</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="https://www.profitableratecpmnetwork.com/h7iu4ucf5?key=629d0734aa9635e65f0197352ff2748f" target="_blank" rel="noopener noreferrer">Partner Offers ↗</a>
             </nav>
             <p class="footer-copy">Bachata S4 is an independent open-source project and is not affiliated with Sony Interactive Entertainment. Use only software and content you are legally entitled to use.</p>
           </div>
