@@ -69,6 +69,8 @@ SPDX-License-Identifier: GPL-2.0-or-later
   <a href="#build-from-source">Build guide</a>
   ·
   <a href="https://github.com/JICA98/Bachata-S4-Compatibility">Compatibility data</a>
+  ·
+  <a href="#support--donate">Support / Donate</a>
 </p>
 
 > [!IMPORTANT]
@@ -462,8 +464,30 @@ licenses; see [`NOTICE.android-runtime.md`](NOTICE.android-runtime.md).
 
 ---
 
+## Support / Donate
+
+If you find Bachata S4 useful and would like to support ongoing development, donations are welcome:
+
+<p align="center">
+  <a href="https://ko-fi.com/zentithblue">
+    <img alt="Support on Ko-fi" src="https://img.shields.io/badge/Support-Ko--fi-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white">
+  </a>
+  <a href="bitcoin:bc1q9zc0nxypk0lugjrst7hrqmlarvvk848rpxjepy">
+    <img alt="Donate Bitcoin" src="https://img.shields.io/badge/Donate-Bitcoin-F7931A?style=for-the-badge&logo=bitcoin&logoColor=white">
+  </a>
+</p>
+
+| Method | Address / Identifier |
+|---|---|
+| **Bitcoin (BTC)** | [`bc1q9zc0nxypk0lugjrst7hrqmlarvvk848rpxjepy`](bitcoin:bc1q9zc0nxypk0lugjrst7hrqmlarvvk848rpxjepy) |
+| **Tether (USDT)** | `jicaetzc81@tether.me` |
+| **Ko-fi** | [ko-fi.com/zentithblue](https://ko-fi.com/zentithblue) |
+
+---
+
 <p align="center">
   <strong>Help push PlayStation 4 emulation on Android forward.</strong>
   <br>
   Install responsibly. Test carefully. Share evidence. Improve compatibility.
 </p>
+
