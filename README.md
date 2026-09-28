@@ -469,9 +469,6 @@ licenses; see [`NOTICE.android-runtime.md`](NOTICE.android-runtime.md).
 If you find Bachata S4 useful and would like to support ongoing development, donations are welcome:
 
 <p align="center">
-  <a href="https://ko-fi.com/zentithblue">
-    <img alt="Support on Ko-fi" src="https://img.shields.io/badge/Support-Ko--fi-FF5E5B?style=for-the-badge&logo=kofi&logoColor=white">
-  </a>
   <a href="bitcoin:bc1q9zc0nxypk0lugjrst7hrqmlarvvk848rpxjepy">
     <img alt="Donate Bitcoin" src="https://img.shields.io/badge/Donate-Bitcoin-F7931A?style=for-the-badge&logo=bitcoin&logoColor=white">
   </a>
@@ -481,7 +478,6 @@ If you find Bachata S4 useful and would like to support ongoing development, don
 |---|---|
 | **Bitcoin (BTC)** | [`bc1q9zc0nxypk0lugjrst7hrqmlarvvk848rpxjepy`](bitcoin:bc1q9zc0nxypk0lugjrst7hrqmlarvvk848rpxjepy) |
 | **Tether (USDT)** | `jicaetzc81@tether.me` |
-| **Ko-fi** | [ko-fi.com/zentithblue](https://ko-fi.com/zentithblue) |
 
 ---
 
