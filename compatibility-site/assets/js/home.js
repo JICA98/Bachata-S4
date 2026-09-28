@@ -8,7 +8,7 @@
       const stats = index.stats || {};
       set('#stat-games', stats.games); set('#stat-reports', stats.reports); set('#stat-devices', stats.devices); set('#stat-playable', stats.playable); set('#stat-ingame', stats.ingame);
       const games = [...(index.games || [])].sort((a,b) => new Date(b.latestTestedAt || 0) - new Date(a.latestTestedAt || 0)).slice(0,6);
-      list.replaceChildren(...games.map(game => window.BachataCards.createGameCard(game)));
+      list.replaceChildren(...games.map((game, i) => window.BachataCards.createGameCard(game, null, i)));
       document.querySelector('#home-data-meta').textContent = games.length ? `Showing ${games.length} most recently tested games` : 'No compatibility reports yet';
     })
     .catch(error => {
