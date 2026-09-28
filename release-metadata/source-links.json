@@ -2,6 +2,27 @@
   "schemaVersion": 1,
   "sourceRepositories": [
     {
+      "name": "Bachata-S4 0.2.3 public source",
+      "repository": "https://github.com/JICA98/Bachata-S4",
+      "revision": "cc52ae2dc896fb14159dc4c976a240e3f90b9464",
+      "tag": "0.2.3",
+      "url": "https://github.com/JICA98/Bachata-S4/tree/cc52ae2dc896fb14159dc4c976a240e3f90b9464"
+    },
+    {
+      "name": "Bachata-S4 0.2.2 public source",
+      "repository": "https://github.com/JICA98/Bachata-S4",
+      "revision": "cc52ae2dc896fb14159dc4c976a240e3f90b9464",
+      "tag": "0.2.2",
+      "url": "https://github.com/JICA98/Bachata-S4/tree/cc52ae2dc896fb14159dc4c976a240e3f90b9464"
+    },
+    {
+      "name": "Bachata-S4 v0.2.0 public source",
+      "repository": "https://github.com/JICA98/Bachata-S4",
+      "revision": "c9263f39394a16bbb9705db5d06faf8cd61ad6e4",
+      "tag": "v0.2.0",
+      "url": "https://github.com/JICA98/Bachata-S4/tree/c9263f39394a16bbb9705db5d06faf8cd61ad6e4"
+    },
+    {
       "name": "Bachata-S4 v0.1.9 historical source",
       "repository": "https://github.com/JICA98/Bachata-S4-Fork-Archive",
       "revision": "67dbf4e5b54b0467bf8a93de3de0a557a71f9f43",
@@ -17,6 +38,33 @@
     }
   ],
   "releaseArtifacts": [
+    {
+      "name": "bachatas4-0.2.3-release.apk",
+      "repository": "https://github.com/JICA98/Bachata-S4",
+      "tag": "0.2.3",
+      "revision": "cc52ae2dc896fb14159dc4c976a240e3f90b9464",
+      "url": "https://github.com/JICA98/Bachata-S4/releases/download/0.2.3/bachatas4-0.2.3-release.apk",
+      "sha256": "7b1045cbc3e883bffdf3b27787f25c5e5f993d80f7fb0c384efd33e70779c9a2",
+      "size": 198453292
+    },
+    {
+      "name": "bachatas4-0.2.2-release.apk",
+      "repository": "https://github.com/JICA98/Bachata-S4",
+      "tag": "0.2.2",
+      "revision": "cc52ae2dc896fb14159dc4c976a240e3f90b9464",
+      "url": "https://github.com/JICA98/Bachata-S4/releases/download/0.2.2/bachatas4-0.2.2-release.apk",
+      "sha256": "32f6912a7aa2f06f5579c2b5a4e38c37d99f0d621e208e7877d8468faa89b55e",
+      "size": 281269140
+    },
+    {
+      "name": "bachatas4-0.2.0-release.apk",
+      "repository": "https://github.com/JICA98/Bachata-S4",
+      "tag": "v0.2.0",
+      "revision": "c9263f39394a16bbb9705db5d06faf8cd61ad6e4",
+      "url": "https://github.com/JICA98/Bachata-S4/releases/download/v0.2.0/bachatas4-0.2.0-release.apk",
+      "sha256": "b9407f65e3d474e650402de5296d75f7cd25e1f5f3d50cd02e73c61dbdc46a3b",
+      "size": 218101724
+    },
     {
       "name": "bachatas4-0.1.9-release.apk",
       "repository": "https://github.com/JICA98/Bachata-S4",

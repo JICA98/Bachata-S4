@@ -157,7 +157,7 @@ jobs:
                   https_at(entry["repository"], p+".repository", "github.com")
                   if not HEX40.fullmatch(string_at(entry["revision"], p+".revision")): stop(p+".revision: expected lowercase 40-hex revision")
                   revisions.add(entry["revision"])
-                  if not re.fullmatch(r"^v[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[0-9A-Za-z.-]+)?$", string_at(entry["tag"], p+".tag", 1)): stop(p+".tag: invalid release tag")
+                  if not re.fullmatch(r"^v?[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[0-9A-Za-z.-]+)?$", string_at(entry["tag"], p+".tag", 1)): stop(p+".tag: invalid release tag")
                   expected = entry["repository"] + "/tree/" + entry["revision"]
                   if entry["url"] != expected: stop(p+".url: must be the exact immutable tree URL")
                   https_at(entry["url"], p+".url", "github.com")
@@ -182,7 +182,7 @@ jobs:
                   string_at(entry["name"], p+".name", 1, 200)
                   if entry["repository"] != ARTIFACT_REPO: stop(p+".repository: unexpected artifact repository")
                   https_at(entry["repository"], p+".repository", "github.com")
-                  if not re.fullmatch(r"^v[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[0-9A-Za-z.-]+)?$", string_at(entry["tag"], p+".tag", 1)): stop(p+".tag: invalid release tag")
+                  if not re.fullmatch(r"^v?[0-9]+\.[0-9]+(?:\.[0-9]+)?(?:-[0-9A-Za-z.-]+)?$", string_at(entry["tag"], p+".tag", 1)): stop(p+".tag: invalid release tag")
                   if not HEX40.fullmatch(string_at(entry["revision"], p+".revision")) or entry["revision"] not in revisions or tags.get(entry["tag"]) != entry["revision"]: stop(p+".revision: not tied to the tagged declared source")
                   if not SHA256.fullmatch(string_at(entry["sha256"], p+".sha256")): stop(p+".sha256: expected lowercase SHA-256")
                   if isinstance(entry["size"], bool) or not isinstance(entry["size"], int) or entry["size"] <= 0: stop(p+".size: expected positive integer")
