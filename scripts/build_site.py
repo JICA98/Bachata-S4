@@ -397,7 +397,11 @@ def build(source: Path, site: Path, output: Path, base_url: str, app_feed: str |
         game_devices = {view(r)["device"] for r in reports if view(r)["device"] != "Unknown device"}
         devices.update(game_devices)
         report_count += len(reports)
-        if best:
+        scored = aggregate_view((feeds.get(cusa) or {}).get("general"))
+        if scored:
+            # Same status the app and the catalog chips show.
+            status_counts[scored["status"]] += 1
+        elif best:
             status_counts[normalize_status(best.get("status"))] += 1
         entry = {
             **game,
