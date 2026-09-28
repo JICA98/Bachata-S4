@@ -232,6 +232,7 @@ jobs:
           # Reports are top-level CUSA JSON only; nested/non-JSON files and
           # accidental root/private files never silently ship.
           allowed = {
+              ".github/FUNDING.yml",
               ".github/ISSUE_TEMPLATE/app-bug-report.yaml",
               ".github/ISSUE_TEMPLATE/compatibility.yml",
               ".github/ISSUE_TEMPLATE/config.yml",
