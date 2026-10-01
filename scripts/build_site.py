@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import os
 import shutil
 import urllib.request
 from collections import Counter
@@ -16,6 +17,8 @@ STATUS_LABEL = {"playable": "Playable", "ingame": "Ingame", "menus": "Menus", "b
 RAW_BASE = "https://raw.githubusercontent.com/JICA98/Bachata-S4-Compatibility/main/"
 # The Android app's compatibility feed. Scores on the site come from the same feed so both show identical numbers.
 APP_FEED_BASE = "https://raw.githubusercontent.com/JICA98/Bachata-S4-Compatibility/app-feed/"
+# Public releases shown in the home page announcements (the page also fetches them live).
+RELEASES_API = "https://api.github.com/repos/JICA98/Bachata-S4/releases?per_page=10"
 AD_NATIVE = '<div class="ad-native-section container"><script async="async" data-cfasync="false" src="https://pl31216953.profitableratecpmnetwork.com/7f163c7ce69fdf82476c891df00fdf82/invoke.js"></script><div id="container-7f163c7ce69fdf82476c891df00fdf82"></div></div>'
 
 
@@ -348,7 +351,37 @@ def render_game_page(base_url: str, game: dict, reports: list[dict], feed: dict 
 </div></main>{AD_NATIVE}<div data-site-footer></div></body></html>'''
 
 
-def build(source: Path, site: Path, output: Path, base_url: str, app_feed: str | None = APP_FEED_BASE) -> None:
+def load_releases(url: str | None) -> list[dict]:
+    """Published releases with their changelog and APK link; empty when unavailable."""
+    if not url or url == "none":
+        return []
+    try:
+        headers = {"Accept": "application/vnd.github+json", "User-Agent": "bachata-site-builder"}
+        if os.environ.get("GITHUB_TOKEN"):
+            headers["Authorization"] = f"Bearer {os.environ['GITHUB_TOKEN']}"
+        with urllib.request.urlopen(urllib.request.Request(url, headers=headers), timeout=15) as response:
+            data = json.load(response)
+    except Exception as exc:
+        print(f"Releases unavailable, building without announcements: {exc}")
+        return []
+    releases = []
+    for item in data if isinstance(data, list) else []:
+        if not isinstance(item, dict) or item.get("draft") or not item.get("tag_name"):
+            continue
+        apk = next((a.get("browser_download_url", "") for a in item.get("assets") or [] if str(a.get("name", "")).lower().endswith(".apk")), "")
+        releases.append({
+            "tag_name": item["tag_name"],
+            "name": item.get("name") or item["tag_name"],
+            "published_at": item.get("published_at") or "",
+            "html_url": item.get("html_url") or "",
+            "prerelease": bool(item.get("prerelease")),
+            "body": item.get("body") or "",
+            "apk": apk,
+        })
+    return releases
+
+
+def build(source: Path, site: Path, output: Path, base_url: str, app_feed: str | None = APP_FEED_BASE, releases_url: str | None = RELEASES_API) -> None:
     if not source.is_dir():
         raise SystemExit(f"Compatibility source directory does not exist: {source}")
     if not site.is_dir():
@@ -432,6 +465,7 @@ def build(source: Path, site: Path, output: Path, base_url: str, app_feed: str |
         "games": games_index,
     }
     write_json(output / "data" / "site-index.json", index)
+    write_json(output / "data" / "releases.json", {"schemaVersion": 1, "generatedAt": now, "releases": load_releases(releases_url)})
 
     static_paths = ["/", "/compatibility.html", "/updates.html", "/methodology.html", "/about.html", "/guide.html", "/faq.html", "/contact.html", "/privacy.html", "/terms.html"]
     urls = [base_url.rstrip("/") + p for p in static_paths]
@@ -454,8 +488,9 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True, help="Generated site output directory")
     parser.add_argument("--base-url", default="https://bachatas4.games")
     parser.add_argument("--app-feed", default=APP_FEED_BASE, help="App compatibility feed URL or directory for scores; 'none' disables")
+    parser.add_argument("--releases", default=RELEASES_API, help="GitHub releases API URL for announcements; 'none' disables")
     args = parser.parse_args()
-    build(args.source.resolve(), args.site.resolve(), args.output.resolve(), args.base_url, args.app_feed)
+    build(args.source.resolve(), args.site.resolve(), args.output.resolve(), args.base_url, args.app_feed, args.releases)
 
 
 if __name__ == "__main__":

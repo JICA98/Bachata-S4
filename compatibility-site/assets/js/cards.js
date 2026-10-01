@@ -67,5 +67,34 @@
     link.append(backdrop, cover, body, scoreRing(compat?.score ?? NaN, ringStatus, compat?.release));
     return link;
   }
-  window.BachataCards = { createGameCard, safeStatus, LABEL, scoreRing, statusPill };
+  // Well-known PS4 franchises, most recognisable first. Matched against the lower-cased title so
+  // regional names and editions ("Remastered", "Definitive Edition") still match.
+  const FAMOUS = [
+    'bloodborne', 'god of war', 'the last of us', 'uncharted', 'spider-man', 'horizon zero dawn', 'red dead redemption',
+    'grand theft auto', 'ghost of tsushima', 'sekiro', 'elden ring', 'dark souls', "demon's souls", 'persona', 'final fantasy',
+    'kingdom hearts', 'resident evil', 'metal gear', 'devil may cry', 'dmc', 'nier', 'yakuza', 'gravity rush', 'infamous',
+    'p.t.', 'silent hill', 'batman', 'the witcher', 'crash bandicoot', 'spyro', 'ratchet', 'until dawn', 'detroit',
+    'death stranding', 'days gone', 'driveclub', 'the order', 'killzone', 'gran turismo', 'shadow of the colossus',
+    'tekken', 'mortal kombat', 'street fighter', 'monster hunter', 'dragon ball', 'sonic', 'deadpool', 'castlevania',
+    'mega man', 'hollow knight', 'cuphead', 'undertale', 'deltarune', 'teenage mutant ninja turtles', 'resogun',
+    'journey', 'wipeout', 'jak and daxter', 'sly cooper', 'ni no kuni', 'tales of', 'ace combat', "dragon's crown",
+  ];
+  const STATUS_RANK = { playable:0, ingame:1, menus:2, boots:3, nothing:4, unknown:5 };
+  const gameStatus = game => safeStatus(game.compatibility?.status || game.latestStatus);
+  const isWorking = game => STATUS_RANK[gameStatus(game)] <= 1;
+  const fameRank = game => {
+    const title = String(game.title || '').toLowerCase().replace(/[™®©]/g, '');
+    const i = FAMOUS.findIndex(name => title.includes(name));
+    return i < 0 ? FAMOUS.length : i;
+  };
+  /** Working games first, famous titles first among them, then status, score, report count and recency. */
+  const featuredCompare = (a, b) =>
+    (isWorking(a) ? 0 : STATUS_RANK[gameStatus(a)]) - (isWorking(b) ? 0 : STATUS_RANK[gameStatus(b)]) ||
+    fameRank(a) - fameRank(b) ||
+    STATUS_RANK[gameStatus(a)] - STATUS_RANK[gameStatus(b)] ||
+    (b.compatibility?.score ?? -1) - (a.compatibility?.score ?? -1) ||
+    (b.reportCount || 0) - (a.reportCount || 0) ||
+    new Date(b.latestTestedAt || 0) - new Date(a.latestTestedAt || 0);
+
+  window.BachataCards = { createGameCard, safeStatus, LABEL, scoreRing, statusPill, gameStatus, isWorking, featuredCompare };
 })();

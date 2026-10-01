@@ -49,12 +49,16 @@ jobs:
             --site bachata/compatibility-site \
             --output _fixture-site \
             --base-url https://bachatas4.games \
-            --app-feed none
+            --app-feed none \
+            --releases none
           python3 bachata/scripts/site_audit.py --site _fixture-site
+          test -f _fixture-site/data/releases.json
           grep -q 'v0.1.6' _fixture-site/games/CUSA00001/index.html
           grep -q 'v0.1.9' _fixture-site/games/CUSA00001/index.html
 
       - name: Build production site
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           python3 bachata/scripts/build_site.py \
             --source compatibility-data \
