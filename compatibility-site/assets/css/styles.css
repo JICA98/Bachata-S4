@@ -148,6 +148,8 @@ h2 { font-weight:300; }
 .nothing { --status:var(--nothing); }
 .unknown { --status:var(--unknown); }
 .status-dot { width:9px; height:9px; border-radius:999px; background:var(--status,var(--unknown)); box-shadow:0 0 0 4px color-mix(in srgb,var(--status,var(--unknown)) 16%,transparent); flex:none; }
+.status-dot.working { background:linear-gradient(135deg, var(--playable) 50%, var(--ingame) 50%); box-shadow:0 0 0 4px color-mix(in srgb, var(--ingame) 16%, transparent); }
+.status-chip.working { --status:var(--ingame); }
 .status-pill, .status-badge {
   display:inline-flex; align-items:center; gap:7px; border-radius:999px; padding:5px 11px;
   background:color-mix(in srgb, var(--status,var(--unknown)) 16%, transparent);
@@ -324,3 +326,38 @@ html[data-theme="light"] .stat-chip { background:rgba(20,24,34,.05); }
 @media (prefers-reduced-motion: reduce) {
   .game-card, .score-ring .arc { animation:none; }
 }
+
+/* Announcements — one release at a time with its changelog */
+.announcements { padding:0 0 8px; }
+.release-carousel { border-radius:var(--radius); padding:22px; box-shadow:var(--shadow); outline:none; }
+.release-carousel:focus-visible { border-color:var(--accent); }
+.release-slide { animation:release-in .35s ease; }
+@keyframes release-in { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+.release-head h3 { margin:10px 0 4px; font-size:clamp(20px,2.6vw,28px); letter-spacing:-.01em; }
+.release-meta { display:flex; flex-wrap:wrap; align-items:center; gap:10px; }
+.release-tag { display:inline-flex; align-items:center; border-radius:999px; padding:4px 11px; font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; border:1px solid var(--line); color:var(--muted); }
+.release-tag.latest { color:var(--accent-soft); border-color:color-mix(in srgb, var(--accent) 55%, transparent); background:color-mix(in srgb, var(--accent) 16%, transparent); }
+.release-notes { max-height:360px; overflow:auto; margin:14px 0 16px; padding-right:8px; color:var(--muted); font-size:14px; line-height:1.65; overscroll-behavior:contain;
+  -webkit-mask-image:linear-gradient(180deg, #000 88%, transparent); mask-image:linear-gradient(180deg, #000 88%, transparent); padding-bottom:28px; }
+.release-notes > p:first-child { color:var(--text); font-size:16px; }
+.release-notes h4, .release-notes h5 { color:var(--text); margin:18px 0 6px; font-size:13px; letter-spacing:.14em; text-transform:uppercase; }
+.release-notes h4 { color:var(--accent-soft); }
+.release-notes ul { margin:0; padding-left:20px; }
+.release-notes li { margin:3px 0; }
+.release-notes li::marker { color:var(--accent); }
+.release-notes code { font-size:12px; padding:1px 6px; border-radius:6px; background:rgba(255,255,255,.08); word-break:break-all; }
+.release-notes a { color:var(--accent-soft); }
+.release-actions { display:flex; flex-wrap:wrap; gap:10px; }
+.release-controls { display:flex; align-items:center; gap:12px; margin-top:18px; padding-top:16px; border-top:1px solid var(--line); }
+.release-nav { font-size:16px; }
+.release-nav:disabled { opacity:.4; cursor:default; }
+.release-dots { display:flex; gap:6px; flex:1; flex-wrap:wrap; }
+.release-dot { width:22px; height:6px; border-radius:999px; border:0; padding:0; background:rgba(255,255,255,.16); cursor:pointer; transition:background .2s ease, width .2s ease; }
+html[data-theme="light"] .release-dot { background:rgba(20,24,34,.16); }
+.release-dot[aria-current="true"] { width:38px; background:var(--accent); }
+.release-counter { color:var(--muted); font-size:12px; letter-spacing:.08em; font-variant-numeric:tabular-nums; }
+@media (max-width: 760px) {
+  .release-carousel { padding:16px; }
+  .release-notes { max-height:300px; }
+}
+@media (prefers-reduced-motion: reduce) { .release-slide { animation:none; } }
