@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Game compatibility report
+    url: https://github.com/JICA98/Bachata-S4-Compatibility/issues/new/choose
+    about: One canonical issue per game (CUSA) is kept in the Bachata-S4-Compatibility repository, next to the reports.
   - name: Bachata S4 compatibility portal
     url: https://bachatas4.games
     about: Search existing game reports and browse current compatibility data.
