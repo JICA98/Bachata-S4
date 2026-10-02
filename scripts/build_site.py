@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import html
 import json
+import re
 import os
 import shutil
 import urllib.request
@@ -12,6 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from urllib.parse import quote
 
+ISSUE_REPOSITORY_RE = re.compile(r"^JICA98/[A-Za-z0-9_.-]+$")
 STATUS_ORDER = {"playable": 0, "ingame": 1, "menus": 2, "boots": 3, "nothing": 4, "unknown": 5}
 STATUS_LABEL = {"playable": "Playable", "ingame": "Ingame", "menus": "Menus", "boots": "Boots", "nothing": "Nothing", "unknown": "Unknown"}
 RAW_BASE = "https://raw.githubusercontent.com/JICA98/Bachata-S4-Compatibility/main/"
@@ -305,6 +307,18 @@ def score_card(title: str, agg: dict | None, empty: str) -> str:
     return f'<article class="score-card glass">{score_ring(agg["score"], agg["status"], size="md")}<div><h3>{esc(title)}</h3>{"".join(lines)}</div></article>'
 
 
+def issue_link(game: dict) -> str:
+    """Link to the game's canonical GitHub discussion issue, when one is recorded."""
+    ref = game.get("canonicalIssue")
+    if not isinstance(ref, dict):
+        return ""
+    repository, number = ref.get("repository"), ref.get("number")
+    if not isinstance(repository, str) or not ISSUE_REPOSITORY_RE.fullmatch(repository) or not isinstance(number, int) or number < 1:
+        return ""
+    url = f"https://github.com/{repository}/issues/{number}"
+    return f'<a class="pill-button" href="{esc(url)}" target="_blank" rel="noopener noreferrer">Discussion #{number} ↗</a>'
+
+
 def render_game_page(base_url: str, game: dict, reports: list[dict], feed: dict | None = None, soc_names: dict | None = None) -> str:
     feed = feed or {}
     soc_names = soc_names or {}
@@ -341,7 +355,7 @@ def render_game_page(base_url: str, game: dict, reports: list[dict], feed: dict 
   <img class="game-hero-bg" src="{esc(hero_img)}" alt="">
   <div class="game-hero-row">
     <img class="game-cover" src="{esc(cover_img)}" alt="{esc(title)} screenshot">
-    <div class="game-hero-copy"><h1>{esc(title)}</h1><p class="muted">{esc(meta)}</p><div class="pill-row">{status_pill(status)}{release_note}</div></div>
+    <div class="game-hero-copy"><h1>{esc(title)}</h1><p class="muted">{esc(meta)}</p><div class="pill-row">{status_pill(status)}{release_note}{issue_link(game)}</div></div>
     {score_ring(general["score"] if general else None, status, "overall", "lg")}
   </div>
 </section>
@@ -412,6 +426,7 @@ def build(source: Path, site: Path, output: Path, base_url: str, app_feed: str |
             "title": raw_game.get("title") or cusa,
             "region": raw_game.get("region", ""),
             "publisher": raw_game.get("publisher", ""),
+            "canonicalIssue": raw_game.get("canonicalIssue"),
         }
         reports = []
         for report_path in sorted((game_path.parent / "reports").glob("*.json")):
