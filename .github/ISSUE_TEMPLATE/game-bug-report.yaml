@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        Link the canonical CUSA compatibility issue. Test a clean, legally owned dump without mods, patches, or cheats.
+        Link the game's canonical compatibility issue from JICA98/Bachata-S4-Compatibility. Test a clean, legally owned dump without mods, patches, or cheats.
         Remove personal information from evidence. Never upload games, keys, firmware, or copyrighted game data.
   - type: input
     id: cusa
@@ -14,7 +14,7 @@ body:
     validations: { required: true }
   - type: input
     id: canonical_issue
-    attributes: { label: Canonical compatibility issue, placeholder: "#123" }
+    attributes: { label: Canonical compatibility issue, placeholder: "https://github.com/JICA98/Bachata-S4-Compatibility/issues/123" }
     validations: { required: true }
   - type: input
     id: release

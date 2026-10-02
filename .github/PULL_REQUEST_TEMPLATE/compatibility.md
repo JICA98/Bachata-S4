@@ -1,6 +1,6 @@
 ## Linked issue
 
-Canonical compatibility issue: <!-- Required: #123 -->
+Canonical compatibility issue: <!-- Required: JICA98/Bachata-S4-Compatibility#123 -->
 
 ## Change type
 
