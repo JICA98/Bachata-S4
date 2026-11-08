@@ -98,7 +98,8 @@ SPDX-License-Identifier: GPL-2.0-or-later
 
 - **Bachata S4 is now on iOS.** The iOS app is released on the App Store:
   **[Download Bachata S4 Emulator for iOS](https://apps.apple.com/in/app/bachatas4-emulator/id6822708927)**.
-  Android builds remain available on Google Play and GitHub Releases.
+  Current App Store version: **1.0**; **1.0.1** is in App Review. Android builds remain
+  available on Google Play and GitHub Releases.
 
 ---
 
@@ -245,7 +246,7 @@ continued development, device testing, and compatibility work.
 
 ### App Store (iOS)
 
-Bachata S4 is also available on iOS.
+Bachata S4 is also available on iOS. Current App Store version: **1.0** (**1.0.1** is in App Review).
 
 **[Install Bachata S4 Emulator from the App Store](https://apps.apple.com/in/app/bachatas4-emulator/id6822708927)**
 
