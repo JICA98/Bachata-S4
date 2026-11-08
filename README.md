@@ -31,6 +31,12 @@ SPDX-License-Identifier: GPL-2.0-or-later
     src="https://img.shields.io/endpoint?url=https%3A%2F%2Fplay.rajkumaar.co.in%2Fversion%3Fid%3Dcom.bachatas4.android&style=for-the-badge&label=Google%20Play"
   >
 </a>
+  <a href="https://apps.apple.com/in/app/bachatas4-emulator/id6822708927">
+  <img
+    alt="Download on the App Store"
+    src="https://img.shields.io/badge/App_Store-Download-0D96F6?style=for-the-badge&logo=apple&logoColor=white"
+  >
+</a>
   <a href="https://github.com/JICA98/Bachata-S4/releases">
   <img
     alt="Latest GitHub release"
@@ -85,6 +91,14 @@ SPDX-License-Identifier: GPL-2.0-or-later
 > Bachata S4 does **not** distribute games, firmware, decryption keys, licenses, or other
 > copyrighted console files. You must provide and use only software and content that you
 > legally own or are otherwise legally entitled to use.
+
+---
+
+## 📰 Latest news
+
+- **Bachata S4 is now on iOS.** The iOS app is released on the App Store:
+  **[Download Bachata S4 Emulator for iOS](https://apps.apple.com/in/app/bachatas4-emulator/id6822708927)**.
+  Android builds remain available on Google Play and GitHub Releases.
 
 ---
 
@@ -228,6 +242,12 @@ The supported Google Play build is the easiest installation path and directly su
 continued development, device testing, and compatibility work.
 
 **[Install Bachata S4 from Google Play](https://play.google.com/store/apps/details?id=com.bachatas4.android)**
+
+### App Store (iOS)
+
+Bachata S4 is also available on iOS.
+
+**[Install Bachata S4 Emulator from the App Store](https://apps.apple.com/in/app/bachatas4-emulator/id6822708927)**
 
 ### GitHub
 
