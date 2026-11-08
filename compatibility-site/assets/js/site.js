@@ -32,7 +32,7 @@
         <div class="container header-inner">
           <a class="brand" href="/" aria-label="Bachata S4 home">
             <img class="brand-logo" src="/assets/bachata-s4-logo.png" alt="Bachata S4 logo" width="42" height="42">
-            <span><strong>Bachata S4</strong><small>PS4 emulation on Android</small></span>
+            <span><strong>Bachata S4</strong><small>PS4 emulation on Android and iOS</small></span>
           </a>
           <nav class="site-nav" id="site-nav" aria-label="Primary">
             ${nav.map(([id, href, label]) => `<a class="nav-link" href="${href}" ${current === id ? 'aria-current="page"' : ''}>${label}</a>`).join('')}
