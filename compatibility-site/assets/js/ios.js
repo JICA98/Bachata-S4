@@ -8,10 +8,12 @@
     const im = document.getElementById('lb-img');
     im.src = '/assets/ios/img/' + s.f; im.alt = s.c;
     document.getElementById('lb-cap').textContent = s.c;
-    lb.showModal ? lb.showModal() : lb.setAttribute('open', '');
+    lb.hidden = false; document.getElementById('lb-close').focus();
   };
-  document.getElementById('lb-close').addEventListener('click', () => lb.close ? lb.close() : lb.removeAttribute('open'));
-  lb.addEventListener('click', e => { if (e.target === lb && lb.close) lb.close(); });
+  const closeShot = () => { lb.hidden = true; };
+  document.getElementById('lb-close').addEventListener('click', closeShot);
+  lb.addEventListener('click', e => { if (e.target === lb) closeShot(); });
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeShot(); });
 
   function card(g) {
     const goal = g.target || 30;
