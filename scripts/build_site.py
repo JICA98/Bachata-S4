@@ -482,7 +482,7 @@ def build(source: Path, site: Path, output: Path, base_url: str, app_feed: str |
     write_json(output / "data" / "site-index.json", index)
     write_json(output / "data" / "releases.json", {"schemaVersion": 1, "generatedAt": now, "releases": load_releases(releases_url)})
 
-    static_paths = ["/", "/compatibility.html", "/updates.html", "/methodology.html", "/about.html", "/guide.html", "/faq.html", "/contact.html", "/privacy.html", "/terms.html"]
+    static_paths = ["/", "/compatibility.html", "/ios.html", "/updates.html", "/methodology.html", "/about.html", "/guide.html", "/faq.html", "/contact.html", "/privacy.html", "/terms.html"]
     urls = [base_url.rstrip("/") + p for p in static_paths]
     urls += [f"{base_url.rstrip('/')}/games/{quote(g['cusaId'])}/" for g in games_index]
     sitemap = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + "\n".join(f"  <url><loc>{esc(url)}</loc></url>" for url in urls) + "\n</urlset>\n"

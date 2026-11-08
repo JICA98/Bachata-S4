@@ -1,0 +1,52 @@
+.ios-page { padding-bottom:64px; }
+.ios-hero { padding:64px 0 24px; }
+.ios-hero h1 { font-size:clamp(34px,6vw,60px); line-height:1.05; margin:8px 0 12px; }
+.ios-hero h1 span { color:var(--accent); }
+.ios-hero p { max-width:720px; color:var(--muted); font-size:17px; line-height:1.7; font-weight:300; }
+.ios-updated { font-size:13px !important; color:var(--faint) !important; margin-top:16px; }
+.ios-counts { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; list-style:none; padding:0; margin:12px 0; }
+.ios-counts li { padding:14px 16px; border-radius:16px; border:1px solid var(--line); background:var(--panel); border-left:4px solid var(--k); }
+.ios-counts b { display:block; font-size:28px; line-height:1; font-variant-numeric:tabular-nums; }
+.ios-counts span { color:var(--muted); font-size:13px; }
+.k-done{--k:var(--playable)} .k-below30{--k:var(--menus)} .k-crash{--k:var(--nothing)} .k-not_tested{--k:var(--unknown)}
+.ios-filters { display:flex; flex-wrap:wrap; gap:8px; margin:18px 0 8px; }
+.ios-filters button { font:inherit; font-size:13px; color:var(--text); border:1px solid var(--line); background:var(--panel); border-radius:999px; padding:7px 14px; cursor:pointer; }
+.ios-filters button[aria-pressed="true"] { background:var(--accent); color:var(--on-accent); border-color:var(--accent); }
+.ios-group h2 { display:flex; align-items:baseline; gap:10px; margin:30px 0 14px; font-size:22px; padding-left:12px; border-left:4px solid var(--k); }
+.ios-group h2 small { color:var(--faint); font-size:13px; font-weight:400; }
+.ios-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:14px; }
+.ios-card { border:1px solid var(--line); border-radius:var(--radius); background:var(--panel); padding:14px; display:grid; gap:10px; align-content:start; min-width:0; }
+.ios-card h3 { margin:0; font-size:17px; line-height:1.25; }
+.ios-card .sub { font-size:12px; color:var(--faint); font-family:ui-monospace,monospace; overflow-wrap:anywhere; }
+.chip { display:inline-flex; align-items:center; gap:6px; padding:2px 10px; border-radius:999px; font-size:12px; font-weight:600; color:var(--k); background:color-mix(in srgb,var(--k) 16%,transparent); width:fit-content; }
+.chip::before { content:""; width:6px; height:6px; border-radius:50%; background:currentColor; }
+.c-done{--k:var(--playable)} .c-below30{--k:var(--menus)} .c-crash{--k:var(--nothing)} .c-test{--k:var(--ingame)} .c-not_tested{--k:var(--unknown)}
+.ios-meta { display:flex; flex-wrap:wrap; gap:6px; }
+.ios-meta .chip { --k:var(--muted); font-weight:500; }
+.ios-fps { display:flex; align-items:baseline; gap:8px; }
+.ios-fps b { font-size:30px; line-height:1; font-variant-numeric:tabular-nums; }
+.ios-fps small { color:var(--faint); font-size:12px; }
+.ios-bar { position:relative; height:8px; border-radius:4px; background:rgba(128,128,128,.25); }
+.ios-bar i { position:absolute; inset:0 auto 0 0; width:var(--v); border-radius:4px; background:var(--fill); }
+.ios-bar.menus i { background:repeating-linear-gradient(135deg,var(--faint) 0 3px,transparent 3px 6px); }
+.ios-bar::after { content:""; position:absolute; left:var(--gp,50%); top:-3px; bottom:-3px; width:2px; background:var(--text); opacity:.8; }
+.t-ok{--fill:var(--playable)} .t-warn{--fill:var(--menus)} .t-bad{--fill:var(--nothing)}
+.ios-lows { display:flex; gap:16px; font-size:13px; color:var(--muted); }
+.ios-lows b { color:var(--text); font-variant-numeric:tabular-nums; }
+.ios-what { margin:0; font-size:13.5px; color:var(--muted); }
+.ios-what em { color:var(--faint); font-style:normal; display:block; font-size:12px; margin-top:2px; }
+.ios-shots { display:flex; gap:6px; flex-wrap:wrap; }
+.ios-thumb { padding:0; border:1px solid var(--line); border-radius:8px; overflow:hidden; background:none; cursor:zoom-in; width:calc(50% - 3px); }
+.ios-thumb img { display:block; width:100%; height:auto; }
+.ios-shots.many .ios-thumb { width:calc(33.3% - 4px); }
+.ios-run { font-size:11.5px; color:var(--faint); font-family:ui-monospace,monospace; }
+.ios-notes { margin-top:36px; padding:24px; border-radius:var(--radius); }
+.ios-notes h2 { margin-top:0; font-size:20px; }
+.ios-notes p { color:var(--muted); line-height:1.7; }
+.ios-error { color:var(--nothing); }
+.ios-page dialog { border:1px solid var(--line); border-radius:14px; background:var(--bg-elev); color:var(--text); padding:12px; max-width:min(1200px,96vw); }
+.ios-page dialog::backdrop { background:rgba(0,0,0,.75); }
+.ios-page dialog img { display:block; max-width:100%; max-height:78vh; height:auto; border-radius:8px; }
+.ios-page dialog figcaption { margin-top:8px; font-size:14px; }
+.ios-page dialog .button { margin-top:10px; }
+@media (max-width:560px){ .ios-grid{grid-template-columns:1fr} }

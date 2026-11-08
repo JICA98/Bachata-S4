@@ -17,6 +17,7 @@
   const nav = [
     ['home', '/', 'Home'],
     ['compatibility', '/compatibility.html', 'Compatibility'],
+    ['ios', '/ios.html', 'iOS'],
     ['updates', '/updates.html', 'Updates'],
     ['methodology', '/methodology.html', 'How Testing Works'],
     ['about', '/about.html', 'About'],
