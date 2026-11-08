@@ -4,10 +4,14 @@
   try { saved = localStorage.getItem('bachata-theme'); } catch (_) {}
   if (saved === 'light' || saved === 'dark') root.dataset.theme = saved;
 
+  const APP_STORE_URL = 'https://apps.apple.com/in/app/bachatas4-emulator/id6822708927';
   const PLAY_URL = 'https://play.google.com/store/apps/details?id=com.bachatas4.android';
   const playIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#34a853" d="M3.6 1.8 13.8 12 3.6 22.2c-.4-.2-.6-.7-.6-1.2V3c0-.5.2-1 .6-1.2z"/><path fill="#fbbc04" d="m17.3 8.5-3.5 3.5 3.5 3.5 4-2.3c.9-.5.9-1.9 0-2.4z"/><path fill="#4285f4" d="M3.6 22.2 13.8 12l3.5 3.5L5 22.4c-.5.3-1 .2-1.4-.2z"/><path fill="#ea4335" d="M3.6 1.8c.4-.4.9-.5 1.4-.2l12.3 6.9-3.5 3.5z"/></svg>';
   const playButton = extra => `<a class="button button-play ${extra}" href="${PLAY_URL}" target="_blank" rel="noopener noreferrer" aria-label="Get Bachata S4 on Google Play">${playIcon}<span><small>Get it on</small><strong>Google Play</strong></span></a>`;
+  const appleIcon = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="#fff" d="M16.4 12.6c0-2.3 1.9-3.4 2-3.5-1.1-1.600-2.800-1.800-3.400-1.800-1.400-.1-2.800.8-3.500.8s-1.800-.8-3-.8c-1.500 0-3 .9-3.800 2.300-1.600 2.800-.4 7 1.200 9.300.8 1.100 1.700 2.400 2.900 2.300 1.200 0 1.600-.7 3-.7s1.800.7 3 .7 2-1.100 2.800-2.200c.9-1.300 1.200-2.500 1.300-2.600-.1 0-2.500-1-2.500-3.800zM14.100 5.700c.6-.8 1.100-1.900.9-3-.9 0-2.100.6-2.700 1.400-.6.700-1.100 1.800-1 2.900 1.100.1 2.200-.5 2.800-1.300z"/></svg>';
+  const appStoreButton = extra => `<a class="button button-play ${extra}" href="${APP_STORE_URL}" target="_blank" rel="noopener noreferrer" aria-label="Download Bachata S4 on the App Store">${appleIcon}<span><small>Download on the</small><strong>App Store</strong></span></a>`;
   window.BachataPlayButton = playButton;
+  window.BachataAppStoreButton = appStoreButton;
 
   const current = document.body.dataset.page || '';
   const nav = [
@@ -33,9 +37,11 @@
             ${nav.map(([id, href, label]) => `<a class="nav-link" href="${href}" ${current === id ? 'aria-current="page"' : ''}>${label}</a>`).join('')}
             <a class="nav-link" href="https://github.com/JICA98/Bachata-S4" target="_blank" rel="noreferrer">GitHub ↗</a>
             ${playButton('nav-play')}
+            ${appStoreButton('nav-play')}
           </nav>
           <div class="header-actions">
             ${playButton('')}
+            ${appStoreButton('')}
             <button class="icon-button" id="theme-toggle" type="button" aria-label="Switch theme">◐</button>
             <button class="icon-button nav-toggle" id="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu">☰</button>
           </div>
@@ -51,9 +57,9 @@
           <div class="brand"><img class="brand-logo" src="/assets/bachata-s4-logo.png" alt="Bachata S4 logo" width="38" height="38"><span><strong>Bachata S4</strong><small>Evidence-based compatibility</small></span></div>
           <div>
             <nav class="footer-nav" aria-label="Footer">
-              <a href="/compatibility.html">Compatibility</a><a href="/guide.html">Guide</a><a href="/faq.html">FAQ</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="${PLAY_URL}" target="_blank" rel="noopener noreferrer">Google Play ↗</a><a href="https://www.profitableratecpmnetwork.com/h7iu4ucf5?key=629d0734aa9635e65f0197352ff2748f" target="_blank" rel="noopener noreferrer">Partner Offers ↗</a>
+              <a href="/compatibility.html">Compatibility</a><a href="/guide.html">Guide</a><a href="/faq.html">FAQ</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="${PLAY_URL}" target="_blank" rel="noopener noreferrer">Google Play ↗</a><a href="${APP_STORE_URL}" target="_blank" rel="noopener noreferrer">App Store ↗</a><a href="https://www.profitableratecpmnetwork.com/h7iu4ucf5?key=629d0734aa9635e65f0197352ff2748f" target="_blank" rel="noopener noreferrer">Partner Offers ↗</a>
             </nav>
-            <p class="footer-copy">Bachata S4 is an independent open-source project and is not affiliated with Sony Interactive Entertainment. Use only software and content you are legally entitled to use. Google Play and the Google Play logo are trademarks of Google LLC.</p>
+            <p class="footer-copy">Bachata S4 is an independent open-source project and is not affiliated with Sony Interactive Entertainment. Use only software and content you are legally entitled to use. Google Play and the Google Play logo are trademarks of Google LLC. App Store and the Apple logo are trademarks of Apple Inc.</p>
           </div>
         </div>
       </footer>`;
