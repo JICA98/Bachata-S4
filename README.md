@@ -39,8 +39,14 @@ SPDX-License-Identifier: GPL-2.0-or-later
 </a>
   <a href="https://github.com/JICA98/Bachata-S4/releases">
   <img
-    alt="Latest GitHub release"
-    src="https://img.shields.io/github/v/release/JICA98/Bachata-S4?include_prereleases&sort=semver&style=for-the-badge&logo=github&logoColor=white&label=GitHub"
+    alt="Latest Android GitHub release"
+    src="https://img.shields.io/github/v/release/JICA98/Bachata-S4?include_prereleases&sort=date&filter=%21jit-%2A&style=for-the-badge&logo=android&logoColor=white&label=GitHub%20Android&color=3DDC84"
+  >
+</a>
+  <a href="https://github.com/JICA98/Bachata-S4/releases?q=jit&expanded=true">
+  <img
+    alt="Latest iOS GitHub release"
+    src="https://img.shields.io/github/v/release/JICA98/Bachata-S4?include_prereleases&sort=date&filter=jit-%2A&style=for-the-badge&logo=apple&logoColor=white&label=GitHub%20iOS&color=0D96F6"
   >
 </a>
   <a href="https://github.com/JICA98/Bachata-S4/releases">
