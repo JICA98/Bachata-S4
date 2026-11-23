@@ -6,15 +6,17 @@
     .then(response => { if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.json(); })
     .then(index => {
       const stats = index.stats || {};
-      set('#stat-games', stats.games); set('#stat-reports', stats.reports); set('#stat-devices', stats.devices); set('#stat-playable', stats.playable); set('#stat-ingame', stats.ingame);
       const all = index.games || [];
-      const working = all.filter(window.BachataCards.isWorking);
+      // Regional releases of the same title count and show once.
+      const groups = window.BachataCards.groupGames(all);
+      set('#stat-games', groups.length); set('#stat-reports', stats.reports); set('#stat-devices', stats.devices); set('#stat-playable', stats.playable); set('#stat-ingame', stats.ingame);
+      const working = groups.filter(group => window.BachataCards.isWorking(group.game));
       // Showcase what runs: famous playable and ingame titles first, everything else only if nothing runs yet.
-      const games = [...(working.length ? working : all)].sort(window.BachataCards.featuredCompare).slice(0, 8);
-      list.replaceChildren(...games.map((game, i) => window.BachataCards.createGameCard(game, null, i)));
+      const picks = [...(working.length ? working : groups)].sort((a, b) => window.BachataCards.featuredCompare(a.game, b.game)).slice(0, 8);
+      list.replaceChildren(...picks.map((group, i) => window.BachataCards.createGameCard(group.game, null, i, group.variants)));
       document.querySelector('#home-data-meta').textContent = working.length
-        ? `${working.length} of ${all.length} tested games reach gameplay`
-        : games.length ? 'Recently tested games' : 'No compatibility reports yet';
+        ? `${working.length} of ${groups.length} tested games reach gameplay`
+        : picks.length ? 'Recently tested games' : 'No compatibility reports yet';
     })
     .catch(error => {
       console.error(error);
@@ -26,7 +28,7 @@
 (() => {
   const root = document.querySelector('#release-carousel');
   if (!root) return;
-  const RELEASES_API = 'https://api.github.com/repos/JICA98/Bachata-S4/releases?per_page=10';
+  const RELEASES_API = 'https://api.github.com/repos/JICA98/Bachata-S4/releases?per_page=40';
   const el = (tag, className, text) => {
     const node = document.createElement(tag);
     if (className) node.className = className;
@@ -65,6 +67,23 @@
     const lines = String(source || '').replace(/\r/g, '').split('\n');
     lines.forEach((raw, i) => {
       const line = raw.trim();
+      if (line.startsWith('<')) {
+        // Raw HTML (screenshot / video tables) is never inserted. Linked captions become plain links;
+        // the rest is dropped instead of showing as literal markup.
+        const links = [...line.matchAll(/<a\s+href="(https:\/\/[^"]+)"[^>]*>[\s\S]*?<\/a>\s*<br\s*\/?>\s*<sub>([\s\S]*?)<\/sub>/gi)];
+        if (links.length) {
+          flush();
+          if (!listEl) { listEl = el('ul'); out.append(listEl); }
+          links.forEach(([, href, caption]) => {
+            const a = el('a', '', caption.replace(/<[^>]*>/g, '').replace(/&amp;/g, '&').trim());
+            a.href = href; a.target = '_blank'; a.rel = 'noopener noreferrer';
+            const li = el('li');
+            li.append(a);
+            listEl.append(li);
+          });
+        }
+        return;
+      }
       const heading = line.match(/^(#{1,6})\s+(.*)$/);
       const bullet = line.match(/^[-*+]\s+(.*)$/);
       if (heading) {
@@ -87,6 +106,15 @@
     return out;
   }
 
+  const APP_STORE = 'https://apps.apple.com/in/app/bachatas4-emulator/id6822708927';
+  const PLATFORMS = [{ key:'android', label:'Android' }, { key:'ios', label:'iOS' }];
+  // iOS builds are published as e.g. tag "jit-v1.1.0-2" named "BachataS4 IOS 1.1.0"; everything else is Android.
+  function platformOf(r) {
+    const explicit = String(r.platform || '').toLowerCase();
+    if (explicit === 'ios' || explicit === 'android') return explicit;
+    return /(^|[^a-z])(ios|ipa)([^a-z]|$)/i.test(`${r.tag_name || r.tag || ''} ${r.name || ''}`) ? 'ios' : 'android';
+  }
+
   const normalize = r => ({
     tag: r.tag_name || r.tag,
     version: String(r.tag_name || r.tag || '').replace(/^v/i, ''),
@@ -97,9 +125,18 @@
     apk: r.apk || (r.assets || []).find(a => /\.apk$/i.test(a.name || ''))?.browser_download_url || '',
     prerelease: Boolean(r.prerelease),
     draft: Boolean(r.draft),
+    platform: platformOf(r),
   });
 
-  function render(releases) {
+  // Created once; always calls whichever carousel is showing.
+  let showCurrent = null;
+  root.addEventListener('keydown', event => {
+    if (event.target.closest('a') || !showCurrent) return;
+    if (event.key === 'ArrowLeft') showCurrent(-1);
+    if (event.key === 'ArrowRight') showCurrent(1);
+  });
+
+  function render(releases, platform) {
     let current = 0;
     const slides = el('div', 'release-slides');
     const dots = el('div', 'release-dots');
@@ -129,6 +166,11 @@
       notes.append(renderMarkdown(release.body, release));
       if (!notes.childNodes.length) notes.append(el('p', 'muted', 'No changelog was published for this release.'));
       const actions = el('div', 'release-actions');
+      if (platform === 'ios') {
+        const store = el('a', 'pill-button button-primary', 'Get on the App Store ↗');
+        store.href = APP_STORE; store.target = '_blank'; store.rel = 'noopener noreferrer';
+        actions.append(store);
+      }
       if (release.apk) {
         const apk = el('a', 'pill-button button-primary', 'Download APK');
         apk.href = release.apk; apk.rel = 'noopener noreferrer';
@@ -163,11 +205,7 @@
     }
     prev.addEventListener('click', () => show(current - 1));
     next.addEventListener('click', () => show(current + 1));
-    root.addEventListener('keydown', event => {
-      if (event.target.closest('a')) return;
-      if (event.key === 'ArrowLeft') show(current - 1);
-      if (event.key === 'ArrowRight') show(current + 1);
-    });
+    showCurrent = step => show(current + step);
 
     const controls = el('div', 'release-controls');
     controls.append(prev, dots, counter, next);
@@ -184,7 +222,27 @@
     .catch(() => load('/data/releases.json'))
     .then(releases => {
       if (!releases.length) throw new Error('No releases');
-      render(releases.sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0)));
+      releases.sort((a, b) => new Date(b.publishedAt || 0) - new Date(a.publishedAt || 0));
+      // Android and iOS builds are versioned separately, so each platform gets its own carousel.
+      const byPlatform = PLATFORMS.map(p => ({ ...p, releases: releases.filter(r => r.platform === p.key) })).filter(p => p.releases.length);
+      const tabs = el('div', 'release-tabs');
+      tabs.setAttribute('role', 'tablist');
+      tabs.setAttribute('aria-label', 'Release platform');
+      const select = platform => {
+        [...tabs.children].forEach(tab => tab.setAttribute('aria-selected', String(tab.dataset.platform === platform.key)));
+        root.setAttribute('aria-label', `Bachata S4 ${platform.label} releases`);
+        render(platform.releases, platform.key);
+      };
+      byPlatform.forEach(platform => {
+        const tab = el('button', 'release-tab', `${platform.label} · ${platform.releases.length}`);
+        tab.type = 'button';
+        tab.dataset.platform = platform.key;
+        tab.setAttribute('role', 'tab');
+        tab.addEventListener('click', () => select(platform));
+        tabs.append(tab);
+      });
+      if (byPlatform.length > 1) root.before(tabs);
+      select(byPlatform[0]);
     })
     .catch(error => {
       console.error(error);

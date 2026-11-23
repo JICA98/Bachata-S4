@@ -20,7 +20,7 @@ RAW_BASE = "https://raw.githubusercontent.com/JICA98/Bachata-S4-Compatibility/ma
 # The Android app's compatibility feed. Scores on the site come from the same feed so both show identical numbers.
 APP_FEED_BASE = "https://raw.githubusercontent.com/JICA98/Bachata-S4-Compatibility/app-feed/"
 # Public releases shown in the home page announcements (the page also fetches them live).
-RELEASES_API = "https://api.github.com/repos/JICA98/Bachata-S4/releases?per_page=10"
+RELEASES_API = "https://api.github.com/repos/JICA98/Bachata-S4/releases?per_page=40"
 AD_NATIVE = '<div class="ad-native-section container"><script async="async" data-cfasync="false" src="https://pl31216953.profitableratecpmnetwork.com/7f163c7ce69fdf82476c891df00fdf82/invoke.js"></script><div id="container-7f163c7ce69fdf82476c891df00fdf82"></div></div>'
 
 

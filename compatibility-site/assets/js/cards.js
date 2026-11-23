@@ -28,7 +28,7 @@
   }
 
   /** Same layout as the in-app catalog card. `report` narrows the card to a filtered report when given. */
-  function createGameCard(game, report = null, index = 0) {
+  function createGameCard(game, report = null, index = 0, variants = null) {
     const compat = game.compatibility || null;
     const latest = (game.reports || [])[0] || {};
     const shown = report || latest;
@@ -53,8 +53,12 @@
 
     const body = el('div', 'body');
     body.append(el('h3', '', game.title));
-    const reports = game.reportCount || (game.reports || []).length || 0;
-    const sub = [game.cusaId, plural(reports, 'report')];
+    const regional = !report && variants && variants.length > 1 ? variants : null;
+    const reportsOf = g => g.reportCount || (g.reports || []).length || 0;
+    const reports = regional ? regional.reduce((sum, g) => sum + reportsOf(g), 0) : reportsOf(game);
+    // One card per game: every regional release (own CUSA id) is listed on it instead of repeating the card.
+    const ids = regional ? regional.map(g => [g.cusaId, regionTag(g.region)].filter(Boolean).join(' ')).join(' · ') : game.cusaId;
+    const sub = [ids, plural(reports, 'report')];
     if (game.socCount) sub.push(plural(game.socCount, 'chipset'));
     body.append(el('div', 'sub', sub.join(' · ')));
     const pills = el('div', 'pill-row');
@@ -67,6 +71,12 @@
     link.append(backdrop, cover, body, scoreRing(compat?.score ?? NaN, ringStatus, compat?.release));
     return link;
   }
+  const REGION_TAG = { us:'NA', usa:'NA', na:'NA', 'north america':'NA', eu:'EU', europe:'EU', jp:'JP', japan:'JP', asia:'Asia' };
+  const regionTag = region => REGION_TAG[String(region || '').trim().toLowerCase()] || '';
+  // Regional releases share a title apart from trademark symbols, case and punctuation
+  // ("inFAMOUS™ Second Son" / "inFAMOUS Second Son™").
+  const titleKey = game => String(game.title || '').normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '') || String(game.cusaId);
+
   // Well-known PS4 franchises, most recognisable first. Matched against the lower-cased title so
   // regional names and editions ("Remastered", "Definitive Edition") still match.
   const FAMOUS = [
@@ -96,5 +106,19 @@
     (b.reportCount || 0) - (a.reportCount || 0) ||
     new Date(b.latestTestedAt || 0) - new Date(a.latestTestedAt || 0);
 
-  window.BachataCards = { createGameCard, safeStatus, LABEL, scoreRing, statusPill, gameStatus, isWorking, featuredCompare };
+  /** Collapses regional releases of one game into {game, variants}; `game` is the best-ranked release. */
+  function groupGames(games) {
+    const groups = new Map();
+    for (const game of games) {
+      const key = titleKey(game);
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(game);
+    }
+    return [...groups.values()].map(variants => {
+      variants.sort(featuredCompare);
+      return { game: variants[0], variants };
+    });
+  }
+
+  window.BachataCards = { groupGames, regionTag, createGameCard, safeStatus, LABEL, scoreRing, statusPill, gameStatus, isWorking, featuredCompare };
 })();

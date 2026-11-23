@@ -331,6 +331,10 @@ html[data-theme="light"] .stat-chip { background:rgba(20,24,34,.05); }
 .announcements { padding:0 0 8px; }
 .release-carousel { border-radius:var(--radius); padding:22px; box-shadow:var(--shadow); outline:none; }
 .release-carousel:focus-visible { border-color:var(--accent); }
+.release-tabs { display:flex; gap:8px; margin:0 0 12px; }
+.release-tab { min-height:36px; padding:0 16px; border:1px solid var(--line); border-radius:999px; background:var(--panel); color:var(--muted); font:inherit; font-size:13px; font-weight:600; cursor:pointer; transition:border-color .2s ease, color .2s ease, background .2s ease; }
+.release-tab:hover { color:var(--text); }
+.release-tab[aria-selected="true"] { color:var(--accent-soft); border-color:color-mix(in srgb, var(--accent) 55%, transparent); background:color-mix(in srgb, var(--accent) 16%, transparent); }
 .release-slide { animation:release-in .35s ease; }
 @keyframes release-in { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
 .release-head h3 { margin:10px 0 4px; font-size:clamp(20px,2.6vw,28px); letter-spacing:-.01em; }
